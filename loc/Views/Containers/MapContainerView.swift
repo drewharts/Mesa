@@ -126,8 +126,8 @@ struct MapContainerView: View {
             .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
                 handleListSelectionChange(newValue)
             }
-            .onChange(of: profileViewModel.showTikToksOnMap) { _, newValue in
-                handleTikToksOnMap(newValue)
+            .onChange(of: profileViewModel.showExternalPlacesOnMap) { _, newValue in
+                handleExternalPlacesOnMap(newValue)
             }
             .onChange(of: profileViewModel.showReviewsOnMap) { _, newValue in
                 handleReviewsOnMap(newValue)
@@ -194,11 +194,11 @@ struct MapContainerView: View {
         }
     }
 
-    /// Handles showing TikToks on map
-    private func handleTikToksOnMap(_ newValue: Bool) {
+    /// Handles showing external places on map
+    private func handleExternalPlacesOnMap(_ newValue: Bool) {
         if newValue {
-            mapViewModel.selectTikToks()
-            profileViewModel.showTikToksOnMap = false
+            mapViewModel.selectExternalPlaces()
+            profileViewModel.showExternalPlacesOnMap = false
             if let userId = userSession.currentUserId {
                 let currentRegion = appCoordinator.currentMapRegion
                 Task {

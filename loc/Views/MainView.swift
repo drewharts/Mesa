@@ -44,8 +44,8 @@ struct MainView: View {
     @State private var annotationDisplayMode: AnnotationDisplayMode = .everyone
     @State private var isSatelliteMap: Bool = false
 
-    /// Convenience accessor for TikTok view model.
-    private var tikTokVM: ProfileTikTokViewModel { profileViewModel.tikTokViewModel }
+    /// Convenience accessor for external content view model.
+    private var externalContentVM: ProfileExternalContentViewModel { profileViewModel.externalContentViewModel }
 
     // MARK: - Initialization
     init(
@@ -147,7 +147,7 @@ struct MainView: View {
                 } else if let pending = profileViewModel.pendingMapFilter {
                     profileViewModel.pendingMapFilter = nil
                     switch pending {
-                    case .tiktoks: profileViewModel.showTikToksOnMap = true
+                    case .externalPlaces: profileViewModel.showExternalPlacesOnMap = true
                     case .reviews: profileViewModel.showReviewsOnMap = true
                     case .favorites: profileViewModel.showFavoritesOnMap = true
                     case .myPlaces: profileViewModel.showMyPlacesOnMap = true
@@ -210,19 +210,19 @@ struct MainView: View {
             case .placeDetail:
                 placeDetailSheet
 
-            // TikTok Import
-            case .tikTokPlaceSelection:
-                tikTokPlaceSelectionSheet
+            // External Content Import
+            case .externalPlaceSelection:
+                externalPlaceSelectionSheet
 
-            case .tikTokNoPlacesFound(let tikTokUrl):
-                tikTokNoPlacesFoundSheet(tikTokUrl: tikTokUrl)
+            case .noPlacesFound(let contentUrl):
+                noPlacesFoundSheet(contentUrl: contentUrl)
 
             // Map Popups (User's Own Data)
             case .list(let listId):
                 listSheet(listId: listId)
 
-            case .tiktoks:
-                tiktoksSheet
+            case .externalVideos:
+                externalPlacesSheet
 
             case .reviews:
                 reviewsSheet
@@ -275,9 +275,9 @@ struct MainView: View {
             .interactiveDismissDisabled(false)
     }
 
-    /// TikTok place selection sheet content.
-    private var tikTokPlaceSelectionSheet: some View {
-        TikTokPlaceSelectionView()
+    /// External place selection sheet content.
+    private var externalPlaceSelectionSheet: some View {
+        ExternalPlaceSelectionView()
             .environmentObject(profileViewModel)
             .environmentObject(selectedPlaceVM)
             .environmentObject(detailPlaceViewModel)
@@ -286,9 +286,9 @@ struct MainView: View {
             .presentationDragIndicator(.visible)
     }
 
-    /// TikTok no places found sheet content.
-    private func tikTokNoPlacesFoundSheet(tikTokUrl: String) -> some View {
-        TikTokNoPlacesFoundView(tikTokUrl: tikTokUrl)
+    /// No places found sheet content.
+    private func noPlacesFoundSheet(contentUrl: String) -> some View {
+        NoPlacesFoundView(contentUrl: contentUrl)
             .environmentObject(profileViewModel)
             .environmentObject(selectedPlaceVM)
             .environmentObject(userSession)
@@ -316,9 +316,9 @@ struct MainView: View {
         .onDisappear { handleMapPopupDisappear() }
     }
 
-    /// TikToks popup sheet content.
-    private var tiktoksSheet: some View {
-        TikToksPopupView(tikTokVM: profileViewModel.tikTokViewModel)
+    /// External places popup sheet content.
+    private var externalPlacesSheet: some View {
+        ExternalPlacesPopupView(externalContentVM: profileViewModel.externalContentViewModel)
             .applyMapPopupEnvironment(from: self)
             .applyMapPopupPresentation()
             .onDisappear { handleMapPopupDisappear() }
@@ -351,8 +351,7 @@ struct MainView: View {
     /// External reviews popup sheet content.
     private var externalReviewsSheet: some View {
         ExternalReviewsListPopupView(
-            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
-            userProfileNavigationVM: userProfileNavigationViewModel
+            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
         .applyMapPopupPresentation()
@@ -383,8 +382,7 @@ struct MainView: View {
     /// External favorites popup sheet content.
     private var externalFavoritesSheet: some View {
         ExternalFavoritesListPopupView(
-            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
-            userProfileNavigationVM: userProfileNavigationViewModel
+            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
         .applyMapPopupPresentation()
@@ -439,7 +437,7 @@ struct MainView: View {
         guard presentationService.activeSheet == nil else { return }
         profileViewModel.selectedListIdForMap = nil
         profileViewModel.pendingMapFilter = nil
-        profileViewModel.tikTokViewModel.disableNearbyFilter()
+        profileViewModel.externalContentViewModel.disableNearbyFilter()
         // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
     }
 
@@ -566,13 +564,13 @@ struct MainView: View {
     private var loadingOverlay: some View {
         Group {
             if deepLinkViewModel.isProcessingDeepLink ||
-               tikTokVM.isProcessingTikTok ||
-               tikTokVM.isWaitingForPlaceDetail {
+               externalContentVM.isProcessingContent ||
+               externalContentVM.isWaitingForPlaceDetail {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
 
                 VStack(spacing: 16) {
-                    if tikTokVM.tikTokImportError != nil {
+                    if externalContentVM.importError != nil {
                         errorView
                     } else {
                         loadingView
@@ -593,14 +591,14 @@ struct MainView: View {
                 .font(.headline)
                 .foregroundColor(.white)
 
-            Text(tikTokVM.tikTokImportError ?? "Unknown error")
+            Text(externalContentVM.importError ?? "Unknown error")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
             Button("Try Again") {
-                tikTokVM.clearTikTokImportError()
+                externalContentVM.clearImportError()
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 8)
@@ -617,7 +615,7 @@ struct MainView: View {
                 .scaleEffect(1.5)
                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
 
-            Text("Processing TikTok...")
+            Text("Processing Video...")
                 .font(.headline)
                 .foregroundColor(.white)
 

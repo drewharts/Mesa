@@ -34,6 +34,7 @@ struct LightweightListPopupView: View {
     @State private var showDeleteConfirmation: Bool = false
     @State private var showDeleteError: Bool = false
     @State private var deleteErrorMessage: String = ""
+    @State private var showEditListSheet: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
@@ -68,7 +69,8 @@ struct LightweightListPopupView: View {
                 updated_at: nil,
                 distance_meters: nil,
                 place_count: 0,
-                city: nil
+                city: nil,
+                description: nil
             )
         }
         return lists[currentListIndex]
@@ -208,6 +210,26 @@ struct LightweightListPopupView: View {
         } message: {
             Text(deleteErrorMessage)
         }
+        .sheet(isPresented: $showEditListSheet) {
+            EditListSheet(
+                listId: currentList.list_id,
+                currentName: currentList.name,
+                currentDescription: currentList.description,
+                onSave: { newName, newDescription in
+                    Task {
+                        if newName != currentList.name {
+                            _ = await listsVM.renameList(currentList, newName: newName)
+                        }
+                        let currentDesc = currentList.description ?? ""
+                        let newDesc = newDescription ?? ""
+                        if newDesc != currentDesc {
+                            _ = await listsVM.updateListDescription(currentList, rawText: newDesc)
+                        }
+                    }
+                }
+            )
+            .presentationDetents([.height(300)])
+        }
     }
 
     // MARK: - View Components
@@ -271,6 +293,12 @@ struct LightweightListPopupView: View {
                                     Divider()
 
                                     Button {
+                                        showEditListSheet = true
+                                    } label: {
+                                        Label("Edit List", systemImage: "pencil")
+                                    }
+
+                                    Button {
                                         showSettingsSheet = true
                                     } label: {
                                         Label("List Settings", systemImage: "gearshape")
@@ -305,6 +333,14 @@ struct LightweightListPopupView: View {
                     .font(.caption)
                     .foregroundColor(.gray)
                     .padding(.top, -8)
+
+                if let description = currentList.description, !description.isEmpty {
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 4)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -417,7 +453,7 @@ struct ListContentView: View {
                 ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
                     PopupPlaceCard(
                         place: place,
-                        preferTikTokThumbnail: true,
+                        preferExternalThumbnail: true,
                         onNavigate: onNavigateToPlace,
                         showAddedBy: list.isCollaborative
                     )

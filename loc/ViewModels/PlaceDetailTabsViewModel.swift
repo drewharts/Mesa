@@ -91,10 +91,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
         self.userSession = userSession
 
         // Create child ViewModels (all fully refactored - no ViewModel dependencies)
-        let tikTokVM = TikTokVideosViewModel()
+        let externalVideosVM = ExternalVideosViewModel()
 
-        // Wire up TikTok callback to refresh external places when video is deleted
-        tikTokVM.onVideoDeleted = { [weak profileVM] in
+        // Wire up external video callback to refresh external places when video is deleted
+        externalVideosVM.onVideoDeleted = { [weak profileVM] in
             Task {
                 await profileVM?.fetchUserExternalPlaces()
             }
@@ -123,7 +123,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
         // AboutTabViewModel - fully refactored (no ViewModel dependencies)
         self.aboutTabViewModel = AboutTabViewModel(
-            tikTokVideosViewModel: tikTokVM,
+            externalVideosViewModel: externalVideosVM,
             placePhotosViewModel: photosVM,
             customPlaceCreatorViewModel: customPlaceCreatorVM,
             notesViewModel: self.notesTabViewModel
@@ -221,16 +221,16 @@ class PlaceDetailTabsViewModel: ObservableObject {
         }
         .store(in: &cancellables)
 
-        // Separate subscription for TikToks cache
+        // Separate subscription for external videos cache
         Publishers.CombineLatest(
             $currentPlace.map { $0?.id.uuidString },
-            postsCacheService.$tiktoksCache
+            postsCacheService.$externalVideosCache
         )
         .receive(on: RunLoop.main)
-        .sink { [weak self] placeId, tiktoksCache in
+        .sink { [weak self] placeId, externalVideosCache in
             guard let placeId = placeId else { return }
-            let tiktoks = tiktoksCache[placeId] ?? []
-            self?.aboutTabViewModel.tikTokVideosViewModel.setPlaceVideos(tiktoks)
+            let externalVideos = externalVideosCache[placeId] ?? []
+            self?.aboutTabViewModel.externalVideosViewModel.setPlaceVideos(externalVideos)
         }
         .store(in: &cancellables)
     }
@@ -279,6 +279,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
         case .error(let error):
             return .error(error)
         }
+    }
+
+    // MARK: - Public Accessors
+
+    /// Returns the current place's posts from the reactive cache.
+    var currentPlacePosts: [PlacePost] {
+        guard let placeId = currentPlace?.id.uuidString else { return [] }
+        return postsCacheService.postsCache[placeId] ?? []
     }
 
     // MARK: - Data-Driven Updates (Called by View via .onChange)
@@ -341,10 +349,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
         self.placeRating = rating
     }
 
-    /// Called by View when TikTok videos change.
-    func setTikTokVideos(placeVideos: [TikTokVideo], userVideos: [TikTokVideo]) {
-        aboutTabViewModel.tikTokVideosViewModel.setPlaceVideos(placeVideos)
-        aboutTabViewModel.tikTokVideosViewModel.setUserVideos(userVideos)
+    /// Called by View when external videos change.
+    func setExternalVideos(placeVideos: [ExternalVideo], userVideos: [ExternalVideo]) {
+        aboutTabViewModel.externalVideosViewModel.setPlaceVideos(placeVideos)
+        aboutTabViewModel.externalVideosViewModel.setUserVideos(userVideos)
     }
 
     /// Called by View when post loading state changes.
@@ -428,7 +436,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
         currentPlace = place
         placeName = place?.name ?? "Loading..."
         isCustomPlace = place?.isCustom == true
-        isDroppedPin = place?.isCustom == true && place?.createdAt == nil
+        isDroppedPin = place?.isDroppedPin == true
 
         if let place = place {
             // For custom places, view shows "Created by [photo]" instead of type

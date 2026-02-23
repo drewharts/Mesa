@@ -1,5 +1,5 @@
 //
-//  TikTokPlaceFlaggingView.swift
+//  PlaceFlaggingView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/29/25.
@@ -7,10 +7,10 @@
 
 import SwiftUI
 
-/// Displays a tappable row that allows users to correct place detection for TikTok videos.
-struct TikTokPlaceFlaggingView: View {
+/// Displays a tappable row that allows users to correct place detection for external videos.
+struct PlaceFlaggingView: View {
     let place: DetailPlace
-    let externalPlaceId: String?
+    let videos: [ExternalVideo]
     @EnvironmentObject var profile: ProfileViewModel
 
     @State private var showingPlaceCorrectionSheet = false
@@ -40,8 +40,8 @@ struct TikTokPlaceFlaggingView: View {
             }
         }
         .sheet(isPresented: $showingPlaceCorrectionSheet) {
-            TikTokPlaceCorrectionSheet(
-                mode: .correction(externalPlaceId: externalPlaceId ?? "", currentPlaceName: place.name),
+            PlaceCorrectionSheet(
+                mode: .correctionWithVideos(videos: videos, currentPlaceName: place.name),
                 onPlaceChanged: { newPlace in
                     profile.recordPlaceCorrectionFlag(for: place.id.uuidString, newPlaceId: newPlace.id.uuidString)
                     onPlaceChanged?(newPlace)

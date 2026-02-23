@@ -46,7 +46,7 @@ struct PlaceChangeHandler: ViewModifier {
         guard let place = newPlace else { return }
 
         updateTravelTime(for: place)
-        updateUserTikTokVideos(for: place)
+        updateUserExternalVideos(for: place)
 
         // Set rating from metadata (posts handled by PlacePostsCacheService subscription)
         tabsViewModel?.setRating(selectedPlaceVM.placeRating)
@@ -60,9 +60,9 @@ struct PlaceChangeHandler: ViewModifier {
 
 
 
-    /// Updates user TikTok videos for the given place (place TikToks handled by PlacePostsCacheService).
-    private func updateUserTikTokVideos(for place: DetailPlace) {
-        let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
-        tabsViewModel?.aboutTabViewModel.tikTokVideosViewModel.setUserVideos(userVideos)
+    /// Updates user external videos for the given place (place videos handled by PlacePostsCacheService).
+    private func updateUserExternalVideos(for place: DetailPlace) {
+        let userVideos = profile.externalContentViewModel.getExternalVideosSync(for: place.id.uuidString)
+        tabsViewModel?.aboutTabViewModel.externalVideosViewModel.setUserVideos(userVideos)
     }
 }

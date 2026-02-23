@@ -334,6 +334,18 @@ class ProfileListsViewModel: ObservableObject {
         await dataViewModel.addNewPlaceList(named: name, city: city, emoji: emoji, image: image)
     }
 
+    /// Renames a lightweight place list in the database and updates local state.
+    func renameList(_ list: LightweightPlaceList, newName: String) async -> Result<Void, Error> {
+        await dataViewModel.renameList(list, newName: newName)
+    }
+
+    /// Updates the description of a lightweight place list from raw user input.
+    func updateListDescription(_ list: LightweightPlaceList, rawText: String) async -> Result<Void, Error> {
+        let trimmed = rawText.trimmingCharacters(in: .whitespaces)
+        let newDescription: String? = trimmed.isEmpty ? nil : trimmed
+        return await dataViewModel.updateListDescription(list, newDescription: newDescription)
+    }
+
     /// Deletes a lightweight place list from database and removes from local state.
     func deleteLightweightList(_ list: LightweightPlaceList) async -> Result<Void, Error> {
         await dataViewModel.deleteLightweightList(list)

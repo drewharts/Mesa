@@ -14,7 +14,7 @@ struct ProfileContentView: View {
     @ObservedObject var socialVM: ProfileSocialViewModel
     @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
     @ObservedObject var favoritesVM: ProfileFavoritesViewModel
-    @ObservedObject var tikTokVM: ProfileTikTokViewModel
+    @ObservedObject var externalContentVM: ProfileExternalContentViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
     @ObservedObject var listsVM: ProfileListsViewModel
     @ObservedObject var photoImportVM: PhotoImportViewModel
@@ -67,10 +67,10 @@ struct ProfileContentView: View {
                         .padding(.top, 15)
                         .padding(.horizontal, 20)
                     
-                    // Favorites/TikToks (tabbed) & Lists
-                    ProfileFavoritesTikToksView(
+                    // Favorites/Videos (tabbed) & Lists
+                    ProfileFavoritesExternalPlacesView(
                         favoritesVM: favoritesVM,
-                        tikTokVM: tikTokVM,
+                        externalContentVM: externalContentVM,
                         reviewsVM: reviewsVM,
                         myPlacesVM: myPlacesVM
                     )

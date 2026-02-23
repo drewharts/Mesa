@@ -3,20 +3,20 @@
 //  loc
 //
 //  Reusable Component: Generic popup container for displaying paginated place lists
-//  Used by: TikToksPopupView, ReviewsListPopupView, and future popup views
+//  Used by: ExternalPlacesPopupView, ReviewsListPopupView, and future popup views
 //  DUMB Component: Pure display, all data provided via parameters
 //
 //  Usage:
 //  PlaceListPopupView(
-//      title: "TikToks",
+//      title: "Saved Videos",
 //      count: profile.totalExternalPlacesCount,
-//      isLoading: profile.isLoadingTikTokPlaces,
+//      isLoading: profile.isLoadingExternalPlaces,
 //      isLoadingMore: profile.isLoadingMoreExternalPlaces,
 //      places: profile.lightweightExternalPlaces,
 //      hasMore: profile.hasMoreExternalPlaces,
 //      emptyIcon: "video",
-//      emptyTitle: "No TikToks Yet",
-//      emptyMessage: "Places you add from TikTok videos will appear here",
+//      emptyTitle: "No Videos Yet",
+//      emptyMessage: "Places you add from videos will appear here",
 //      loadMore: { await profile.loadMoreExternalPlaces() },
 //      cardBuilder: { place, navigate in PopupPlaceCard(place: place, onNavigate: navigate, ...) }
 //  )

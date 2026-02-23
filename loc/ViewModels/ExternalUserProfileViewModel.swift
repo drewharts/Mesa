@@ -103,7 +103,7 @@ class ExternalUserProfileViewModel: ObservableObject {
                 name: favorite.name,
                 latest_review_photo: favorite.latest_review_photo,
                 external_place_id: nil,
-                tiktok_url: nil,
+                content_url: nil,
                 added_by_user_id: nil,
                 added_by_name: nil,
                 added_by_photo_url: nil
@@ -450,11 +450,11 @@ class ExternalUserProfileViewModel: ObservableObject {
             totalReviewedPlacesCount = totalCount
             hasMoreReviews = !places.isEmpty && places.count >= reviewsPerPage
 
-            // Prefetch TikTok metadata
-            let tiktokUrls = places.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
+            // Prefetch external content metadata
+            let contentUrls = places.compactMap { $0.content_url }.filter { !$0.isEmpty }
+            if !contentUrls.isEmpty {
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: contentUrls)
                 }
             }
         } catch {
@@ -483,11 +483,11 @@ class ExternalUserProfileViewModel: ObservableObject {
             lightweightReviewedPlaces.append(contentsOf: newUniquePlaces)
             hasMoreReviews = !places.isEmpty && places.count >= reviewsPerPage
 
-            // Prefetch TikTok metadata
-            let tiktokUrls = places.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
+            // Prefetch external content metadata
+            let contentUrls = places.compactMap { $0.content_url }.filter { !$0.isEmpty }
+            if !contentUrls.isEmpty {
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: contentUrls)
                 }
             }
         } catch {

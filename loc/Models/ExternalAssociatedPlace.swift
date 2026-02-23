@@ -1,13 +1,13 @@
 //
-//  TikTokAssociatedPlace.swift
+//  ExternalAssociatedPlace.swift
 //  loc
 //
-//  Model representing a place associated with a TikTok video.
+//  Model representing a place associated with an external video.
 //
 
 import Foundation
 
-struct TikTokAssociatedPlace: Identifiable, Codable {
+struct ExternalAssociatedPlace: Identifiable, Codable {
     let id: String
     let name: String
     let address: String?

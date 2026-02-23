@@ -2,7 +2,7 @@
 //  ProfileTabHeader.swift
 //  loc
 //
-//  Reusable tab header for profile sections (Favorites, TikToks, Reviews).
+//  Reusable tab header for profile sections (Favorites, Videos, Reviews).
 //  Matches MyProfile styling exactly.
 //
 //  Single Responsibility: Display and manage tab selection with consistent styling.
@@ -27,7 +27,7 @@ struct ProfileTab: Identifiable, Equatable {
     // MARK: - Predefined Tabs
 
     static let favorites = ProfileTab(id: "favorites", title: "Favorites")
-    static let tiktoks = ProfileTab(id: "tiktoks", title: "TikToks", showHelpButton: true)
+    static let externalPlaces = ProfileTab(id: "externalPlaces", title: "Videos", showHelpButton: true)
     static let reviews = ProfileTab(id: "reviews", title: "Reviews")
     static let myPlaces = ProfileTab(id: "myPlaces", title: "My Places")
 }

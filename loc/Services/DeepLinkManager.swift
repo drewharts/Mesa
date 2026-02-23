@@ -22,7 +22,7 @@ class DeepLinkManager: ObservableObject {
     private let placeService: PlaceService
     private let userService: UserService
     private let selectedPlaceViewModel: SelectedPlaceViewModel
-    private let tikTokService: TikTokService
+    private let externalContentService: ExternalContentService
     private let detailPlaceViewModel: DetailPlaceViewModel
     
     // Weak references to avoid retain cycles (set after init due to circular dependencies)
@@ -30,24 +30,24 @@ class DeepLinkManager: ObservableObject {
     private weak var userProfileNavigationViewModel: UserProfileNavigationViewModel?
     private weak var userSession: UserSession?
     
-    // MARK: - TikTok Processing State
+    // MARK: - External Content Processing State
     nonisolated(unsafe) private static var recentlyProcessedURLs: Set<String> = []
     private static var urlProcessingQueue = DispatchQueue(label: "url-processing", qos: .userInitiated)
-    private var currentProcessingTikTokUrl: String?
+    private var currentProcessingURL: String?
     
     // MARK: - Initialization
     init(
         placeService: PlaceService,
         userService: UserService,
         selectedPlaceViewModel: SelectedPlaceViewModel,
-        tikTokService: TikTokService = TikTokService(),
+        externalContentService: ExternalContentService = ExternalContentService(),
         detailPlaceViewModel: DetailPlaceViewModel,
         profileViewModel: ProfileViewModel? = nil
     ) {
         self.placeService = placeService
         self.userService = userService
         self.selectedPlaceViewModel = selectedPlaceViewModel
-        self.tikTokService = tikTokService
+        self.externalContentService = externalContentService
         self.detailPlaceViewModel = detailPlaceViewModel
         self.profileViewModel = profileViewModel
     }
@@ -88,18 +88,18 @@ class DeepLinkManager: ObservableObject {
             print("👤 [DeepLinkManager] Routing to handleProfileDeepLink")
             await handleProfileDeepLink(url)
         case "tiktok-shared":
-            print("🎵 [DeepLinkManager] host is 'tiktok-shared', routing to handleTikTokFromExtension")
-            await handleTikTokFromExtension()
+            print("📤 [DeepLinkManager] host is 'tiktok-shared', routing to handleContentFromExtension")
+            await handleContentFromExtension()
         case "share":
             print("📤 [DeepLinkManager] host is 'share', checking path...")
-            if url.path == "/tiktok" {
-                print("🎵 [DeepLinkManager] Path is '/tiktok', routing to handleTikTokDeepLink")
-                await handleTikTokDeepLink(url)
+            if url.path == "/content" || url.path == "/tiktok" {
+                print("📤 [DeepLinkManager] Path is '\(url.path)', routing to handleExternalContentDeepLink")
+                await handleExternalContentDeepLink(url)
             } else if url.path == "/list" {
                 print("📋 [DeepLinkManager] Path is '/list', routing to handleListShareDeepLink")
                 await handleListShareDeepLink(url)
             } else {
-                print("❌ [DeepLinkManager] Path is '\(url.path)', not '/tiktok' or '/list'")
+                print("❌ [DeepLinkManager] Path is '\(url.path)', not '/content', '/tiktok', or '/list'")
             }
         default:
             print("❌ [DeepLinkManager] Unknown host: \(url.host ?? "nil")")
@@ -162,19 +162,19 @@ class DeepLinkManager: ObservableObject {
         await loadPlaceDetails(shareablePlace)
     }
     
-    private func handleTikTokDeepLink(_ url: URL) async {
-        print("🔗 [DeepLinkManager] handleTikTokDeepLink called with URL: \(url)")
+    private func handleExternalContentDeepLink(_ url: URL) async {
+        print("🔗 [DeepLinkManager] handleExternalContentDeepLink called with URL: \(url)")
 
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let urlItem = components.queryItems?.first(where: { $0.name == "url" }),
-              let tiktokURLString = urlItem.value else {
-            print("❌ [DeepLinkManager] Failed to extract TikTok URL from deep link")
+              let contentURLString = urlItem.value else {
+            print("❌ [DeepLinkManager] Failed to extract content URL from deep link")
             return
         }
 
-        print("✅ [DeepLinkManager] Extracted TikTok URL: \(tiktokURLString)")
+        print("✅ [DeepLinkManager] Extracted content URL: \(contentURLString)")
         isProcessingDeepLink = true
-        await processTikTokURL(tiktokURLString)
+        await processExternalContentURL(contentURLString)
         isProcessingDeepLink = false
     }
 
@@ -201,36 +201,38 @@ class DeepLinkManager: ObservableObject {
         }
     }
     
-    private func handleTikTokFromExtension() async {
-        print("🎵 [DeepLinkManager] handleTikTokFromExtension called")
+    private func handleContentFromExtension() async {
+        print("🎵 [DeepLinkManager] handleContentFromExtension called")
         
-        // Check App Group first (preferred method)
+        // Check App Group first (preferred method) - check both old and new keys for backward compat
         if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa"),
-           let tiktokURLString = sharedDefaults.string(forKey: "sharedTikTokURL") {
-            print("✅ [DeepLinkManager] Found TikTok URL in App Group: \(tiktokURLString)")
+           let contentURLString = sharedDefaults.string(forKey: "sharedTikTokURL") ?? sharedDefaults.string(forKey: "sharedContentURL") {
+            print("✅ [DeepLinkManager] Found content URL in App Group: \(contentURLString)")
             sharedDefaults.removeObject(forKey: "sharedTikTokURL")
+            sharedDefaults.removeObject(forKey: "sharedContentURL")
             sharedDefaults.synchronize()
-            await processTikTokURL(tiktokURLString)
+            await processExternalContentURL(contentURLString)
             return
         }
-        
-        // Fallback: Check standard UserDefaults
-        if let tiktokURLString = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
-            print("✅ [DeepLinkManager] Found TikTok URL in standard UserDefaults: \(tiktokURLString)")
+
+        // Fallback: Check standard UserDefaults - check both old and new keys for backward compat
+        if let contentURLString = UserDefaults.standard.string(forKey: "sharedTikTokURL") ?? UserDefaults.standard.string(forKey: "sharedContentURL") {
+            print("✅ [DeepLinkManager] Found content URL in standard UserDefaults: \(contentURLString)")
             UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
+            UserDefaults.standard.removeObject(forKey: "sharedContentURL")
             UserDefaults.standard.synchronize()
-            await processTikTokURL(tiktokURLString)
+            await processExternalContentURL(contentURLString)
             return
         }
-        
-        print("❌ [DeepLinkManager] No TikTok URL found in App Group or standard UserDefaults")
+
+        print("❌ [DeepLinkManager] No content URL found in App Group or standard UserDefaults")
     }
     
-    private func processTikTokURL(_ urlString: String) async {
-        print("🎬 [DeepLinkManager] Starting processTikTokURL for: \(urlString)")
+    private func processExternalContentURL(_ urlString: String) async {
+        print("🎬 [DeepLinkManager] Starting processExternalContentURL for: \(urlString)")
         
         // Store URL for later use when creating external_place entry
-        currentProcessingTikTokUrl = urlString
+        currentProcessingURL = urlString
         
         // Check for duplicate processing
         let shouldProcess = await withCheckedContinuation { continuation in
@@ -255,13 +257,13 @@ class DeepLinkManager: ObservableObject {
         
         guard shouldProcess else { 
             print("⏭️ [DeepLinkManager] Skipping duplicate URL")
-            currentProcessingTikTokUrl = nil
+            currentProcessingURL = nil
             return 
         }
         
-        print("📞 [DeepLinkManager] Calling TikTokService...")
-        let result = await tikTokService.processTikTokURL(urlString)
-        print("📨 [DeepLinkManager] TikTokService returned with result")
+        print("📞 [DeepLinkManager] Calling ExternalContentService...")
+        let result = await externalContentService.processURL(urlString)
+        print("📨 [DeepLinkManager] ExternalContentService returned with result")
         print("🔍 [DeepLinkManager] Processing result...")
         
         switch result {
@@ -273,7 +275,7 @@ class DeepLinkManager: ObservableObject {
                     let message = "We couldn't figure out what place is associated with this video."
                     self.onNoLocationFound?(message)
                 }
-                currentProcessingTikTokUrl = nil
+                currentProcessingURL = nil
                 return
             }
             
@@ -282,15 +284,15 @@ class DeepLinkManager: ObservableObject {
                 print("🧭 [DeepLinkManager] Navigating to place: \(place.name)")
                 
                 // Navigate directly - backend returns full place details
-                await navigateToPlace(place, tikTokUrl: urlString)
+                await navigateToPlace(place, contentUrl: urlString)
             } else {
                 // Multiple places - let ProfileViewModel handle the selection
                 await MainActor.run {
                     // We need to trigger the ProfileViewModel's multiple place handling
                     NotificationCenter.default.post(
-                        name: NSNotification.Name("TikTokMultiplePlacesFound"),
+                        name: NSNotification.Name("ExternalContentMultiplePlacesFound"),
                         object: nil,
-                        userInfo: ["places": detailPlaces, "tikTokUrl": urlString]
+                        userInfo: ["places": detailPlaces, "contentUrl": urlString]
                     )
                 }
                 // Keep URL stored for when user selects a place
@@ -299,14 +301,14 @@ class DeepLinkManager: ObservableObject {
         case .failure(let error):
             print("❌ [DeepLinkManager] Result is .failure: \(error.localizedDescription)")
             await MainActor.run {
-                if let tikTokVM = self.profileViewModel?.tikTokViewModel {
-                    tikTokVM.noPlacesFoundTikTokUrl = urlString
-                    tikTokVM.isShowingNoPlacesFound = true
+                if let externalContentVM = self.profileViewModel?.externalContentViewModel {
+                    externalContentVM.noPlacesFoundContentUrl = urlString
+                    externalContentVM.isShowingNoPlacesFound = true
                 } else {
-                    self.onNoLocationFound?("We couldn't identify a place in this TikTok video.")
+                    self.onNoLocationFound?("We couldn't identify a place in this video.")
                 }
             }
-            currentProcessingTikTokUrl = nil
+            currentProcessingURL = nil
         }
     }
     
@@ -390,7 +392,7 @@ class DeepLinkManager: ObservableObject {
     
     // MARK: - Navigation
     
-    private func navigateToPlace(_ place: DetailPlace, tikTokUrl: String? = nil) async {
+    private func navigateToPlace(_ place: DetailPlace, contentUrl: String? = nil) async {
         print("📍 [DeepLinkManager] navigateToPlace called for: \(place.name)")
         await MainActor.run {
             print("📱 [DeepLinkManager] On main thread, setting up place detail view")
@@ -398,16 +400,16 @@ class DeepLinkManager: ObservableObject {
             
             // selectPlaceAndFetchDetails will:
             // 1. Set selectedPlace (triggers didSet)
-            // 2. Load reviews AND TikToks for the place
+            // 2. Load reviews AND external videos for the place
             // 3. Animate map to place location
-            print("🔄 [DeepLinkManager] Calling selectPlaceAndFetchDetails - this will load reviews & TikToks")
+            print("🔄 [DeepLinkManager] Calling selectPlaceAndFetchDetails - this will load reviews & external videos")
             selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             selectedPlaceViewModel.isDetailSheetPresented = true
             print("✅ [DeepLinkManager] Place detail sheet presented")
             pendingPlace = nil
         }
         
-        currentProcessingTikTokUrl = nil
+        currentProcessingURL = nil
     }
     
     // MARK: - Public Methods

@@ -20,7 +20,7 @@ class ServiceContainer: ObservableObject {
     // MARK: - Other Services (unchanged)
     lazy var imageService = ImageService.shared
     lazy var placeShareService = PlaceShareService()
-    lazy var tikTokService = TikTokService()
+    lazy var externalContentService = ExternalContentService()
     lazy var collaborationService = CollaborationService.shared
 
     // MARK: - Cache Services
@@ -54,7 +54,7 @@ class ServiceContainer: ObservableObject {
             placeService: self.placeService,
             userService: self.userService,
             selectedPlaceViewModel: dummySelectedPlaceVM,
-            tikTokService: self.tikTokService,
+            externalContentService: self.externalContentService,
             detailPlaceViewModel: dummyDetailPlaceVM
         )
     }()

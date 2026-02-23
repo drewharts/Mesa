@@ -5,8 +5,8 @@
 //  DUMB Component: Header for lists section with LISTS label and action buttons
 //  Single Responsibility: Display header with title, shared filter, and add list actions
 //
-//  Layout: [LISTS label] ... [Shared button] [Plus button]
-//  Matches FAVORITES and TIKTOKS header style
+//  Layout: [LISTS label] ... [Shared button] [Search button] [Plus menu]
+//  Matches FAVORITES and VIDEOS header style
 //
 //  Accepts state from ViewModel, contains no business logic
 //
@@ -25,12 +25,13 @@ struct ListHeaderView: View {
     var onToggleFilter: () -> Void
     var onToggleSearch: () -> Void
     var onAddList: () -> Void
+    var onImportGoogleMapsList: () -> Void
     
     // MARK: - Body
     
     var body: some View {
         HStack {
-            // Lists label on left (matches Favorites/TikToks style)
+            // Lists label on left (matches Favorites/Videos style)
             Text("Lists")
                 .font(.headline)
                 .fontWeight(.semibold)
@@ -48,11 +49,22 @@ struct ListHeaderView: View {
                 // Search button
                 searchButton
                 
-                // Add list button (matches ListSelectionSheet style)
-            Button(action: onAddList) {
+                // Add list menu (New List or Import from Google Maps)
+                Menu {
+                    Button {
+                        onAddList()
+                    } label: {
+                        Label("New List", systemImage: "plus")
+                    }
+                    Button {
+                        onImportGoogleMapsList()
+                    } label: {
+                        Label("Import from Google Maps", systemImage: "map")
+                    }
+                } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.gray)
+                        .foregroundColor(.gray)
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(Color(.systemGray5)))
                         .contentShape(Circle())
@@ -138,7 +150,8 @@ struct ListHeaderView: View {
             isSearching: false,
             onToggleFilter: {},
             onToggleSearch: {},
-            onAddList: {}
+            onAddList: {},
+            onImportGoogleMapsList: {}
         )
         
         Text("Filter active").font(.caption2).foregroundColor(.gray)
@@ -149,7 +162,8 @@ struct ListHeaderView: View {
             isSearching: false,
             onToggleFilter: {},
             onToggleSearch: {},
-            onAddList: {}
+            onAddList: {},
+            onImportGoogleMapsList: {}
         )
         
         Text("Search active").font(.caption2).foregroundColor(.gray)
@@ -160,7 +174,8 @@ struct ListHeaderView: View {
             isSearching: true,
             onToggleFilter: {},
             onToggleSearch: {},
-            onAddList: {}
+            onAddList: {},
+            onImportGoogleMapsList: {}
         )
         
         Text("Loading state (disabled)").font(.caption2).foregroundColor(.gray)
@@ -171,7 +186,8 @@ struct ListHeaderView: View {
             isSearching: false,
             onToggleFilter: {},
             onToggleSearch: {},
-            onAddList: {}
+            onAddList: {},
+            onImportGoogleMapsList: {}
         )
         
         Text("No shared lists").font(.caption2).foregroundColor(.gray)
@@ -182,7 +198,8 @@ struct ListHeaderView: View {
             isSearching: false,
             onToggleFilter: {},
             onToggleSearch: {},
-            onAddList: {}
+            onAddList: {},
+            onImportGoogleMapsList: {}
         )
     }
     .padding()

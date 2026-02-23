@@ -1,21 +1,22 @@
 //
-//  TikTokPlaceCorrectionViewModel.swift
+//  PlaceCorrectionViewModel.swift
 //  loc
 //
-//  Single Responsibility: Manages search and place assignment/correction for TikTok videos.
+//  Single Responsibility: Manages search and place assignment/correction for external videos.
 //  Depends on Services (PlaceSearchService, UserService, SupabasePlaceService), not other ViewModels.
 
 import SwiftUI
 
 /// Determines whether the sheet corrects an existing place or assigns a brand-new one.
-enum TikTokPlaceAssignmentMode {
+enum PlaceAssignmentMode {
     case correction(externalPlaceId: String, currentPlaceName: String)
-    case newAssignment(tikTokUrl: String)
+    case correctionWithVideos(videos: [ExternalVideo], currentPlaceName: String)
+    case newAssignment(contentUrl: String)
 }
 
 @MainActor
-class TikTokPlaceCorrectionViewModel: ObservableObject {
-    let mode: TikTokPlaceAssignmentMode
+class PlaceCorrectionViewModel: ObservableObject {
+    let mode: PlaceAssignmentMode
 
     @Published var searchText = ""
     @Published var searchResults: [MesaPlaceSuggestion] = []
@@ -23,16 +24,64 @@ class TikTokPlaceCorrectionViewModel: ObservableObject {
     @Published var isUpdating = false
     @Published var errorMessage: String?
     @Published var didComplete = false
+    @Published var selectedVideo: ExternalVideo?
+    @Published var enrichedVideos: [ExternalVideo] = []
 
     /// The resolved DetailPlace after successful assignment (read by View on completion).
     private(set) var resolvedPlace: DetailPlace?
 
     private let searchService = PlaceSearchService()
     private let userService = UserService.shared
+    private let externalContentService = ExternalContentService()
 
-    /// Initializes the ViewModel with the assignment mode.
-    init(mode: TikTokPlaceAssignmentMode) {
+    /// Initializes the ViewModel with the assignment mode. Auto-selects when only one video exists.
+    init(mode: PlaceAssignmentMode) {
         self.mode = mode
+
+        if case .correctionWithVideos(let videos, _) = mode {
+            self.enrichedVideos = videos
+            // Auto-select when there's only one video so the selector step is skipped.
+            if videos.count == 1 {
+                self.selectedVideo = videos.first
+            }
+        }
+    }
+
+    /// Fetches thumbnail URLs for videos that have empty thumbnails via oEmbed.
+    func loadVideoThumbnails() {
+        guard case .correctionWithVideos(let videos, _) = mode else { return }
+
+        for (index, video) in videos.enumerated() where video.thumbnailURL.isEmpty {
+            Task {
+                let result = await externalContentService.getTikTokOEmbed(url: video.url)
+                if case .success(let oembed) = result, !oembed.thumbnailUrl.isEmpty {
+                    var updated = self.enrichedVideos[index]
+                    updated.thumbnailURL = oembed.thumbnailUrl
+                    self.enrichedVideos[index] = updated
+                }
+            }
+        }
+    }
+
+    /// True when the mode provides multiple videos and the user hasn't picked one yet.
+    var needsVideoSelection: Bool {
+        if case .correctionWithVideos(let videos, _) = mode {
+            return videos.count > 1
+        }
+        return false
+    }
+
+    /// True when a video has been selected (or the mode doesn't require selection).
+    var hasSelectedVideo: Bool {
+        if case .correctionWithVideos = mode {
+            return selectedVideo != nil
+        }
+        return true
+    }
+
+    /// Sets the selected video for the correction flow.
+    func selectVideo(_ video: ExternalVideo) {
+        selectedVideo = video
     }
 
     // MARK: - Computed Properties for Mode-Dependent UI
@@ -40,7 +89,7 @@ class TikTokPlaceCorrectionViewModel: ObservableObject {
     /// Returns the navigation title based on mode.
     var navigationTitle: String {
         switch mode {
-        case .correction: return "Change Place"
+        case .correction, .correctionWithVideos: return "Change Place"
         case .newAssignment: return "Find Place"
         }
     }
@@ -48,7 +97,7 @@ class TikTokPlaceCorrectionViewModel: ObservableObject {
     /// Returns the header label text based on mode.
     var headerLabelText: String {
         switch mode {
-        case .correction: return "Current Place"
+        case .correction, .correctionWithVideos: return "Current Place"
         case .newAssignment: return "No Place Detected"
         }
     }
@@ -56,7 +105,7 @@ class TikTokPlaceCorrectionViewModel: ObservableObject {
     /// Returns the icon name for the header based on mode.
     var headerIconName: String {
         switch mode {
-        case .correction: return "mappin.circle.fill"
+        case .correction, .correctionWithVideos: return "mappin.circle.fill"
         case .newAssignment: return "questionmark.circle.fill"
         }
     }
@@ -65,6 +114,7 @@ class TikTokPlaceCorrectionViewModel: ObservableObject {
     var headerTitle: String {
         switch mode {
         case .correction(_, let currentPlaceName): return currentPlaceName
+        case .correctionWithVideos(_, let currentPlaceName): return currentPlaceName
         case .newAssignment: return "Unknown Place"
         }
     }
@@ -72,8 +122,8 @@ class TikTokPlaceCorrectionViewModel: ObservableObject {
     /// Returns the header subtitle based on mode.
     var headerSubtitle: String {
         switch mode {
-        case .correction: return "Search below to find the correct place"
-        case .newAssignment: return "Search below to find the place in this TikTok"
+        case .correction, .correctionWithVideos: return "Search below to find the correct place"
+        case .newAssignment: return "Search below to find the place in this video"
         }
     }
 
@@ -142,17 +192,29 @@ class TikTokPlaceCorrectionViewModel: ObservableObject {
 
             switch mode {
             case .correction(let externalPlaceId, _):
-                try await userService.updateTikTokPlaceAssociation(
+                try await userService.updateExternalPlaceAssociation(
                     externalPlaceId: externalPlaceId,
                     newPlaceId: newPlaceId,
                     userId: userId
                 )
 
-            case .newAssignment(let tikTokUrl):
+            case .correctionWithVideos:
+                guard let externalPlaceId = selectedVideo?.externalPlaceId else {
+                    errorMessage = "No video selected for correction"
+                    isUpdating = false
+                    return
+                }
+                try await userService.updateExternalPlaceAssociation(
+                    externalPlaceId: externalPlaceId,
+                    newPlaceId: newPlaceId,
+                    userId: userId
+                )
+
+            case .newAssignment(let contentUrl):
                 try await userService.createExternalPlace(
                     userId: userId,
                     placeId: newPlaceId,
-                    url: tikTokUrl
+                    url: contentUrl
                 )
             }
 

@@ -19,7 +19,7 @@ class AboutTabViewModel: ObservableObject {
     @Published var wouldReturnStats: WouldReturnStats = WouldReturnStats(wouldReturnCount: 0, wouldNotReturnCount: 0)
 
     // MARK: - Child ViewModels
-    let tikTokVideosViewModel: TikTokVideosViewModel
+    let externalVideosViewModel: ExternalVideosViewModel
     let placePhotosViewModel: PlacePhotosViewModel
     let customPlaceCreatorViewModel: CustomPlaceCreatorViewModel
     let notesViewModel: NotesTabViewModel
@@ -36,11 +36,11 @@ class AboutTabViewModel: ObservableObject {
 
     // MARK: - Initialization
     /// Initializes the coordinator ViewModel with child ViewModels.
-    init(tikTokVideosViewModel: TikTokVideosViewModel,
+    init(externalVideosViewModel: ExternalVideosViewModel,
          placePhotosViewModel: PlacePhotosViewModel,
          customPlaceCreatorViewModel: CustomPlaceCreatorViewModel,
          notesViewModel: NotesTabViewModel) {
-        self.tikTokVideosViewModel = tikTokVideosViewModel
+        self.externalVideosViewModel = externalVideosViewModel
         self.placePhotosViewModel = placePhotosViewModel
         self.customPlaceCreatorViewModel = customPlaceCreatorViewModel
         self.notesViewModel = notesViewModel
@@ -57,7 +57,7 @@ class AboutTabViewModel: ObservableObject {
     func setPlace(_ place: DetailPlace?) {
         self.place = place
         self.placeId = place?.id.uuidString ?? ""
-        tikTokVideosViewModel.setPlaceId(place?.id.uuidString)
+        externalVideosViewModel.setPlaceId(place?.id.uuidString)
         customPlaceCreatorViewModel.setPlace(place)
         checkDescriptionAndStartPolling(for: place)
     }

@@ -460,6 +460,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             distance_meters: oldList.distance_meters,
             place_count: newCount,
             city: oldList.city,
+            description: oldList.description,
             collaborator_count: oldList.collaborator_count,
             is_shared: oldList.is_shared,
             owner_name: oldList.owner_name,

@@ -1,23 +1,23 @@
 //
-//  TikTokVideosViewModel.swift
+//  ExternalVideosViewModel.swift
 //  loc
 //
 //  Created by Cursor on 1/22/25.
-//  Handles TikTok video fetching, state management, and deletion
+//  Handles external video fetching, state management, and deletion
 //
 
 import Foundation
 import Combine
 
 @MainActor
-class TikTokVideosViewModel: ObservableObject {
+class ExternalVideosViewModel: ObservableObject {
     // MARK: - Published State
-    @Published var videos: [TikTokVideo] = []
+    @Published var videos: [ExternalVideo] = []
     @Published var isLoading: Bool = false
     @Published var error: Error?
 
     // MARK: - Dependencies (Services only)
-    private let tikTokService: TikTokPlaceService
+    private let externalContentService: ExternalPlaceService
 
     // MARK: - Callbacks
     /// Called after a video is deleted so parent can refresh external places
@@ -25,13 +25,13 @@ class TikTokVideosViewModel: ObservableObject {
 
     // MARK: - Private State
     private var currentPlaceId: String?
-    private var placeVideos: [TikTokVideo] = []
-    private var userVideos: [TikTokVideo] = []
+    private var placeVideos: [ExternalVideo] = []
+    private var userVideos: [ExternalVideo] = []
 
     // MARK: - Initialization
-    /// Initializes the ViewModel with TikTok service dependency.
-    init(tikTokService: TikTokPlaceService = TikTokPlaceService.shared) {
-        self.tikTokService = tikTokService
+    /// Initializes the ViewModel with external content service dependency.
+    init(externalContentService: ExternalPlaceService = ExternalPlaceService.shared) {
+        self.externalContentService = externalContentService
     }
 
     // MARK: - Data-Driven Methods
@@ -46,14 +46,14 @@ class TikTokVideosViewModel: ObservableObject {
         }
     }
 
-    /// Sets the place-associated TikTok videos and combines with user videos.
-    func setPlaceVideos(_ videos: [TikTokVideo]) {
+    /// Sets the place-associated external videos and combines with user videos.
+    func setPlaceVideos(_ videos: [ExternalVideo]) {
         placeVideos = videos
         combineAndDeduplicateVideos()
     }
 
-    /// Sets the user's TikTok videos for the current place and combines with place videos.
-    func setUserVideos(_ videos: [TikTokVideo]) {
+    /// Sets the user's external videos for the current place and combines with place videos.
+    func setUserVideos(_ videos: [ExternalVideo]) {
         userVideos = videos
         combineAndDeduplicateVideos()
     }
@@ -77,16 +77,16 @@ class TikTokVideosViewModel: ObservableObject {
         videos = allVideos
     }
 
-    /// Deletes a TikTok video from a place, verifying ownership first.
-    func deleteVideo(_ video: TikTokVideo, placeId: String, userId: String) async {
+    /// Deletes an external video from a place, verifying ownership first.
+    func deleteVideo(_ video: ExternalVideo, placeId: String, userId: String) async {
         do {
             // Security: Verify user owns this video before deletion
             guard video.savedByUserId == userId else {
-                print("❌ [TikTokVideosViewModel] Cannot delete video - user doesn't own it")
+                print("❌ [ExternalVideosViewModel] Cannot delete video - user doesn't own it")
                 error = NSError(
-                    domain: "TikTokVideosViewModel",
+                    domain: "ExternalVideosViewModel",
                     code: 403,
-                    userInfo: [NSLocalizedDescriptionKey: "You can only delete your own TikToks"]
+                    userInfo: [NSLocalizedDescriptionKey: "You can only delete your own videos"]
                 )
                 return
             }
@@ -94,7 +94,7 @@ class TikTokVideosViewModel: ObservableObject {
             let videoUrl = video.url
             let externalPlaceId = video.externalPlaceId
 
-            try await tikTokService.deleteTikTokFromPlace(
+            try await externalContentService.deleteVideoFromPlace(
                 placeId: placeId,
                 videoUrl: videoUrl,
                 userId: userId,
@@ -109,7 +109,7 @@ class TikTokVideosViewModel: ObservableObject {
             onVideoDeleted?()
         } catch let deleteError {
             error = deleteError
-            print("❌ Error deleting TikTok: \(deleteError)")
+            print("❌ Error deleting video: \(deleteError)")
         }
     }
 

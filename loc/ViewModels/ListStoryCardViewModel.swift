@@ -32,7 +32,7 @@ class ListStoryCardViewModel: ObservableObject {
 
     private let imageCacheService = ImageCacheService.shared
     private let imageService = ImageService.shared
-    private let tikTokMetadataCache = TikTokMetadataCache.shared
+    private let externalMetadataCache = ExternalMetadataCache.shared
     private let instagramService = InstagramStoriesService()
     private let mapSnapshotService = MapSnapshotService()
     private let placeService = SupabasePlaceService.shared
@@ -54,19 +54,19 @@ class ListStoryCardViewModel: ObservableObject {
         var photos: [PhotoOption] = []
 
         for place in places {
-            // Check TikTok thumbnails
-            if let tikTokUrl = place.tiktok_url {
-                if let thumbnailUrl = tikTokMetadataCache.getCachedThumbnailUrl(for: tikTokUrl) {
+            // Check external video thumbnails
+            if let contentUrl = place.content_url {
+                if let thumbnailUrl = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) {
                     photos.append(PhotoOption(
                         url: thumbnailUrl,
                         placeName: place.name,
-                        source: .tiktok
+                        source: .externalVideo
                     ))
-                } else if let thumbnailUrl = await tikTokMetadataCache.getThumbnailUrl(for: tikTokUrl) {
+                } else if let thumbnailUrl = await externalMetadataCache.getThumbnailUrl(for: contentUrl) {
                     photos.append(PhotoOption(
                         url: thumbnailUrl,
                         placeName: place.name,
-                        source: .tiktok
+                        source: .externalVideo
                     ))
                 }
             }
@@ -289,17 +289,17 @@ class ListStoryCardViewModel: ObservableObject {
 
     /// Finds the best background photo URL from the list's places.
     private func findBackgroundPhotoURL(from places: [LightweightPlace]) async -> URL? {
-        // Priority 1: TikTok thumbnail (cached)
+        // Priority 1: External video thumbnail (cached)
         for place in places {
-            if let tikTokUrl = place.tiktok_url {
+            if let contentUrl = place.content_url {
                 // Try cached thumbnail first (synchronous)
-                if let thumbnailUrl = tikTokMetadataCache.getCachedThumbnailUrl(for: tikTokUrl),
+                if let thumbnailUrl = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl),
                    let url = URL(string: thumbnailUrl) {
                     return url
                 }
 
                 // Fetch if not cached
-                if let thumbnailUrl = await tikTokMetadataCache.getThumbnailUrl(for: tikTokUrl),
+                if let thumbnailUrl = await externalMetadataCache.getThumbnailUrl(for: contentUrl),
                    let url = URL(string: thumbnailUrl) {
                     return url
                 }
@@ -373,8 +373,9 @@ struct PhotoOption: Identifiable {
     let source: PhotoSource
 
     enum PhotoSource {
-        case tiktok
+        case externalVideo
         case review
+        case post
     }
 }
 

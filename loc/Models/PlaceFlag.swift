@@ -1,5 +1,5 @@
 //
-//  TikTokPlaceFlag.swift
+//  PlaceFlag.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/29/25.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum TikTokPlaceFlagType: String, CaseIterable, Codable {
+enum PlaceFlagType: String, CaseIterable, Codable {
     case unableToIdentify = "unable_to_identify"
     case wrongSuggestion = "wrong_suggestion"
     
@@ -23,28 +23,28 @@ enum TikTokPlaceFlagType: String, CaseIterable, Codable {
     var description: String {
         switch self {
         case .unableToIdentify:
-            return "The system couldn't identify a specific place from this TikTok video"
+            return "The system couldn't identify a specific place from this video"
         case .wrongSuggestion:
-            return "The suggested place is incorrect for this TikTok video"
+            return "The suggested place is incorrect for this video"
         }
     }
 }
 
-struct TikTokPlaceFlag: Codable, Identifiable {
+struct PlaceFlag: Codable, Identifiable {
     var id: String = UUID().uuidString
     var placeId: String
     var userId: String
-    var flagType: TikTokPlaceFlagType
-    var tikTokUrl: String?
+    var flagType: PlaceFlagType
+    var contentUrl: String?
     var userComment: String?
     var createdAt: Date?
     var updatedAt: Date?
     
-    init(placeId: String, userId: String, flagType: TikTokPlaceFlagType, tikTokUrl: String? = nil, userComment: String? = nil) {
+    init(placeId: String, userId: String, flagType: PlaceFlagType, contentUrl: String? = nil, userComment: String? = nil) {
         self.placeId = placeId
         self.userId = userId
         self.flagType = flagType
-        self.tikTokUrl = tikTokUrl
+        self.contentUrl = contentUrl
         self.userComment = userComment
         self.createdAt = Date()
         self.updatedAt = Date()

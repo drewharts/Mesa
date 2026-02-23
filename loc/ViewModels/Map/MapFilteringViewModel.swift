@@ -2,7 +2,7 @@
 //  MapFilteringViewModel.swift
 //  loc
 //
-//  Handles user content filtering for map annotations (lists, TikToks, reviews, favorites, my places, keywords).
+//  Handles user content filtering for map annotations (lists, external places, reviews, favorites, my places, keywords).
 //
 
 import Foundation
@@ -10,7 +10,7 @@ import Foundation
 @MainActor
 class MapFilteringViewModel: ObservableObject {
     @Published var selectedListId: String? = nil
-    @Published var showingTikToksOnMap: Bool = false
+    @Published var showingExternalPlacesOnMap: Bool = false
     @Published var showingReviewsOnMap: Bool = false
     @Published var showingFavoritesOnMap: Bool = false
     @Published var showingMyPlacesOnMap: Bool = false
@@ -24,7 +24,7 @@ class MapFilteringViewModel: ObservableObject {
 
     var hasActiveFilter: Bool {
         selectedListId != nil ||
-        showingTikToksOnMap ||
+        showingExternalPlacesOnMap ||
         showingReviewsOnMap ||
         showingFavoritesOnMap ||
         showingMyPlacesOnMap ||
@@ -40,7 +40,7 @@ class MapFilteringViewModel: ObservableObject {
         }
 
         selectedListId = listId
-        showingTikToksOnMap = false
+        showingExternalPlacesOnMap = false
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
         showingMyPlacesOnMap = false
@@ -58,9 +58,9 @@ class MapFilteringViewModel: ObservableObject {
 
     // MARK: - Content Type Filtering
 
-    /// Sets the map to show only TikTok places.
-    func selectTikToks() {
-        showingTikToksOnMap = true
+    /// Sets the map to show only external places.
+    func selectExternalPlaces() {
+        showingExternalPlacesOnMap = true
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
         showingMyPlacesOnMap = false
@@ -73,7 +73,7 @@ class MapFilteringViewModel: ObservableObject {
     /// Sets the map to show only reviewed places.
     func selectReviews() {
         showingReviewsOnMap = true
-        showingTikToksOnMap = false
+        showingExternalPlacesOnMap = false
         showingFavoritesOnMap = false
         showingMyPlacesOnMap = false
         selectedListId = nil
@@ -85,7 +85,7 @@ class MapFilteringViewModel: ObservableObject {
     /// Sets the map to show only favorite places.
     func selectFavorites() {
         showingFavoritesOnMap = true
-        showingTikToksOnMap = false
+        showingExternalPlacesOnMap = false
         showingReviewsOnMap = false
         showingMyPlacesOnMap = false
         selectedListId = nil
@@ -97,7 +97,7 @@ class MapFilteringViewModel: ObservableObject {
     /// Sets the map to show only user's created places.
     func selectMyPlaces() {
         showingMyPlacesOnMap = true
-        showingTikToksOnMap = false
+        showingExternalPlacesOnMap = false
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
         selectedListId = nil
@@ -110,7 +110,7 @@ class MapFilteringViewModel: ObservableObject {
     func selectKeywordResults(keyword: String, types: [String]) {
         showingKeywordResultsPopup = true
         keywordTypesFilter = types
-        showingTikToksOnMap = false
+        showingExternalPlacesOnMap = false
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
         showingMyPlacesOnMap = false
@@ -121,7 +121,7 @@ class MapFilteringViewModel: ObservableObject {
     /// Clears all user filters.
     func clearAllFilters() {
         selectedListId = nil
-        showingTikToksOnMap = false
+        showingExternalPlacesOnMap = false
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
         showingMyPlacesOnMap = false

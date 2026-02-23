@@ -1,15 +1,15 @@
 //
-//  TikTokVideosSection.swift
+//  ExternalVideosSection.swift
 //  loc
 //
 //  Created by Cursor on 1/22/25.
-//  Smart component with its own ViewModel for TikTok video display
+//  Smart component with its own ViewModel for external video display
 //
 
 import SwiftUI
 
-struct TikTokVideosSection: View {
-    @ObservedObject var viewModel: TikTokVideosViewModel
+struct ExternalVideosSection: View {
+    @ObservedObject var viewModel: ExternalVideosViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
 
@@ -28,12 +28,12 @@ struct TikTokVideosSection: View {
             } else if viewModel.hasVideos {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("TikTok Videos")
+                        Text("Videos")
                             .font(.headline)
                             .fontWeight(.bold)
-                        
+
                         Spacer()
-                        
+
                         Text("\(viewModel.videoCount)")
                             .font(.caption)
                             .foregroundColor(.gray)
@@ -42,14 +42,14 @@ struct TikTokVideosSection: View {
                             .background(Color.gray.opacity(0.2))
                             .cornerRadius(12)
                     }
-                    
+
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(viewModel.videos, id: \.videoID) { video in
                                 // Only show delete option if current user saved this video
                                 let canDelete = video.savedByUserId == userSession.currentUserId
-                                TikTokVideoView(
-                                    tikTokVideo: video,
+                                ExternalVideoView(
+                                    externalVideo: video,
                                     externalPlaceId: video.externalPlaceId,
                                     onDelete: {
                                         Task {
@@ -58,19 +58,19 @@ struct TikTokVideosSection: View {
                                     },
                                     showDeleteOption: canDelete
                                 )
-                                .id("tiktok_\(video.videoID)")
+                                .id("video_\(video.videoID)")
                             }
                         }
                         .padding(.horizontal, 1)
                     }
                 }
                 .padding(.top, 15)
-                
-                // TikTok Place Flagging - shown when TikTok videos are visible
+
+                // Place Flagging - shown when external videos are visible
                 if let place = selectedPlace {
-                    TikTokPlaceFlaggingView(
+                    PlaceFlaggingView(
                         place: place,
-                        externalPlaceId: viewModel.videos.first?.externalPlaceId,
+                        videos: viewModel.videos,
                         onPlaceChanged: onPlaceChanged
                     )
                     .environmentObject(profile)
@@ -81,7 +81,7 @@ struct TikTokVideosSection: View {
     }
 
     // MARK: - Private Actions
-    private func deleteVideo(_ video: TikTokVideo) async {
+    private func deleteVideo(_ video: ExternalVideo) async {
         guard let userId = userSession.currentUserId else { return }
         await viewModel.deleteVideo(video, placeId: placeId, userId: userId)
     }
@@ -91,12 +91,12 @@ struct TikTokVideosSection: View {
 #Preview {
     let services = ServiceContainer.shared
     let locationManager = LocationManager()
-    
+
     let detailPlaceVM = DetailPlaceViewModel(
         placeService: services.placeService,
         userService: services.userService
     )
-    
+
     let selectedPlaceVM = SelectedPlaceViewModel(
         locationManager: locationManager,
         postService: services.postService,
@@ -105,13 +105,13 @@ struct TikTokVideosSection: View {
         imageService: services.imageService,
         detailPlaceViewModel: detailPlaceVM
     )
-    
+
     let userSession = UserSession(
         userService: services.userService,
         locationManager: locationManager,
         detailPlaceVM: detailPlaceVM
     )
-    
+
     let profileVM = ProfileViewModel(
         userSession: userSession,
         userService: services.userService,
@@ -123,18 +123,18 @@ struct TikTokVideosSection: View {
         deepLinkManager: services.deepLinkManager,
         deepLinkViewModel: nil
     )
-    
+
     // Create ViewModel (fully refactored - no ViewModel dependencies)
-    let tikTokVM = TikTokVideosViewModel()
+    let externalVideosVM = ExternalVideosViewModel()
 
     var mockPlace = DetailPlace()
     mockPlace.name = "Sample Restaurant"
 
     // Set sample videos
-    tikTokVM.setPlaceId("test-place-123")
+    externalVideosVM.setPlaceId("test-place-123")
 
-    return TikTokVideosSection(
-        viewModel: tikTokVM,
+    return ExternalVideosSection(
+        viewModel: externalVideosVM,
         placeId: "test-place-123",
         selectedPlace: mockPlace
     )

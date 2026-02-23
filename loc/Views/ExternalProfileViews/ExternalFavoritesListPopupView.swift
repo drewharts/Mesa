@@ -11,7 +11,6 @@ import SwiftUI
 
 struct ExternalFavoritesListPopupView: View {
     @ObservedObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
-    @ObservedObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
     var body: some View {
@@ -25,13 +24,10 @@ struct ExternalFavoritesListPopupView: View {
             emptyTitle: "No Favorites Yet",
             emptyMessage: "This user hasn't added any favorite places yet",
             loadMore: { }, // No pagination needed
-            onBackToProfile: {
-                userProfileNavigationVM.isUserDetailPresented = true
-            },
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false,
+                    preferExternalThumbnail: false,
                     onNavigate: navigate
                 )
             }

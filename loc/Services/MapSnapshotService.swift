@@ -15,6 +15,7 @@ class MapSnapshotService {
     func generateSnapshot(
         coordinates: [CLLocationCoordinate2D],
         size: CGSize,
+        minimumSpanDelta: Double = 0.01,
         completion: @escaping (UIImage?) -> Void
     ) {
         guard !coordinates.isEmpty else {
@@ -23,7 +24,7 @@ class MapSnapshotService {
         }
 
         // Calculate region that fits all coordinates
-        let region = calculateRegion(for: coordinates)
+        let region = calculateRegion(for: coordinates, minimumSpanDelta: minimumSpanDelta)
 
         // Configure snapshot options
         let options = MKMapSnapshotter.Options()
@@ -56,17 +57,18 @@ class MapSnapshotService {
     /// Async version of generateSnapshot.
     func generateSnapshot(
         coordinates: [CLLocationCoordinate2D],
-        size: CGSize
+        size: CGSize,
+        minimumSpanDelta: Double = 0.01
     ) async -> UIImage? {
         await withCheckedContinuation { continuation in
-            generateSnapshot(coordinates: coordinates, size: size) { image in
+            generateSnapshot(coordinates: coordinates, size: size, minimumSpanDelta: minimumSpanDelta) { image in
                 continuation.resume(returning: image)
             }
         }
     }
 
     /// Calculates a map region that fits all coordinates with padding.
-    private func calculateRegion(for coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion {
+    private func calculateRegion(for coordinates: [CLLocationCoordinate2D], minimumSpanDelta: Double) -> MKCoordinateRegion {
         guard !coordinates.isEmpty else {
             return MKCoordinateRegion()
         }
@@ -94,8 +96,8 @@ class MapSnapshotService {
 
         // Ensure minimum span for single point or very close points
         let span = MKCoordinateSpan(
-            latitudeDelta: max(latDelta, 0.01),
-            longitudeDelta: max(lonDelta, 0.01)
+            latitudeDelta: max(latDelta, minimumSpanDelta),
+            longitudeDelta: max(lonDelta, minimumSpanDelta)
         )
 
         return MKCoordinateRegion(center: center, span: span)

@@ -23,7 +23,8 @@ RETURNS TABLE(
     distance_meters DOUBLE PRECISION,
     place_count BIGINT,
     collaborator_count BIGINT,
-    collaborator_photos TEXT[]
+    collaborator_photos TEXT[],
+    description TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -50,7 +51,8 @@ BEGIN
                 WHERE plc.list_id = pl.id
                 LIMIT 5
             ) collab_photos
-        ) AS collaborator_photos
+        ) AS collaborator_photos,
+        pl.description
     FROM place_lists pl
     WHERE pl.user_id = p_user_id
         AND pl.name ILIKE '%' || p_search_term || '%'

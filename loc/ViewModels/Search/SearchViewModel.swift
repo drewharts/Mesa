@@ -55,22 +55,49 @@ class SearchViewModel: ObservableObject {
         recentSearchesService.getRecentSelections()
     }
 
-    /// Parses searchText as GPS coordinates (e.g. "40.71, -74.00" / "40.71,-74.00" / "40.71 -74.00")
+    /// Parses searchText as GPS coordinates in decimal or degree-cardinal formats
     var parsedCoordinate: CLLocationCoordinate2D? {
         let trimmed = searchText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
 
-        // Split on comma (with optional spaces) or whitespace between two numbers
-        // Matches: "40.71, -74.00", "40.71,-74.00", "40.71 -74.00"
+        return parseDecimalCoordinate(trimmed) ?? parseDegreeCardinalCoordinate(trimmed)
+    }
+
+    /// Parses plain decimal coordinates (e.g. "40.71, -74.00" / "40.71,-74.00" / "40.71 -74.00")
+    private func parseDecimalCoordinate(_ text: String) -> CLLocationCoordinate2D? {
         let pattern = #"^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-              let latRange = Range(match.range(at: 1), in: trimmed),
-              let lonRange = Range(match.range(at: 2), in: trimmed),
-              let lat = Double(trimmed[latRange]),
-              let lon = Double(trimmed[lonRange]) else {
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let latRange = Range(match.range(at: 1), in: text),
+              let lonRange = Range(match.range(at: 2), in: text),
+              let lat = Double(text[latRange]),
+              let lon = Double(text[lonRange]) else {
             return nil
         }
+
+        guard lat >= -90, lat <= 90, lon >= -180, lon <= 180 else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+
+    /// Parses degree-cardinal coordinates (e.g. "43.71469° N, 110.67206° W")
+    private func parseDegreeCardinalCoordinate(_ text: String) -> CLLocationCoordinate2D? {
+        let pattern = #"^(\d+\.?\d*)\s*°?\s*([NSns])\s*[,\s]+\s*(\d+\.?\d*)\s*°?\s*([EWew])$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let latNumRange = Range(match.range(at: 1), in: text),
+              let latDirRange = Range(match.range(at: 2), in: text),
+              let lonNumRange = Range(match.range(at: 3), in: text),
+              let lonDirRange = Range(match.range(at: 4), in: text),
+              var lat = Double(text[latNumRange]),
+              var lon = Double(text[lonNumRange]) else {
+            return nil
+        }
+
+        let latDir = text[latDirRange].uppercased()
+        let lonDir = text[lonDirRange].uppercased()
+
+        if latDir == "S" { lat = -lat }
+        if lonDir == "W" { lon = -lon }
 
         guard lat >= -90, lat <= 90, lon >= -180, lon <= 180 else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)

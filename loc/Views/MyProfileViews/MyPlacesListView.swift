@@ -29,7 +29,7 @@ struct MyPlacesListView: View {
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: true,
+                    preferExternalThumbnail: true,
                     onNavigate: navigate
                 )
                 .contextMenu {

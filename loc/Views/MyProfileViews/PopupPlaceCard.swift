@@ -3,11 +3,11 @@
 //  loc
 //
 //  Reusable Component: Generic place card for popup grids
-//  Used by: TikToksPopupView, ReviewsListPopupView, ListContentView, and future popup views
+//  Used by: ExternalPlacesPopupView, ReviewsListPopupView, ListContentView, and future popup views
 //  DUMB Component: Pure display — parents add .contextMenu for actions
 //
 //  Configuration Options:
-//  - preferTikTokThumbnail: Whether to prioritize TikTok thumbnail over review photo (default: true)
+//  - preferExternalThumbnail: Whether to prioritize external video thumbnail over review photo (default: true)
 //  - onNavigate: Custom navigation callback (for external profile views that need to dismiss the profile)
 
 import SwiftUI
@@ -16,7 +16,7 @@ struct PopupPlaceCard: View {
     let place: LightweightPlace
 
     // Configuration
-    var preferTikTokThumbnail: Bool = true
+    var preferExternalThumbnail: Bool = true
     /// Custom navigation callback - when provided, bypasses default navigation
     /// Use this for external profile views that need to dismiss the profile sheet first
     var onNavigate: ((String) -> Void)? = nil
@@ -100,11 +100,11 @@ struct PopupPlaceCard: View {
     
     @ViewBuilder
     private func photoContent(size: CGSize) -> some View {
-        if preferTikTokThumbnail {
-            // TikTok-style: prioritize TikTok thumbnail
-            if let tiktokUrl = place.tiktok_url,
-               let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: tiktokUrl, size: size)
+        if preferExternalThumbnail {
+            // External video style: prioritize external video thumbnail
+            if let contentUrl = place.content_url,
+               let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) {
+                externalThumbnailView(thumbnailURL: thumbnailURL, contentUrl: contentUrl, size: size)
             } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
                 reviewPhotoView(url: url, size: size)
             } else {
@@ -114,9 +114,9 @@ struct PopupPlaceCard: View {
             // Reviews-style: prioritize review photo
             if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
                 reviewPhotoView(url: url, size: size)
-            } else if let tiktokUrl = place.tiktok_url,
-                      let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: nil, size: size)
+            } else if let contentUrl = place.content_url,
+                      let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) {
+                externalThumbnailView(thumbnailURL: thumbnailURL, contentUrl: nil, size: size)
             } else {
                 placeholderView
             }
@@ -124,13 +124,13 @@ struct PopupPlaceCard: View {
     }
     
     @ViewBuilder
-    private func tiktokThumbnailView(thumbnailURL: String, tiktokUrl: String?, size: CGSize) -> some View {
+    private func externalThumbnailView(thumbnailURL: String, contentUrl: String?, size: CGSize) -> some View {
         CachedAsyncImage(url: URL(string: thumbnailURL), targetSize: size) {
             ShimmerView()
                 .onAppear {
-                    if let tiktokUrl = tiktokUrl {
+                    if let contentUrl = contentUrl {
                         Task {
-                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                         }
                     }
                 }
@@ -153,10 +153,10 @@ struct PopupPlaceCard: View {
     private var placeholderView: some View {
         Color.clear
             .onAppear {
-                // Prefetch TikTok metadata if URL exists but no cached thumbnail
-                if preferTikTokThumbnail, let tiktokUrl = place.tiktok_url {
+                // Prefetch external metadata if URL exists but no cached thumbnail
+                if preferExternalThumbnail, let contentUrl = place.content_url {
                     Task {
-                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                        _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                     }
                 }
             }

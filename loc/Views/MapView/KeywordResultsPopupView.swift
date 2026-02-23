@@ -46,7 +46,7 @@ struct KeywordResultsPopupView: View {
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false,
+                    preferExternalThumbnail: false,
                     onNavigate: navigate
                 )
             }

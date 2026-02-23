@@ -19,7 +19,10 @@ struct AboutTabContent: View {
     
     let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
 
-    /// Callback when user changes a TikTok's place association - parent should navigate to new place
+    /// Callback when user taps the "Share something..." button to create a post
+    let onAddPost: () -> Void
+
+    /// Callback when user changes a video's place association - parent should navigate to new place
     var onPlaceChanged: ((DetailPlace) -> Void)?
 
     /// Whether a manual refresh is currently in progress
@@ -41,7 +44,8 @@ struct AboutTabContent: View {
                     place: place,
                     isDescriptionLoading: viewModel.isDescriptionLoading,
                     isRefreshing: isRefreshing,
-                    onRefresh: onRefresh
+                    onRefresh: onRefresh,
+                    onAddPost: onAddPost
                 )
             }
             
@@ -56,9 +60,9 @@ struct AboutTabContent: View {
                 WouldReturnScaleView(stats: viewModel.wouldReturnStats)
             }
 
-            // 4. SMART COMPONENT: TikTok videos with their own ViewModel
-            TikTokVideosSection(
-                viewModel: viewModel.tikTokVideosViewModel,
+            // 4. SMART COMPONENT: External videos with their own ViewModel
+            ExternalVideosSection(
+                viewModel: viewModel.externalVideosViewModel,
                 placeId: viewModel.placeId,
                 selectedPlace: viewModel.place,
                 onPlaceChanged: onPlaceChanged
@@ -119,7 +123,7 @@ struct AboutTabContent: View {
     )
     
     // Create child ViewModels (all fully refactored - no ViewModel dependencies)
-    let tikTokVM = TikTokVideosViewModel()
+    let externalVideosVM = ExternalVideosViewModel()
     let photosVM = PlacePhotosViewModel()
     let customPlaceCreatorVM = CustomPlaceCreatorViewModel(
         placeService: services.placeService
@@ -128,7 +132,7 @@ struct AboutTabContent: View {
 
     // Create coordinator ViewModel (fully refactored - no ViewModel dependencies)
     let aboutVM = AboutTabViewModel(
-        tikTokVideosViewModel: tikTokVM,
+        externalVideosViewModel: externalVideosVM,
         placePhotosViewModel: photosVM,
         customPlaceCreatorViewModel: customPlaceCreatorVM,
         notesViewModel: notesVM
@@ -149,7 +153,8 @@ struct AboutTabContent: View {
         viewModel: aboutVM,
         onPhotoTapped: { photos, index in
             print("Tapped photo at index: \(index)")
-        }
+        },
+        onAddPost: { print("Add post tapped") }
     )
     .environmentObject(profileVM)
     .environmentObject(userSession)

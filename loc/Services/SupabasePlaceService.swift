@@ -526,7 +526,7 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Image Loading
     
-    /// Batch fetch place images from reviews or TikTok thumbnails
+    /// Batch fetch place images from reviews or external thumbnails
     /// Uses the get_latest_review_photo SQL function for efficiency
     func fetchPlaceImages(for placeIds: [String]) async throws -> [String: String] {
         guard !placeIds.isEmpty else {
@@ -836,8 +836,8 @@ class SupabasePlaceService: ObservableObject {
         }
     }
 
-    /// Fetch TikTok/external place annotations in the viewport for a user
-    func fetchTikTokAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+    /// Fetch external place annotations in the viewport for a user
+    func fetchExternalAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
         do {
             struct ViewportParams: Encodable {
                 let p_user_id: String
@@ -863,7 +863,7 @@ class SupabasePlaceService: ObservableObject {
             return response
         } catch {
             if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
-                print("❌ [Supabase] Error fetching TikTok annotations: \(error)")
+                print("❌ [Supabase] Error fetching external annotations: \(error)")
             }
             throw error
         }
