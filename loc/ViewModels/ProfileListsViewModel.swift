@@ -339,6 +339,13 @@ class ProfileListsViewModel: ObservableObject {
         await dataViewModel.renameList(list, newName: newName)
     }
 
+    /// Updates the description of a lightweight place list from raw user input.
+    func updateListDescription(_ list: LightweightPlaceList, rawText: String) async -> Result<Void, Error> {
+        let trimmed = rawText.trimmingCharacters(in: .whitespaces)
+        let newDescription: String? = trimmed.isEmpty ? nil : trimmed
+        return await dataViewModel.updateListDescription(list, newDescription: newDescription)
+    }
+
     /// Deletes a lightweight place list from database and removes from local state.
     func deleteLightweightList(_ list: LightweightPlaceList) async -> Result<Void, Error> {
         await dataViewModel.deleteLightweightList(list)

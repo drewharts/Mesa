@@ -59,6 +59,7 @@ struct PlacePostView: View {
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .onTapGesture { showCommentsSheet = true }
             }
 
             // Media (photos + videos)
@@ -79,6 +80,12 @@ struct PlacePostView: View {
                 post: post,
                 postsViewModel: viewModel
             )
+        }
+        .onChange(of: viewModel.autoOpenCommentsPostId) { _, postId in
+            if postId == post.id {
+                showCommentsSheet = true
+                viewModel.clearAutoOpenComments()
+            }
         }
     }
     

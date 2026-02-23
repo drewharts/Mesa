@@ -20,7 +20,8 @@ RETURNS TABLE (
     user_role TEXT,
     added_at TIMESTAMPTZ,
     collaborator_photos TEXT[],
-    collaborator_count BIGINT
+    collaborator_count BIGINT,
+    description TEXT
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -55,7 +56,8 @@ BEGIN
             FROM place_list_collaborators plc3 
             WHERE plc3.list_id = pl.id 
             AND plc3.user_id != p_user_id
-        ) AS collaborator_count
+        ) AS collaborator_count,
+        pl.description
     FROM place_list_collaborators plc
     JOIN place_lists pl ON pl.id = plc.list_id
     JOIN users u ON u.id = pl.user_id

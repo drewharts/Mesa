@@ -16,6 +16,7 @@ class PlacePostsViewModel: ObservableObject {
     @Published var loadingState: LoadingState = .idle
     @Published var place: DetailPlace?
     @Published var highlightedPostId: String?
+    @Published var autoOpenCommentsPostId: String?
 
     // MARK: - Dependencies (Services only)
     private let postService: PostService
@@ -136,6 +137,18 @@ class PlacePostsViewModel: ObservableObject {
     /// Clears the highlighted post notification.
     func clearHighlightedPost() {
         notificationManager.clearHighlightedReview()
+    }
+
+    // MARK: - Auto-Open Comments
+
+    /// Signals that the comments sheet should auto-open for a specific post.
+    func triggerAutoOpenComments(for postId: String) {
+        autoOpenCommentsPostId = postId
+    }
+
+    /// Clears the auto-open comments signal after the sheet has been presented.
+    func clearAutoOpenComments() {
+        autoOpenCommentsPostId = nil
     }
 }
 

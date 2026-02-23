@@ -295,6 +295,8 @@ class LoginViewModel: ObservableObject {
                 // For existing users, keep using the original UID as the session ID
                 // but they're now authenticated via Supabase
                 userSession.setUserLoggedIn(uid: existingUser.id)
+                userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
+                userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                 await self.dataManager.initializeProfileData(userId: existingUser.id)
             }
 
@@ -458,6 +460,8 @@ class LoginViewModel: ObservableObject {
                     Task { @MainActor in
                         // For new users, the profile ID is the same as supabaseUserId
                         userSession.setUserLoggedIn(uid: supabaseUserId)
+                        userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
+                userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                         await self.dataManager.initializeProfileData(userId: supabaseUserId)
                     }
                 }
@@ -583,16 +587,18 @@ class LoginViewModel: ObservableObject {
                 Task { @MainActor in
                     // For existing users, use the existing profile ID, not the Supabase auth UID
                     userSession.setUserLoggedIn(uid: existingUser.id)
+                    userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
+                userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                     await self.dataManager.initializeProfileData(userId: existingUser.id)
                 }
-                
+
             case .failure(let error):
                 if (error as NSError).code == 404 {
                     print("👤 Creating new Apple user profile...")
-                    
+
                     let givenName = fullName?.givenName ?? ""
                     let familyName = fullName?.familyName ?? ""
-                    
+
                     let profileData = ProfileData(
                         id: supabaseUserId,
                         firstName: givenName,
@@ -604,7 +610,7 @@ class LoginViewModel: ObservableObject {
                         fullName: "\(givenName) \(familyName)",
                         fcmToken: nil  // TODO: Implement push notifications with Supabase
                     )
-                    
+
                     self.userService.saveUserProfile(uid: supabaseUserId, profileData: profileData) { [weak self] error in
                         if let error = error {
                             Task { @MainActor in
@@ -614,6 +620,8 @@ class LoginViewModel: ObservableObject {
                             print("✅ Apple profile created successfully")
                             Task { @MainActor in
                                 userSession.setUserLoggedIn(uid: supabaseUserId)
+                                userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
+                userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                             }
                         }
                     }

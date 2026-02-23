@@ -24,7 +24,8 @@ RETURNS TABLE(
     distance_meters DOUBLE PRECISION, 
     place_count BIGINT,
     collaborator_count BIGINT,
-    collaborator_photos TEXT[]
+    collaborator_photos TEXT[],
+    description TEXT
 )
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -43,7 +44,8 @@ BEGIN
         combined.distance_meters,
         combined.place_count,
         combined.collaborator_count,
-        combined.collaborator_photos
+        combined.collaborator_photos,
+        combined.description
     FROM (
         -- Lists WITH average_location (sorted by proximity)
     SELECT
@@ -67,6 +69,7 @@ BEGIN
                     LIMIT 5
                 ) collab_photos
             ) AS collaborator_photos,
+            pl.description,
             0 AS sort_order  -- Lists with location come first
     FROM place_lists pl
     WHERE pl.user_id = p_user_id
@@ -96,6 +99,7 @@ BEGIN
                     LIMIT 5
                 ) collab_photos
             ) AS collaborator_photos,
+            pl.description,
             1 AS sort_order  -- Lists without location come after
         FROM place_lists pl
         WHERE pl.user_id = p_user_id

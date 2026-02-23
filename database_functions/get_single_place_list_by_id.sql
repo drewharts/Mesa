@@ -18,7 +18,8 @@ RETURNS TABLE(
     distance_meters double precision,
     place_count bigint,
     city text,
-    average_location text
+    average_location text,
+    description text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -35,10 +36,11 @@ BEGIN
         NULL::double precision AS distance_meters,
         COUNT(pli.place_id) AS place_count,
         NULL::text AS city,
-        ST_AsText(pl.average_location) AS average_location
+        ST_AsText(pl.average_location) AS average_location,
+        pl.description
     FROM place_lists pl
     LEFT JOIN place_list_items pli ON pl.id::text = pli.list_id::text
     WHERE pl.id::text = p_list_id
-    GROUP BY pl.id, pl.name, pl.is_public, pl.image, pl.created_at, pl.updated_at, pl.average_location;
+    GROUP BY pl.id, pl.name, pl.is_public, pl.image, pl.created_at, pl.updated_at, pl.average_location, pl.description;
 END;
 $function$;

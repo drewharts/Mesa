@@ -109,15 +109,20 @@ struct PlacePostsView: View {
         .padding(40)
     }
     
+    /// Scrolls to the highlighted post and triggers auto-open comments after the animation settles.
     private func scrollToPost(_ postId: String, proxy: ScrollViewProxy) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             withAnimation(.easeInOut(duration: 0.8)) {
                 proxy.scrollTo(postId, anchor: .center)
             }
-            
+
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
-            
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                viewModel.triggerAutoOpenComments(for: postId)
+            }
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 viewModel.clearHighlightedPost()
             }
