@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Function: get_place_reviews_with_tiktoks
 -- ============================================================================
--- Returns reviews for a place with TikTok videos array
+-- Returns reviews for a place with TikTok videos array and comment count
 -- NOTE: TikTok metadata is now fetched on-demand in Swift via oEmbed endpoint
 -- This function returns an empty array for tiktok_videos since we no longer
 -- store TikTok metadata in the database (only the URL)
@@ -26,7 +26,8 @@ RETURNS TABLE(
     tiktok_videos jsonb[],
     would_return boolean,
     review_video_urls text[],
-    review_video_thumbnails text[]
+    review_video_thumbnails text[],
+    review_comment_count integer
 )
 LANGUAGE plpgsql
 AS $function$
@@ -48,13 +49,14 @@ BEGIN
         u.profile_photo_url AS user_profile_photo_url,
 
         -- TikTok videos - now returns empty array since metadata is fetched on-demand
-        -- TikTok URLs are stored in external_places.url, but metadata is fetched via oEmbed
         '{}'::jsonb[] AS tiktok_videos,
 
         r.would_return AS would_return,
 
         COALESCE(r.video_urls, '{}') AS review_video_urls,
-        COALESCE(r.video_thumbnail_urls, '{}') AS review_video_thumbnails
+        COALESCE(r.video_thumbnail_urls, '{}') AS review_video_thumbnails,
+
+        COALESCE(r.comment_count, 0) AS review_comment_count
     FROM reviews r
     INNER JOIN users u ON r.user_id = u.id
     WHERE r.place_id = UPPER(p_place_id::text)

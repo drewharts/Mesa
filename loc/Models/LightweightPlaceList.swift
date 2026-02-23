@@ -11,6 +11,7 @@ struct LightweightPlaceList: Identifiable {
     let distance_meters: Double?
     let place_count: Int
     let city: String?
+    var description: String?
 
     // MARK: - Location Field
     // WKT string from ST_AsText() e.g. "POINT(-73.98 40.76)"
@@ -78,6 +79,7 @@ struct LightweightPlaceList: Identifiable {
         distance_meters: Double?,
         place_count: Int,
         city: String?,
+        description: String? = nil,
         average_location_raw: String? = nil,
         collaborator_count: Int? = nil,
         is_shared: Bool? = nil,
@@ -95,6 +97,7 @@ struct LightweightPlaceList: Identifiable {
         self.distance_meters = distance_meters
         self.place_count = place_count
         self.city = city
+        self.description = description
         self.average_location_raw = average_location_raw
         self.collaborator_count = collaborator_count
         self.is_shared = is_shared
@@ -118,6 +121,7 @@ extension LightweightPlaceList: Codable {
         case distance_meters
         case place_count
         case city
+        case description
         case average_location
         case collaborator_count
         case is_shared
@@ -142,6 +146,7 @@ extension LightweightPlaceList: Codable {
         updated_at = try container.decodeIfPresent(String.self, forKey: .updated_at)
         distance_meters = try container.decodeIfPresent(Double.self, forKey: .distance_meters)
         city = try container.decodeIfPresent(String.self, forKey: .city)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
 
         // All RPCs return average_location as WKT text via ST_AsText().
         // GeoJSON fallback guards against PostgREST returning raw geometry if an RPC omits ST_AsText().
@@ -185,6 +190,7 @@ extension LightweightPlaceList: Codable {
         try container.encodeIfPresent(updated_at, forKey: .updated_at)
         try container.encodeIfPresent(distance_meters, forKey: .distance_meters)
         try container.encodeIfPresent(city, forKey: .city)
+        try container.encodeIfPresent(description, forKey: .description)
         try container.encodeIfPresent(average_location_raw, forKey: .average_location)
 
         try container.encodeIfPresent(collaborator_count, forKey: .collaborator_count)

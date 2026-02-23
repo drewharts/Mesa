@@ -48,8 +48,8 @@ struct ContentView: View {
                 dataManager: dataManager,
                 serviceContainer: serviceContainer
             )
-            .opacity(userSession.isUserLoggedIn ? 1 : 0)
-            .allowsHitTesting(userSession.isUserLoggedIn)
+            .opacity(userSession.isUserLoggedIn && !userSession.needsProfilePhoto && !userSession.needsListOnboarding ? 1 : 0)
+            .allowsHitTesting(userSession.isUserLoggedIn && !userSession.needsProfilePhoto && !userSession.needsListOnboarding)
             .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
                 handleNotificationNavigation(pendingNavigation)
             }
@@ -64,15 +64,52 @@ struct ContentView: View {
                 )
                 .transition(.opacity)
             }
+
+            // Profile photo onboarding overlays after login but before main app
+            if userSession.isUserLoggedIn && userSession.needsProfilePhoto {
+                ProfilePhotoOnboardingView(userId: userSession.currentUserId ?? "")
+                    .transition(.opacity)
+            }
+
+            // List creation onboarding overlays after photo onboarding but before main app
+            if userSession.isUserLoggedIn && !userSession.needsProfilePhoto && userSession.needsListOnboarding {
+                ListOnboardingView()
+                    .transition(.opacity)
+            }
         }
         .alert("Navigation Error", isPresented: $showNavigationError) {
             Button("OK") { }
         } message: {
             Text(navigationErrorMessage)
         }
+        .onChange(of: userSession.needsProfilePhoto) { oldValue, newValue in
+            // When photo onboarding completes, refresh profile data
+            if oldValue && !newValue {
+                if let userId = userSession.currentUserId {
+                    Task {
+                        await dataManager.loadProfileData(userId: userId)
+                    }
+                }
+            }
+        }
+        .onChange(of: userSession.needsListOnboarding) { oldValue, newValue in
+            // When list onboarding completes, reload profile data and show suggested profiles
+            if oldValue && !newValue {
+                if let userId = userSession.currentUserId {
+                    Task {
+                        await dataManager.loadProfileData(userId: userId)
+                    }
+                }
+                if SuggestedProfilesViewModel.shouldShowPopup {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        PresentationService.shared.present(.suggestedProfiles)
+                    }
+                }
+            }
+        }
         .onChange(of: userSession.isUserLoggedIn) { oldValue, newValue in
-            // Show suggested profiles popup on first login via PresentationService
-            if !oldValue && newValue && SuggestedProfilesViewModel.shouldShowPopup {
+            // Show suggested profiles on login only if all onboarding is already complete
+            if !oldValue && newValue && !userSession.needsProfilePhoto && !userSession.needsListOnboarding && SuggestedProfilesViewModel.shouldShowPopup {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     PresentationService.shared.present(.suggestedProfiles)
                 }
@@ -80,39 +117,24 @@ struct ContentView: View {
         }
     }
     
+    /// Processes a pending notification navigation by fetching the place and presenting its detail sheet.
     private func handleNotificationNavigation(_ pendingNavigation: PendingNavigation?) {
         guard let navigation = pendingNavigation else { return }
-        
-        // Ensure user is properly logged in before processing notification
+
         guard userSession.isUserLoggedIn, userSession.currentUserId != nil else {
-            print("⚠️ Cannot process notification - user not logged in")
             notificationManager.clearPendingNavigation()
             notificationManager.clearHighlightedReview()
             return
         }
-        
-        print("🚀 Processing notification navigation to place: \(navigation.placeId), review: \(navigation.reviewId)")
-        
-        // Fetch the place details first
+
         serviceContainer.placeService.getDetailPlace(mapboxId: navigation.placeId) { place in
             if let place = place {
-                print("✅ Found place: \(place.name)")
-                
-                // Animate map to place location when navigating from notification
                 selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                 selectedPlaceViewModel.isDetailSheetPresented = true
-                
-                // Clear the pending navigation but keep the highlighted review ID
                 notificationManager.clearPendingNavigation()
-                
-                print("📍 Navigated to place detail view, highlighting review: \(navigation.reviewId)")
             } else {
-                print("❌ Failed to fetch place details")
-                
-                // Show user-friendly error
                 navigationErrorMessage = "Sorry, we couldn't find that place. It may have been removed."
                 showNavigationError = true
-                
                 notificationManager.clearPendingNavigation()
                 notificationManager.clearHighlightedReview()
             }

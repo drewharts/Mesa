@@ -11,7 +11,6 @@ import SwiftUI
 
 struct ExternalReviewsListPopupView: View {
     @ObservedObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
-    @ObservedObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
     var body: some View {
@@ -26,9 +25,6 @@ struct ExternalReviewsListPopupView: View {
             emptyTitle: "No Reviews Yet",
             emptyMessage: "This user hasn't reviewed any places yet",
             loadMore: { }, // No pagination in map display mode
-            onBackToProfile: {
-                userProfileNavigationVM.isUserDetailPresented = true
-            },
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,

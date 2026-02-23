@@ -74,20 +74,20 @@ class PostPhotosViewModel: ObservableObject {
         }
     }
 
-    /// Loads images in parallel from URLs, returning successfully loaded images.
+    /// Loads images in parallel from URLs, returning them in the same order as the input URLs.
     private func loadImagesInParallel(from urls: [String]) async -> [UIImage] {
-        var images: [UIImage] = []
-        await withTaskGroup(of: UIImage?.self) { group in
-            for imageUrl in urls {
+        await withTaskGroup(of: (Int, UIImage?).self) { group in
+            for (index, imageUrl) in urls.enumerated() {
                 group.addTask {
-                    await ImageLoadingUtility.loadImageFromURL(imageUrl: imageUrl)
+                    (index, await ImageLoadingUtility.loadImageFromURL(imageUrl: imageUrl))
                 }
             }
-            for await image in group {
-                if let image { images.append(image) }
+            var indexed: [(Int, UIImage)] = []
+            for await (i, image) in group {
+                if let image { indexed.append((i, image)) }
             }
+            return indexed.sorted { $0.0 < $1.0 }.map { $0.1 }
         }
-        return images
     }
 
     /// Reloads photos for a specific post.

@@ -34,10 +34,7 @@ struct LightweightListPopupView: View {
     @State private var showDeleteConfirmation: Bool = false
     @State private var showDeleteError: Bool = false
     @State private var deleteErrorMessage: String = ""
-    @State private var showRenameAlert: Bool = false
-    @State private var renameText: String = ""
-    @State private var showRenameError: Bool = false
-    @State private var renameErrorMessage: String = ""
+    @State private var showEditListSheet: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
@@ -72,7 +69,8 @@ struct LightweightListPopupView: View {
                 updated_at: nil,
                 distance_meters: nil,
                 place_count: 0,
-                city: nil
+                city: nil,
+                description: nil
             )
         }
         return lists[currentListIndex]
@@ -212,27 +210,25 @@ struct LightweightListPopupView: View {
         } message: {
             Text(deleteErrorMessage)
         }
-        .alert("Rename List", isPresented: $showRenameAlert) {
-            TextField("List name", text: $renameText)
-            Button("Cancel", role: .cancel) { }
-            Button("Save") {
-                let trimmed = renameText.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty else { return }
-                Task {
-                    let result = await listsVM.renameList(currentList, newName: trimmed)
-                    if case .failure(let error) = result {
-                        renameErrorMessage = error.localizedDescription
-                        showRenameError = true
+        .sheet(isPresented: $showEditListSheet) {
+            EditListSheet(
+                listId: currentList.list_id,
+                currentName: currentList.name,
+                currentDescription: currentList.description,
+                onSave: { newName, newDescription in
+                    Task {
+                        if newName != currentList.name {
+                            _ = await listsVM.renameList(currentList, newName: newName)
+                        }
+                        let currentDesc = currentList.description ?? ""
+                        let newDesc = newDescription ?? ""
+                        if newDesc != currentDesc {
+                            _ = await listsVM.updateListDescription(currentList, rawText: newDesc)
+                        }
                     }
                 }
-            }
-        } message: {
-            Text("Enter a new name for this list.")
-        }
-        .alert("Unable to Rename", isPresented: $showRenameError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(renameErrorMessage)
+            )
+            .presentationDetents([.height(300)])
         }
     }
 
@@ -297,10 +293,9 @@ struct LightweightListPopupView: View {
                                     Divider()
 
                                     Button {
-                                        renameText = currentList.name
-                                        showRenameAlert = true
+                                        showEditListSheet = true
                                     } label: {
-                                        Label("Rename List", systemImage: "pencil")
+                                        Label("Edit List", systemImage: "pencil")
                                     }
 
                                     Button {
@@ -338,6 +333,14 @@ struct LightweightListPopupView: View {
                     .font(.caption)
                     .foregroundColor(.gray)
                     .padding(.top, -8)
+
+                if let description = currentList.description, !description.isEmpty {
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 4)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)

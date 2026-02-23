@@ -11,17 +11,30 @@ extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
 }
 
+/// Wrapper to make an Int index Identifiable for fullScreenCover(item:).
+private struct IdentifiableIndex: Identifiable {
+    let id: Int
+    var index: Int { id }
+}
+
 struct PlacePostView: View {
     let post: PlacePost
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([String], Int) -> Void
 
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
 
-    @State private var fullscreenVideoURL: URL?
+    @State private var selectedMediaIndex: Int?
+    @State private var showCommentsSheet = false
+
+    /// Converts selectedMediaIndex to an Identifiable binding for fullScreenCover.
+    private var selectedMediaBinding: Binding<IdentifiableIndex?> {
+        Binding(
+            get: { selectedMediaIndex.map { IdentifiableIndex(id: $0) } },
+            set: { selectedMediaIndex = $0?.id }
+        )
+    }
 
     private var mediaWidth: CGFloat {
         UIScreen.main.bounds.width - 56
@@ -39,21 +52,40 @@ struct PlacePostView: View {
         VStack(spacing: 12) {
             // Header: Profile Picture, Name, Timestamp, and Sentiment
             headerSection
-            
+
             // Post Text (if any)
             if !post.text.isEmpty {
                 Text(post.text)
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .onTapGesture { showCommentsSheet = true }
             }
-            
+
             // Media (photos + videos)
             mediaSection
+
+            // Like + Comment action bar
+            actionBarSection
         }
         .padding(.vertical, 12)
-        .fullScreenCover(item: $fullscreenVideoURL) { url in
-            FullscreenVideoPlayerView(url: url)
+        .fullScreenCover(item: selectedMediaBinding) { wrapper in
+            FullscreenMediaGalleryView(
+                mediaItems: post.allMediaItems,
+                initialIndex: wrapper.index
+            )
+        }
+        .sheet(isPresented: $showCommentsSheet) {
+            PostCommentsSheet(
+                post: post,
+                postsViewModel: viewModel
+            )
+        }
+        .onChange(of: viewModel.autoOpenCommentsPostId) { _, postId in
+            if postId == post.id {
+                showCommentsSheet = true
+                viewModel.clearAutoOpenComments()
+            }
         }
     }
     
@@ -123,26 +155,13 @@ struct PlacePostView: View {
         .cornerRadius(12)
     }
     
-    private var likesSection: some View {
-        HStack(spacing: 4) {
-            Button(action: {
-                guard let currentUserId = userSession.currentUserId else { return }
-                selectedPlaceVM.likePost(post, userId: currentUserId)
-            }) {
-                Image(systemName: "heart.fill")
-                    .foregroundColor(isOwnPost ? .gray : (selectedPlaceVM.isPostLiked(post.id) ? .red : .gray))
-                    .opacity(isOwnPost ? 0.3 : 0.7)
+    private var actionBarSection: some View {
+        PostActionBar(
+            commentCount: post.commentCount,
+            onCommentTapped: {
+                showCommentsSheet = true
             }
-            .disabled(isOwnPost)
-            
-            Text("\(post.likes)")
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-    }
-    
-    private var isOwnPost: Bool {
-        userSession.currentUserId != nil && post.userId == userSession.currentUserId
+        )
     }
     
     // MARK: - Media Section
@@ -195,7 +214,7 @@ struct PlacePostView: View {
                     // Video items
                     ForEach(Array(post.videoUrls.enumerated()), id: \.element) { index, videoUrlString in
                         let thumbnail = index < post.videoThumbnailUrls.count ? post.videoThumbnailUrls[index] : nil
-                        videoMediaCell(urlString: videoUrlString, thumbnailUrlString: thumbnail)
+                        videoMediaCell(urlString: videoUrlString, thumbnailUrlString: thumbnail, videoIndex: index)
                     }
                 }
             }
@@ -210,7 +229,7 @@ struct PlacePostView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(radius: 2)
             .onTapGesture {
-                onPhotoTapped(post.images, index)
+                selectedMediaIndex = index
             }
             .onAppear {
                 if index == postPhotos.count - 1 {
@@ -220,11 +239,11 @@ struct PlacePostView: View {
     }
 
     @ViewBuilder
-    private func videoMediaCell(urlString: String, thumbnailUrlString: String?) -> some View {
+    private func videoMediaCell(urlString: String, thumbnailUrlString: String?, videoIndex: Int) -> some View {
         if let videoURL = URL(string: urlString) {
             let thumbURL = thumbnailUrlString.flatMap { URL(string: $0) }
             InlineVideoPlayerView(url: videoURL, thumbnailURL: thumbURL) {
-                fullscreenVideoURL = videoURL
+                selectedMediaIndex = post.images.count + videoIndex
             }
             .frame(width: mediaWidth, height: mediaWidth)
             .shadow(radius: 2)
@@ -255,6 +274,7 @@ struct PlacePostView: View {
     
     // MARK: - Helpers
     
+    /// Navigates to the post author's profile if it's not the current user.
     private func navigateToProfile() {
         guard let currentUserId = userSession.currentUserId else { return }
 
@@ -263,6 +283,7 @@ struct PlacePostView: View {
         }
     }
     
+    /// Formats a date into a compact relative timestamp string (e.g. "5m", "2h", "3d").
     private func formattedTimestamp(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current

@@ -243,6 +243,19 @@ class PlaceListService {
             .execute()
     }
 
+    /// Updates the description of a place list.
+    func updateListDescription(listId: String, description: String?) async throws {
+        struct UpdateData: Encodable {
+            let description: String?
+        }
+
+        try await supabase.client
+            .from("place_lists")
+            .update(UpdateData(description: description))
+            .eq("id", value: listId)
+            .execute()
+    }
+
     /// Updates the privacy setting for a place list.
     func updateListPrivacy(listId: String, isPublic: Bool) async throws {
         struct UpdateData: Encodable {

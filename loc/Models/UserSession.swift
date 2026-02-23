@@ -13,7 +13,34 @@ class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profileViewModel: ProfileViewModel?
     @Published var currentUserId: String?
-    
+    @Published var needsProfilePhoto: Bool = false
+    @Published var needsListOnboarding: Bool = false
+
+    private static let hasCompletedPhotoOnboardingKey = "hasCompletedProfilePhotoOnboarding"
+    private static let hasCompletedListOnboardingKey = "hasCompletedListOnboarding"
+
+    /// Checks whether the user has completed profile photo onboarding.
+    static var hasCompletedPhotoOnboarding: Bool {
+        UserDefaults.standard.bool(forKey: hasCompletedPhotoOnboardingKey)
+    }
+
+    /// Checks whether the user has completed list creation onboarding.
+    static var hasCompletedListOnboarding: Bool {
+        UserDefaults.standard.bool(forKey: hasCompletedListOnboardingKey)
+    }
+
+    /// Marks profile photo onboarding as complete.
+    func completeProfilePhotoOnboarding() {
+        UserDefaults.standard.set(true, forKey: Self.hasCompletedPhotoOnboardingKey)
+        self.needsProfilePhoto = false
+    }
+
+    /// Marks list creation onboarding as complete.
+    func completeListOnboarding() {
+        UserDefaults.standard.set(true, forKey: Self.hasCompletedListOnboardingKey)
+        self.needsListOnboarding = false
+    }
+
     private let authService = SupabaseAuthService.shared
     private let userService: UserService
     private let locationManager: LocationManager

@@ -20,6 +20,7 @@ struct ProfileReviewsPopupView: View {
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @Environment(\.presentationMode) var presentationMode
 
     @State private var navigationPath = NavigationPath()
@@ -50,30 +51,57 @@ struct ProfileReviewsPopupView: View {
 
     private var header: some View {
         VStack(spacing: 12) {
-            HStack {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(.primary)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center) {
+                    Text("\(viewModel.user.firstName)'s Reviews")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
 
-            VStack(spacing: 4) {
-                Text("\(viewModel.user.firstName)'s Reviews")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+                    Spacer()
+
+                    HStack(alignment: .center, spacing: 12) {
+                        Button(action: viewReviewsOnMap) {
+                            Image(systemName: "map")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
+
+                        Button(action: {
+                            presentationMode.wrappedValue.dismiss()
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
+                    }
+                }
 
                 Text("\(viewModel.totalReviewedPlacesCount) place\(viewModel.totalReviewedPlacesCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.gray)
+                    .padding(.top, -8)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 28)
+    }
+
+    /// Dismisses the sheet and shows reviews on the map.
+    private func viewReviewsOnMap() {
+        let navVM = userProfileNavigationVM
+        mapDisplayCoordinatorVM.triggerExternalReviewsOnMap(
+            userId: viewModel.userId,
+            userName: viewModel.user.fullName,
+            userPhotoUrl: viewModel.user.profilePhotoURL?.absoluteString,
+            reviews: viewModel.lightweightReviewedPlaces,
+            totalCount: viewModel.totalReviewedPlacesCount,
+            dismissProfile: { navVM.clearSelection() }
+        )
+        presentationMode.wrappedValue.dismiss()
     }
 
     // MARK: - Content
