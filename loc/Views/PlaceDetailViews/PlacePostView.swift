@@ -274,6 +274,7 @@ struct PlacePostView: View {
     
     // MARK: - Helpers
     
+    /// Navigates to the post author's profile if it's not the current user.
     private func navigateToProfile() {
         guard let currentUserId = userSession.currentUserId else { return }
 
@@ -282,6 +283,7 @@ struct PlacePostView: View {
         }
     }
     
+    /// Formats a date into a compact relative timestamp string (e.g. "5m", "2h", "3d").
     private func formattedTimestamp(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current

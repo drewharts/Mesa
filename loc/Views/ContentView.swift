@@ -67,7 +67,7 @@ struct ContentView: View {
 
             // Profile photo onboarding overlays after login but before main app
             if userSession.isUserLoggedIn && userSession.needsProfilePhoto {
-                ProfilePhotoOnboardingView(dataManager: dataManager)
+                ProfilePhotoOnboardingView(userId: userSession.currentUserId ?? "")
                     .transition(.opacity)
             }
 
@@ -117,39 +117,24 @@ struct ContentView: View {
         }
     }
     
+    /// Processes a pending notification navigation by fetching the place and presenting its detail sheet.
     private func handleNotificationNavigation(_ pendingNavigation: PendingNavigation?) {
         guard let navigation = pendingNavigation else { return }
-        
-        // Ensure user is properly logged in before processing notification
+
         guard userSession.isUserLoggedIn, userSession.currentUserId != nil else {
-            print("⚠️ Cannot process notification - user not logged in")
             notificationManager.clearPendingNavigation()
             notificationManager.clearHighlightedReview()
             return
         }
-        
-        print("🚀 Processing notification navigation to place: \(navigation.placeId), review: \(navigation.reviewId)")
-        
-        // Fetch the place details first
+
         serviceContainer.placeService.getDetailPlace(mapboxId: navigation.placeId) { place in
             if let place = place {
-                print("✅ Found place: \(place.name)")
-                
-                // Animate map to place location when navigating from notification
                 selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                 selectedPlaceViewModel.isDetailSheetPresented = true
-                
-                // Clear the pending navigation but keep the highlighted review ID
                 notificationManager.clearPendingNavigation()
-                
-                print("📍 Navigated to place detail view, highlighting review: \(navigation.reviewId)")
             } else {
-                print("❌ Failed to fetch place details")
-                
-                // Show user-friendly error
                 navigationErrorMessage = "Sorry, we couldn't find that place. It may have been removed."
                 showNavigationError = true
-                
                 notificationManager.clearPendingNavigation()
                 notificationManager.clearHighlightedReview()
             }

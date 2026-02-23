@@ -8,10 +8,8 @@
 import SwiftUI
 
 struct ProfilePhotoOnboardingView: View {
-    @StateObject var viewModel = ProfilePhotoOnboardingViewModel()
+    @StateObject var viewModel: ProfilePhotoOnboardingViewModel
     @EnvironmentObject var userSession: UserSession
-
-    let dataManager: DataManager
 
     @State private var showSheet = false
 
@@ -19,6 +17,10 @@ struct ProfilePhotoOnboardingView: View {
     private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
     private let cardBackground = Color(red: 248/255, green: 248/255, blue: 250/255)
     private let subtleGray = Color(red: 200/255, green: 200/255, blue: 205/255)
+
+    init(userId: String) {
+        self._viewModel = StateObject(wrappedValue: ProfilePhotoOnboardingViewModel(userId: userId))
+    }
 
     var body: some View {
         ZStack {
@@ -37,13 +39,18 @@ struct ProfilePhotoOnboardingView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear {
-            loadExistingGooglePhoto()
+            viewModel.loadExistingGooglePhoto()
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3)) {
                 showSheet = true
             }
         }
         .sheet(isPresented: $viewModel.showImagePicker) {
             ImagePicker(images: $viewModel.pickerImages, selectionLimit: 1)
+        }
+        .onChange(of: viewModel.isOnboardingComplete) { _, isComplete in
+            if isComplete {
+                userSession.completeProfilePhotoOnboarding()
+            }
         }
     }
 
@@ -160,7 +167,7 @@ struct ProfilePhotoOnboardingView: View {
 
     private var continueButton: some View {
         Button {
-            handleContinue()
+            viewModel.handleContinue()
         } label: {
             Group {
                 if viewModel.isUploading {
@@ -192,48 +199,6 @@ struct ProfilePhotoOnboardingView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
-        }
-    }
-
-    // MARK: - Actions
-
-    /// Loads any existing Google profile photo for preview.
-    private func loadExistingGooglePhoto() {
-        guard let userId = userSession.currentUserId else { return }
-        Task {
-            do {
-                let profile = try await UserService.shared.fetchUserById(userId: userId)
-                if let url = profile.profilePhotoURL {
-                    viewModel.loadExistingPhoto(url: url)
-                }
-            } catch {
-                print("⚠️ Could not load existing profile for photo onboarding: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    /// Handles the continue button tap: uploads if new photo, or skips upload for existing.
-    private func handleContinue() {
-        guard let userId = userSession.currentUserId else { return }
-
-        if viewModel.hasNewPhoto {
-            Task {
-                let success = await viewModel.uploadProfilePhoto(userId: userId)
-                if success {
-                    completeOnboarding(userId: userId)
-                }
-            }
-        } else {
-            // Google user keeping their existing photo — no upload needed
-            completeOnboarding(userId: userId)
-        }
-    }
-
-    /// Marks onboarding complete and refreshes profile data.
-    private func completeOnboarding(userId: String) {
-        userSession.completeProfilePhotoOnboarding()
-        Task {
-            await dataManager.loadProfileData(userId: userId)
         }
     }
 }
