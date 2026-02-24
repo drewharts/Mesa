@@ -127,12 +127,13 @@ struct ContentView: View {
             return
         }
 
-        serviceContainer.placeService.getDetailPlace(mapboxId: navigation.placeId) { place in
-            if let place = place {
+        serviceContainer.placeService.fetchPlace(withId: navigation.placeId) { result in
+            switch result {
+            case .success(let place):
                 selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                 selectedPlaceViewModel.isDetailSheetPresented = true
                 notificationManager.clearPendingNavigation()
-            } else {
+            case .failure:
                 navigationErrorMessage = "Sorry, we couldn't find that place. It may have been removed."
                 showNavigationError = true
                 notificationManager.clearPendingNavigation()
