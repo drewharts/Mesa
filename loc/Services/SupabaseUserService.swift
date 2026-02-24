@@ -509,7 +509,7 @@ class SupabaseUserService: ObservableObject {
         
         try await supabase.client
             .from("following")
-            .insert(record)
+            .upsert(record)
             .execute()
     }
     
