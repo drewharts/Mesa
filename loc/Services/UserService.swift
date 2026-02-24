@@ -463,7 +463,12 @@ class UserService: ObservableObject {
     func fetchPlaceListById(listId: String) async throws -> LightweightPlaceList? {
         return try await supabase.fetchPlaceListById(listId: listId)
     }
-    
+
+    /// Fetches the owner user ID for a given place list.
+    func fetchListOwnerId(listId: String) async throws -> String {
+        return try await supabase.fetchListOwnerId(listId: listId)
+    }
+
     /// Fetch user's place lists without location sorting (fallback)
     func fetchPlaceListsWithoutLocation(userId: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
         return try await supabase.fetchPlaceListsWithoutLocation(userId: userId, page: page, pageSize: pageSize)

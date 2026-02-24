@@ -37,6 +37,7 @@ class UserProfileNavigationViewModel: ObservableObject {
     private let userService: UserService
     private let userSession: UserSession
     private var notificationObserver: NSObjectProtocol?
+    private var listNotificationObserver: NSObjectProtocol?
 
     // MARK: - Initialization
 
@@ -50,11 +51,14 @@ class UserProfileNavigationViewModel: ObservableObject {
         if let observer = notificationObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = listNotificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // MARK: - Notification Observer
 
-    /// Sets up observer for follow notification navigation.
+    /// Sets up observers for follow and list notification navigation.
     private func setupNotificationObserver() {
         notificationObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("NavigateToUserProfileFromNotification"),
@@ -67,6 +71,20 @@ class UserProfileNavigationViewModel: ObservableObject {
                 return
             }
             self.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+        }
+
+        listNotificationObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("NavigateToListFromNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let listId = notification.userInfo?["listId"] as? String else {
+                return
+            }
+            Task { @MainActor in
+                await self.navigateToListFromNotification(listId: listId)
+            }
         }
     }
 
@@ -124,6 +142,18 @@ class UserProfileNavigationViewModel: ObservableObject {
                 print("Error fetching user profile: \(error.localizedDescription)")
                 self?.clearPendingListState()
             }
+        }
+    }
+
+    /// Resolves the list owner and navigates to their profile with the list auto-opened.
+    func navigateToListFromNotification(listId: String) async {
+        guard let currentUserId = userSession.currentUserId else { return }
+
+        do {
+            let ownerId = try await userService.fetchListOwnerId(listId: listId)
+            navigateToUserWithList(userId: ownerId, listId: listId, currentUserId: currentUserId)
+        } catch {
+            print("❌ [UserProfileNavigationVM] Error fetching list owner: \(error.localizedDescription)")
         }
     }
 
