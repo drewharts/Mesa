@@ -43,6 +43,7 @@ struct MainView: View {
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var annotationDisplayMode: AnnotationDisplayMode = .everyone
     @State private var isSatelliteMap: Bool = false
+    @State private var showTripsSheet = false
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profileViewModel.externalContentViewModel }
@@ -164,6 +165,10 @@ struct MainView: View {
                     .environmentObject(deepLinkManager)
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
+            }
+            .fullScreenCover(isPresented: $showTripsSheet) {
+                TripsListView()
+                    .environmentObject(userSession)
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -491,7 +496,7 @@ struct MainView: View {
 
             Spacer()
         }
-        .overlay(floatingActionButtons)
+        .overlay(bottomNavigationBar)
         .sheet(isPresented: $showSearchPage, onDismiss: {
             if appCoordinator.hasPendingKeywordPopup {
                 appCoordinator.hasPendingKeywordPopup = false
@@ -520,22 +525,26 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Floating Action Buttons
-    /// Single Responsibility: Conditionally display floating action buttons based on UI state.
-    private var floatingActionButtons: some View {
+    // MARK: - Bottom Navigation Bar
+    /// Single Responsibility: Conditionally display bottom navigation bar based on UI state.
+    private var bottomNavigationBar: some View {
         Group {
-            if shouldShowFloatingActionButtons {
-                FloatingActionButtons(
-                    showSearchPage: $showSearchPage,
-                    shouldNavigateToProfile: $shouldNavigateToProfile
-                )
-                .environmentObject(profileViewModel)
+            if shouldShowBottomNavBar {
+                VStack {
+                    Spacer()
+                    BottomNavigationBar(
+                        showSearchPage: $showSearchPage,
+                        shouldNavigateToProfile: $shouldNavigateToProfile,
+                        showTripsSheet: $showTripsSheet
+                    )
+                    .environmentObject(profileViewModel)
+                }
             }
         }
     }
 
-    /// Determines if floating action buttons should be visible.
-    private var shouldShowFloatingActionButtons: Bool {
+    /// Determines if the bottom navigation bar should be visible.
+    private var shouldShowBottomNavBar: Bool {
         presentationService.activeSheet == nil &&
         !isCreatePlacePopupActive
     }
