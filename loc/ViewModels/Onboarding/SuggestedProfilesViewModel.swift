@@ -30,15 +30,18 @@ class SuggestedProfilesViewModel: ObservableObject {
     @Published var suggestedProfiles: [ProfileData] = []
     @Published var isLoading = true
     @Published var loadError: Error?
+    @Published var followStates: [String: Bool] = [:]
 
     // MARK: - Dependencies
 
     private let userService: UserService
+    private let supabaseUserService: SupabaseUserService
 
     // MARK: - Initialization
 
-    init(userService: UserService? = nil) {
+    init(userService: UserService? = nil, supabaseUserService: SupabaseUserService? = nil) {
         self.userService = userService ?? ServiceContainer.shared.userService
+        self.supabaseUserService = supabaseUserService ?? ServiceContainer.shared.supabaseUserService
     }
 
     // MARK: - Static Methods
@@ -91,5 +94,45 @@ class SuggestedProfilesViewModel: ObservableObject {
     /// Retries loading profiles after an error occurred.
     func retry() async {
         await loadSuggestedProfiles()
+    }
+
+    // MARK: - Follow Logic
+
+    /// Checks the initial follow status for all loaded profiles.
+    func checkFollowStates(currentUserId: String) async {
+        for profile in suggestedProfiles {
+            do {
+                let isFollowing = try await supabaseUserService.isFollowingUser(
+                    followerId: currentUserId,
+                    followingId: profile.id
+                )
+                followStates[profile.id] = isFollowing
+            } catch {
+                followStates[profile.id] = false
+            }
+        }
+    }
+
+    /// Toggles follow state for a profile with optimistic update and rollback on failure.
+    func toggleFollow(profileId: String, currentUserId: String) async {
+        let wasFollowing = followStates[profileId] ?? false
+        followStates[profileId] = !wasFollowing
+
+        do {
+            if wasFollowing {
+                try await supabaseUserService.unfollowUser(
+                    followerId: currentUserId,
+                    followingId: profileId
+                )
+            } else {
+                try await supabaseUserService.followUser(
+                    followerId: currentUserId,
+                    followingId: profileId
+                )
+            }
+        } catch {
+            followStates[profileId] = wasFollowing
+            print("⚠️ [SuggestedProfilesVM] Failed to toggle follow for \(profileId): \(error.localizedDescription)")
+        }
     }
 }

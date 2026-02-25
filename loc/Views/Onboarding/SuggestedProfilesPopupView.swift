@@ -10,6 +10,7 @@ import SwiftUI
 
 struct SuggestedProfilesPopupView: View {
     @StateObject private var viewModel = SuggestedProfilesViewModel()
+    @EnvironmentObject var userSession: UserSession
     @Binding var isPresented: Bool
 
     @State private var navigationPath = NavigationPath()
@@ -42,6 +43,9 @@ struct SuggestedProfilesPopupView: View {
         }
         .task {
             await viewModel.loadSuggestedProfiles()
+            if let currentUserId = userSession.currentUserId {
+                await viewModel.checkFollowStates(currentUserId: currentUserId)
+            }
         }
     }
 
@@ -93,9 +97,22 @@ struct SuggestedProfilesPopupView: View {
             Divider()
 
             ForEach(viewModel.suggestedProfiles) { profile in
-                SuggestedProfileRowView(profile: profile) {
-                    navigationPath.append(profile)
-                }
+                SuggestedProfileRowView(
+                    profile: profile,
+                    isFollowing: viewModel.followStates[profile.id] ?? false,
+                    onTap: {
+                        navigationPath.append(profile)
+                    },
+                    onFollowTap: {
+                        guard let currentUserId = userSession.currentUserId else { return }
+                        Task {
+                            await viewModel.toggleFollow(
+                                profileId: profile.id,
+                                currentUserId: currentUserId
+                            )
+                        }
+                    }
+                )
                 .padding(.horizontal, 16)
 
                 if profile.id != viewModel.suggestedProfiles.last?.id {
