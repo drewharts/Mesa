@@ -33,22 +33,9 @@ struct ExternalUserProfileListsView: View {
     @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            sectionHeader
-
-            if viewModel.isSearchingLists {
-                searchBar
-            }
-
+        VStack(alignment: .leading, spacing: 12) {
+            searchBar
             listContent
-        }
-        .onChange(of: viewModel.isSearchingLists) { _, isSearching in
-            if !isSearching {
-                viewModel.listSearchText = ""
-                Task {
-                    await viewModel.reloadListsAfterSearch()
-                }
-            }
         }
         .sheet(isPresented: $viewModel.shouldShowListPopup, onDismiss: {
             viewModel.onListPopupDismissed()
@@ -78,33 +65,7 @@ struct ExternalUserProfileListsView: View {
 
     // MARK: - View Components
 
-    /// Header with "Lists" label and search toggle button.
-    private var sectionHeader: some View {
-        HStack {
-            Text("Lists")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Button {
-                withAnimation {
-                    viewModel.isSearchingLists.toggle()
-                }
-            } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(viewModel.isSearchingLists ? .white : .gray)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(viewModel.isSearchingLists ? Color.primary : Color(.systemGray5)))
-                    .contentShape(Circle())
-            }
-        }
-        .padding(.horizontal, 16)
-    }
-
-    /// Inline search bar for filtering lists by name.
+    /// Always-visible search bar for filtering lists by name.
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -128,11 +89,12 @@ struct ExternalUserProfileListsView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(Color(.systemGray5).opacity(0.6))
+        )
         .padding(.horizontal, 20)
-        .padding(.bottom, 4)
     }
 
     @ViewBuilder

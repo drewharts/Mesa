@@ -59,6 +59,8 @@ struct ListsSearchBar: View {
                     .fill(sharedButtonBackground)
             )
         }
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Circle())
         .disabled(!isFilterEnabled)
     }
 
@@ -125,5 +127,7 @@ struct ListsSearchBar: View {
                         .fill(Color(.systemGray5).opacity(0.6))
                 )
         }
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Circle())
     }
 }

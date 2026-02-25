@@ -27,19 +27,17 @@ struct LightweightProfileListSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Photo collage button
-            Button(action: onTap) {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 8) {
                 ListCardImage(places: places, placeColors: $placeColors)
-            }
-            .buttonStyle(PlainButtonStyle())
 
-            // List info
-            ListCardInfo(
-                list: list,
-                totalPlaceCount: totalPlaceCount
-            )
+                ListCardInfo(
+                    list: list,
+                    totalPlaceCount: totalPlaceCount
+                )
+            }
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
