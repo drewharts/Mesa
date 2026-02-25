@@ -12,6 +12,8 @@ struct ManageTripCollaboratorsSheet: View {
     @StateObject private var viewModel: TripCollaboratorsViewModel
     @Environment(\.dismiss) private var dismiss
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     init(tripId: String, currentUserId: String) {
         _viewModel = StateObject(wrappedValue: TripCollaboratorsViewModel(
             tripId: tripId,
@@ -174,7 +176,7 @@ struct ManageTripCollaboratorsSheet: View {
                         Spacer()
 
                         Image(systemName: "plus.circle")
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(mesaCharcoal)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 6)

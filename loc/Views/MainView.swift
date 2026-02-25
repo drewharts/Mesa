@@ -169,6 +169,11 @@ struct MainView: View {
             .fullScreenCover(isPresented: $showTripsSheet) {
                 TripsListView()
                     .environmentObject(userSession)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(userProfileNavigationViewModel)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(locationManager)
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {

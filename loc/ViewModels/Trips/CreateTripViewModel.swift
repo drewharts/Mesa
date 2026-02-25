@@ -42,6 +42,9 @@ class CreateTripViewModel: ObservableObject {
     @Published var startDate: Date = Date()
     @Published var endDate: Date = Calendar.current.date(byAdding: .day, value: 3, to: Date()) ?? Date()
 
+    // Child ViewModel for inline calendar range picker
+    let dateRangePickerViewModel: DateRangePickerViewModel
+
     // Contributors
     @Published var selectedContributors: [ProfileData] = []
     @Published var contributorSearchText: String = ""
@@ -62,7 +65,21 @@ class CreateTripViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        let today = Calendar.current.startOfDay(for: Date())
+        let defaultEnd = Calendar.current.date(byAdding: .day, value: 3, to: today) ?? today
+        self.dateRangePickerViewModel = DateRangePickerViewModel(startDate: today, endDate: defaultEnd)
         setupContributorSearchPipeline()
+        setupDateSyncSubscription()
+        forwardChildObjectWillChange()
+    }
+
+    /// Forwards child ViewModel's objectWillChange to this parent so SwiftUI re-evaluates canProceed.
+    private func forwardChildObjectWillChange() {
+        dateRangePickerViewModel.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Navigation
@@ -99,7 +116,10 @@ class CreateTripViewModel: ObservableObject {
         case .name:
             return !tripName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .dates:
-            return endDate >= startDate
+            if case .complete = dateRangePickerViewModel.selectionState {
+                return true
+            }
+            return false
         case .contributors:
             return true
         default:
@@ -142,6 +162,28 @@ class CreateTripViewModel: ObservableObject {
         } catch {
             currentStep = .failed(message: error.localizedDescription)
         }
+    }
+
+    // MARK: - Date Sync
+
+    /// Subscribes to the date range picker's selection state and syncs start/end dates.
+    private func setupDateSyncSubscription() {
+        dateRangePickerViewModel.$selectionState
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .complete(let start, let end):
+                    self.startDate = start
+                    self.endDate = end
+                case .startOnly(let start):
+                    self.startDate = start
+                    self.endDate = start
+                case .empty:
+                    break
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Contributor Search
@@ -232,6 +274,7 @@ class CreateTripViewModel: ObservableObject {
         tripName = ""
         startDate = Date()
         endDate = Calendar.current.date(byAdding: .day, value: 3, to: Date()) ?? Date()
+        dateRangePickerViewModel.reset()
         selectedContributors = []
         contributorSearchText = ""
         contributorSearchResults = []

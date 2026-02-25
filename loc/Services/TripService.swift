@@ -140,7 +140,9 @@ class TripService {
                 placeLongitude: row.placeLongitude,
                 placePhoto: row.placePhoto,
                 addedByName: row.addedByName,
-                addedByPhotoUrl: row.addedByPhotoUrl
+                addedByPhotoUrl: row.addedByPhotoUrl,
+                contentUrl: row.contentUrl,
+                placeType: row.placeType
             )
         }
 
@@ -233,6 +235,48 @@ class TripService {
             .execute()
     }
 
+    // MARK: - Ideas (Unassigned Places)
+
+    /// Adds a place to a trip as an unassigned Idea (dayIndex = -1).
+    func addPlaceAsIdea(tripId: String, placeId: String, addedBy: String) async throws {
+        try await addPlaceToDay(
+            tripId: tripId,
+            placeId: placeId,
+            dayIndex: TripDayPlace.ideasDayIndex,
+            addedBy: addedBy
+        )
+    }
+
+    /// Removes a place from a trip by matching trip_id and place_id.
+    func removePlaceFromTrip(tripId: String, placeId: String) async throws {
+        try await supabase.client
+            .from("trip_day_places")
+            .delete()
+            .eq("trip_id", value: tripId)
+            .eq("place_id", value: placeId)
+            .execute()
+    }
+
+    /// Batch-checks which of the given trips contain a specific place.
+    func fetchPlaceTripMembership(placeId: String, tripIds: [String]) async throws -> [String: Bool] {
+        guard !tripIds.isEmpty else { return [:] }
+
+        let rows: [TripPlaceMembershipRow] = try await supabase.client
+            .from("trip_day_places")
+            .select("trip_id")
+            .eq("place_id", value: placeId)
+            .in("trip_id", values: tripIds)
+            .execute()
+            .value
+
+        let memberTripIds = Set(rows.map(\.tripId))
+        var result: [String: Bool] = [:]
+        for tripId in tripIds {
+            result[tripId] = memberTripIds.contains(tripId)
+        }
+        return result
+    }
+
     // MARK: - Helpers
 
     /// Formats a Date to yyyy-MM-dd string for Supabase date columns.
@@ -303,6 +347,14 @@ private extension TripService {
         let p_place_ids: [String]
     }
 
+    struct TripPlaceMembershipRow: Decodable {
+        let tripId: String
+
+        enum CodingKeys: String, CodingKey {
+            case tripId = "trip_id"
+        }
+    }
+
     /// Intermediate row type for the get_trip_with_places RPC response.
     struct TripWithPlaceRow: Decodable {
         let tripId: String
@@ -324,6 +376,9 @@ private extension TripService {
         let placePhoto: String?
         let addedByName: String?
         let addedByPhotoUrl: String?
+        let externalPlaceId: String?
+        let contentUrl: String?
+        let placeType: String?
 
         enum CodingKeys: String, CodingKey {
             case tripId = "trip_id"
@@ -345,6 +400,9 @@ private extension TripService {
             case placePhoto = "place_photo"
             case addedByName = "added_by_name"
             case addedByPhotoUrl = "added_by_photo_url"
+            case externalPlaceId = "external_place_id"
+            case contentUrl = "tiktok_url"
+            case placeType = "place_type"
         }
     }
 }

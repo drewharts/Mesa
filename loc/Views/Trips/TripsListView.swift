@@ -10,8 +10,11 @@ import SwiftUI
 /// Displays the user's trips with navigation to trip detail and creation.
 struct TripsListView: View {
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @StateObject private var viewModel = TripsListViewModel()
     @Environment(\.dismiss) private var dismiss
+
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
 
     @State private var navigationPath = NavigationPath()
 
@@ -43,6 +46,7 @@ struct TripsListView: View {
             .navigationDestination(for: String.self) { tripId in
                 TripDetailView(tripId: tripId)
                     .environmentObject(userSession)
+                    .environmentObject(selectedPlaceVM)
             }
             .fullScreenCover(isPresented: $viewModel.showCreateTrip) {
                 CreateTripView { tripId in
@@ -99,7 +103,7 @@ struct TripsListView: View {
                     .fontWeight(.semibold)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(Color.accentColor)
+                    .background(mesaCharcoal)
                     .foregroundStyle(.white)
                     .clipShape(Capsule())
             }

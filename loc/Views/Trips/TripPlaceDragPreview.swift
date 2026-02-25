@@ -11,10 +11,12 @@ import SwiftUI
 struct TripPlaceDragPreview: View {
     let placeName: String
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "mappin.circle.fill")
-                .foregroundColor(.accentColor)
+                .foregroundColor(mesaCharcoal)
             Text(placeName)
                 .font(.subheadline)
                 .fontWeight(.medium)

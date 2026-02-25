@@ -46,6 +46,18 @@ class TripDetailViewModel: ObservableObject {
         Set(dayPlaces.values.flatMap { $0 }.map(\.placeId))
     }
 
+    /// Whether any assigned day place has coordinates for map display.
+    var hasPlacesWithCoordinates: Bool {
+        dayPlaces.contains { dayIndex, places in
+            dayIndex >= 0 && places.contains { $0.placeLatitude != nil && $0.placeLongitude != nil }
+        }
+    }
+
+    /// Places saved as unassigned Ideas (dayIndex = -1).
+    var ideaPlaces: [TripDayPlace] {
+        dayPlaces[TripDayPlace.ideasDayIndex] ?? []
+    }
+
     /// Formats a day index into a display label (e.g. "Day 1 · Wed Jan 15").
     func dayLabel(for index: Int) -> String {
         guard let trip = trip else { return "Day \(index + 1)" }
@@ -85,6 +97,14 @@ class TripDetailViewModel: ObservableObject {
                 grouped[key]?.sort { $0.sortOrder < $1.sortOrder }
             }
             dayPlaces = grouped
+
+            // Prefetch external content metadata for PopupPlaceCard thumbnail display
+            let contentUrls = result.dayPlaces.compactMap(\.contentUrl).filter { !$0.isEmpty }
+            if !contentUrls.isEmpty {
+                Task {
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: contentUrls)
+                }
+            }
 
             // Fetch collaborators for header display
             await loadCollaborators()
@@ -223,6 +243,30 @@ class TripDetailViewModel: ObservableObject {
         } catch {
             self.error = error.localizedDescription
             print("[TripDetailVM] Failed to add place: \(error)")
+        }
+    }
+
+    // MARK: - Ideas
+
+    /// Removes an Idea entry by its entry ID.
+    func removeIdea(entryId: String) async {
+        await removePlaceFromDay(entryId: entryId)
+    }
+
+    /// Moves an Idea to a specific calendar day.
+    func moveIdeaToDay(entryId: String, dayIndex: Int) async {
+        await movePlaceToDifferentDay(entryId: entryId, toDayIndex: dayIndex)
+    }
+
+    // MARK: - Drop Handling
+
+    /// Routes a calendar day drop to either a move (from Ideas) or a new place add.
+    func handleCalendarDrop(droppedId: String, dayIndex: Int) {
+        let ideaEntryIds = Set(ideaPlaces.map(\.id))
+        if ideaEntryIds.contains(droppedId) {
+            Task { await moveIdeaToDay(entryId: droppedId, dayIndex: dayIndex) }
+        } else {
+            Task { await addPlaceToSpecificDay(placeId: droppedId, dayIndex: dayIndex) }
         }
     }
 

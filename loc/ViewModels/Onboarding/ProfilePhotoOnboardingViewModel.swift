@@ -11,8 +11,6 @@ import Combine
 @MainActor
 class ProfilePhotoOnboardingViewModel: ObservableObject {
     @Published var selectedImage: UIImage?
-    @Published var existingPhotoURL: URL?
-    @Published var existingPhoto: UIImage?
     @Published var isUploading: Bool = false
     @Published var errorMessage: String?
     @Published var showImagePicker: Bool = false
@@ -39,61 +37,17 @@ class ProfilePhotoOnboardingViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// The image to display in the preview circle.
-    var displayImage: UIImage? {
-        selectedImage ?? existingPhoto
-    }
-
-    /// Whether the user can proceed (has some photo to use).
+    /// Whether the user can proceed (has selected a photo).
     var canContinue: Bool {
-        displayImage != nil
-    }
-
-    /// Whether the user picked a new photo (vs keeping existing Google photo).
-    var hasNewPhoto: Bool {
         selectedImage != nil
     }
 
-    /// Fetches any existing Google profile photo from the user's profile for preview display.
-    func loadExistingGooglePhoto() {
-        Task {
-            do {
-                let profile = try await UserService.shared.fetchUserById(userId: userId)
-                if let url = profile.profilePhotoURL {
-                    loadExistingPhoto(url: url)
-                }
-            } catch {
-                // Non-fatal: user may not have an existing photo yet
-            }
-        }
-    }
-
-    /// Handles the continue button tap: uploads if new photo, or completes immediately for existing.
+    /// Handles the continue button tap: uploads the selected photo.
     func handleContinue() {
-        if hasNewPhoto {
-            Task {
-                let success = await uploadProfilePhoto()
-                if success {
-                    isOnboardingComplete = true
-                }
-            }
-        } else {
-            isOnboardingComplete = true
-        }
-    }
-
-    /// Downloads a photo from the given URL and sets it as the existing profile photo preview.
-    private func loadExistingPhoto(url: URL) {
-        self.existingPhotoURL = url
-
         Task {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                if let image = UIImage(data: data) {
-                    self.existingPhoto = image
-                }
-            } catch {
-                // Non-fatal: preview will show placeholder
+            let success = await uploadProfilePhoto()
+            if success {
+                isOnboardingComplete = true
             }
         }
     }
