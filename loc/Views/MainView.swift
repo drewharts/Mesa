@@ -491,7 +491,7 @@ struct MainView: View {
 
             Spacer()
         }
-        .overlay(floatingActionButtons)
+        .overlay(bottomNavigationBar)
         .sheet(isPresented: $showSearchPage, onDismiss: {
             if appCoordinator.hasPendingKeywordPopup {
                 appCoordinator.hasPendingKeywordPopup = false
@@ -520,12 +520,12 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Floating Action Buttons
-    /// Single Responsibility: Conditionally display floating action buttons based on UI state.
-    private var floatingActionButtons: some View {
+    // MARK: - Bottom Navigation Bar
+    /// Single Responsibility: Conditionally display bottom navigation bar based on UI state.
+    private var bottomNavigationBar: some View {
         Group {
-            if shouldShowFloatingActionButtons {
-                FloatingActionButtons(
+            if shouldShowBottomNavigationBar {
+                MapBottomNavigationBar(
                     showSearchPage: $showSearchPage,
                     shouldNavigateToProfile: $shouldNavigateToProfile
                 )
@@ -534,8 +534,8 @@ struct MainView: View {
         }
     }
 
-    /// Determines if floating action buttons should be visible.
-    private var shouldShowFloatingActionButtons: Bool {
+    /// Determines if bottom navigation bar should be visible.
+    private var shouldShowBottomNavigationBar: Bool {
         presentationService.activeSheet == nil &&
         !isCreatePlacePopupActive
     }

@@ -46,22 +46,8 @@ struct ProfileViewListsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            headerView
-
-            // Simple inline search bar
-            if listsVM.isSearchingLists {
-                searchBar
-            }
-
+            listsSearchBar
             listContent
-        }
-        .onChange(of: listsVM.isSearchingLists) { isSearching in
-            if !isSearching {
-                listsVM.listSearchText = ""
-                Task {
-                    await listsVM.reloadListsAfterSearch()
-                }
-            }
         }
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
@@ -143,21 +129,19 @@ struct ProfileViewListsView: View {
         }
     }
     
-    // MARK: - Header View
-    
-    private var headerView: some View {
-        ListHeaderView(
+    // MARK: - Lists Search Bar
+
+    private var listsSearchBar: some View {
+        ListsSearchBar(
+            searchText: Binding(
+                get: { listsVM.listSearchText },
+                set: { listsVM.listSearchText = $0 }
+            ),
             showOnlyShared: listsVM.showOnlySharedLists,
             hasSharedLists: listsVM.hasSharedLists,
             isFilterEnabled: listsVM.canInteractWithSharedFilter,
-            isSearching: listsVM.isSearchingLists,
             onToggleFilter: {
                 listsVM.showOnlySharedLists.toggle()
-            },
-            onToggleSearch: {
-                withAnimation {
-                    listsVM.isSearchingLists.toggle()
-                }
             },
             onAddList: {
                 showingNewListSheet = true
@@ -166,42 +150,6 @@ struct ProfileViewListsView: View {
                 showingGoogleMapsImport = true
             }
         )
-    }
-    
-    // MARK: - Search Bar
-    
-    /// Simple inline search bar for filtering lists
-    private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
-                .font(.system(size: 14))
-
-            TextField("Search lists...", text: Binding(
-                get: { listsVM.listSearchText },
-                set: { listsVM.listSearchText = $0 }
-            ))
-                .font(.subheadline)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-
-            if !listsVM.listSearchText.isEmpty {
-                Button {
-                    listsVM.listSearchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
-                        .font(.system(size: 14))
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 4)
     }
     
     // MARK: - List Content (State-based rendering)
@@ -346,12 +294,12 @@ struct ProfileViewListsView: View {
     /// Handle list appearing - triggers pagination when approaching end
     private func handleListAppear(list: LightweightPlaceList) {
         // Don't paginate during search or shared filter
-        guard !listsVM.showOnlySharedLists && !listsVM.isSearchingLists else { return }
+        guard !listsVM.showOnlySharedLists && listsVM.listSearchText.isEmpty else { return }
 
         if listsVM.shouldLoadMoreLists(
             currentItem: list,
             filteredLists: listsVM.filteredPlaceLists,
-            isSearching: listsVM.isSearchingLists
+            isSearching: !listsVM.listSearchText.isEmpty
         ) {
             Task {
                 await listsVM.loadMoreLists()
