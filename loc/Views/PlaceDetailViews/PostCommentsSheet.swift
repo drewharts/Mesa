@@ -147,7 +147,7 @@ struct PostCommentsSheet: View {
                     onDelete: {
                         Task {
                             guard let userId = userSession.currentUserId else { return }
-                            await commentsViewModel.deleteComment(commentId: comment.id, userId: userId)
+                            await commentsViewModel.deleteComment(commentId: comment.id, reviewId: post.id, placeId: post.placeId, userId: userId)
                         }
                     }
                 )

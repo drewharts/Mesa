@@ -23,6 +23,9 @@ class ServiceContainer: ObservableObject {
     lazy var externalContentService = ExternalContentService()
     lazy var collaborationService = CollaborationService.shared
 
+    // MARK: - Contacts
+    lazy var contactsService = ContactsService()
+
     // MARK: - Cache Services
     lazy var postsCacheService = PlacePostsCacheService.shared
 

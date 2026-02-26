@@ -389,6 +389,10 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         if type == "follow", let userId = userInfo["userId"] as? String {
             NotificationManager.shared.handleFollowNotificationTap(userId: userId)
         }
+        // Handle place added to list notifications
+        else if type == "place_added_to_list", let listId = userInfo["listId"] as? String {
+            NotificationManager.shared.handleListNotificationTap(listId: listId)
+        }
         // Handle review notifications
         else if let reviewId = userInfo["reviewId"] as? String,
            let placeId = userInfo["placeId"] as? String,

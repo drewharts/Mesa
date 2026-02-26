@@ -26,6 +26,9 @@ class PlacePostsViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
+    /// Stores a highlight request received before posts were loaded.
+    private var pendingHighlightPostId: String?
+
     // MARK: - Callbacks
     /// Called when like statuses need to be checked
     var onCheckLikeStatuses: ((String) -> Void)?
@@ -60,7 +63,18 @@ class PlacePostsViewModel: ObservableObject {
     private func observeHighlightedPost() {
         notificationManager.$highlightedReviewId
             .sink { [weak self] postId in
-                self?.highlightedPostId = postId
+                guard let self = self else { return }
+                if let postId = postId {
+                    if self.hasPosts {
+                        self.highlightedPostId = postId
+                        self.pendingHighlightPostId = nil
+                    } else {
+                        self.pendingHighlightPostId = postId
+                    }
+                } else {
+                    self.highlightedPostId = nil
+                    self.pendingHighlightPostId = nil
+                }
             }
             .store(in: &cancellables)
     }
@@ -73,12 +87,21 @@ class PlacePostsViewModel: ObservableObject {
         if place == nil {
             posts = []
             loadingState = .idle
+            pendingHighlightPostId = nil
         }
     }
 
-    /// Sets the posts for the current place.
+    /// Sets the posts for the current place and applies any pending highlight.
     func setPosts(_ posts: [PlacePost]) {
         self.posts = posts
+        applyPendingHighlightIfNeeded()
+    }
+
+    /// Applies a deferred highlight once posts are available.
+    private func applyPendingHighlightIfNeeded() {
+        guard let pendingId = pendingHighlightPostId, hasPosts else { return }
+        highlightedPostId = pendingId
+        pendingHighlightPostId = nil
     }
 
     /// Sets the loading state for posts.

@@ -75,6 +75,7 @@ struct SplashScreenView: View {
             // Set user logged in
             await MainActor.run {
                 userSession.setUserLoggedIn(uid: profile.id)
+                userSession.needsPhoneOnboarding = !UserSession.hasCompletedPhoneOnboarding
                 userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
                 userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
             }

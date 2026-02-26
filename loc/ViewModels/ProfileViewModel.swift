@@ -293,10 +293,16 @@ class ProfileViewModel: ObservableObject {
     /// Sets up debounced observer for list search text changes
     private func setupListSearchObserver() {
         listSearchCancellable = listsViewModel.searchViewModel.$listSearchText
+            .dropFirst()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .sink { [weak self] (_: String) in
+            .removeDuplicates()
+            .sink { [weak self] (text: String) in
                 Task { @MainActor [weak self] in
-                    await self?.listsViewModel.performListSearch()
+                    if text.trimmingCharacters(in: .whitespaces).isEmpty {
+                        await self?.listsViewModel.reloadListsAfterSearch()
+                    } else {
+                        await self?.listsViewModel.performListSearch()
+                    }
                 }
             }
     }

@@ -28,17 +28,29 @@ class SuggestedProfilesViewModel: ObservableObject {
     // MARK: - Published State
 
     @Published var suggestedProfiles: [ProfileData] = []
+    @Published var contactMatches: [ProfileData] = []
     @Published var isLoading = true
+    @Published var isLoadingContacts = false
+    @Published var contactsAccessDenied = false
     @Published var loadError: Error?
+    @Published var followStates: [String: Bool] = [:]
 
     // MARK: - Dependencies
 
     private let userService: UserService
+    private let supabaseUserService: SupabaseUserService
+    private let contactsService: ContactsService
 
     // MARK: - Initialization
 
-    init(userService: UserService? = nil) {
+    init(
+        userService: UserService? = nil,
+        supabaseUserService: SupabaseUserService? = nil,
+        contactsService: ContactsService? = nil
+    ) {
         self.userService = userService ?? ServiceContainer.shared.userService
+        self.supabaseUserService = supabaseUserService ?? ServiceContainer.shared.supabaseUserService
+        self.contactsService = contactsService ?? ServiceContainer.shared.contactsService
     }
 
     // MARK: - Static Methods
@@ -91,5 +103,81 @@ class SuggestedProfilesViewModel: ObservableObject {
     /// Retries loading profiles after an error occurred.
     func retry() async {
         await loadSuggestedProfiles()
+    }
+
+    // MARK: - Contact Matching
+
+    /// Requests contacts access, fetches phone numbers, and matches them against Supabase users.
+    func loadContactMatches(currentUserId: String) async {
+        isLoadingContacts = true
+
+        let granted = await contactsService.requestAccess()
+        guard granted else {
+            contactsAccessDenied = true
+            isLoadingContacts = false
+            return
+        }
+
+        let phoneNumbers = await contactsService.fetchNormalizedPhoneNumbers()
+        guard !phoneNumbers.isEmpty else {
+            isLoadingContacts = false
+            return
+        }
+
+        do {
+            let matches = try await contactsService.matchContacts(
+                phoneNumbers: phoneNumbers,
+                requestingUserId: currentUserId
+            )
+            contactMatches = matches
+
+            // Remove contact matches from suggested profiles to avoid duplicates
+            let matchIds = Set(matches.map(\.id))
+            suggestedProfiles = suggestedProfiles.filter { !matchIds.contains($0.id) }
+        } catch {
+            print("⚠️ [SuggestedProfilesVM] Contact matching failed: \(error.localizedDescription)")
+        }
+
+        isLoadingContacts = false
+    }
+
+    // MARK: - Follow Logic
+
+    /// Checks the initial follow status for all loaded profiles.
+    func checkFollowStates(currentUserId: String) async {
+        for profile in suggestedProfiles {
+            do {
+                let isFollowing = try await supabaseUserService.isFollowingUser(
+                    followerId: currentUserId,
+                    followingId: profile.id
+                )
+                followStates[profile.id] = isFollowing
+            } catch {
+                followStates[profile.id] = false
+            }
+        }
+    }
+
+    /// Toggles follow state for a profile with optimistic update and rollback on failure.
+    func toggleFollow(profileId: String, currentUserId: String) async {
+        let wasFollowing = followStates[profileId] ?? false
+        followStates[profileId] = !wasFollowing
+
+        do {
+            if wasFollowing {
+                try await supabaseUserService.unfollowUser(
+                    followerId: currentUserId,
+                    followingId: profileId
+                )
+            } else {
+                try await supabaseUserService.followUser(
+                    followerId: currentUserId,
+                    followingId: profileId
+                )
+            }
+        } catch {
+            followStates[profileId] = wasFollowing
+            print("⚠️ [SuggestedProfilesVM] Failed to toggle follow for \(profileId): \(error.localizedDescription)")
+        }
     }
 }

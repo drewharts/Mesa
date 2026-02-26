@@ -205,6 +205,7 @@ class ExternalListsLoadingViewModel: ObservableObject {
             dataVM.setPlacesForList(listId: list.list_id, places: places)
         } catch {
             print("❌ [ExternalListsLoadingViewModel] Error loading places for list: \(error)")
+            dataVM.setPlacesForList(listId: list.list_id, places: [])
         }
     }
 

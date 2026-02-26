@@ -191,6 +191,24 @@ class PlacePostsCacheService: ObservableObject {
         likedPostIds.remove(postId)
     }
 
+    // MARK: - Comment Count
+
+    /// Increments the comment count for a post in the cache.
+    func incrementCommentCount(forPostId postId: String, inPlaceId placeId: String) {
+        guard var posts = postsCache[placeId],
+              let index = posts.firstIndex(where: { $0.id == postId }) else { return }
+        posts[index].commentCount += 1
+        postsCache[placeId] = posts
+    }
+
+    /// Decrements the comment count for a post in the cache.
+    func decrementCommentCount(forPostId postId: String, inPlaceId placeId: String) {
+        guard var posts = postsCache[placeId],
+              let index = posts.firstIndex(where: { $0.id == postId }) else { return }
+        posts[index].commentCount = max(0, posts[index].commentCount - 1)
+        postsCache[placeId] = posts
+    }
+
     // MARK: - Formatting
 
     /// Formats a post's timestamp for display.

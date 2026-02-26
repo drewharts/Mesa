@@ -13,11 +13,18 @@ class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profileViewModel: ProfileViewModel?
     @Published var currentUserId: String?
+    @Published var needsPhoneOnboarding: Bool = false
     @Published var needsProfilePhoto: Bool = false
     @Published var needsListOnboarding: Bool = false
 
+    private static let hasCompletedPhoneOnboardingKey = "hasCompletedPhoneOnboarding"
     private static let hasCompletedPhotoOnboardingKey = "hasCompletedProfilePhotoOnboarding"
     private static let hasCompletedListOnboardingKey = "hasCompletedListOnboarding"
+
+    /// Checks whether the user has completed phone number onboarding.
+    static var hasCompletedPhoneOnboarding: Bool {
+        UserDefaults.standard.bool(forKey: hasCompletedPhoneOnboardingKey)
+    }
 
     /// Checks whether the user has completed profile photo onboarding.
     static var hasCompletedPhotoOnboarding: Bool {
@@ -27,6 +34,12 @@ class UserSession: ObservableObject {
     /// Checks whether the user has completed list creation onboarding.
     static var hasCompletedListOnboarding: Bool {
         UserDefaults.standard.bool(forKey: hasCompletedListOnboardingKey)
+    }
+
+    /// Marks phone number onboarding as complete.
+    func completePhoneOnboarding() {
+        UserDefaults.standard.set(true, forKey: Self.hasCompletedPhoneOnboardingKey)
+        self.needsPhoneOnboarding = false
     }
 
     /// Marks profile photo onboarding as complete.

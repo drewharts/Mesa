@@ -509,7 +509,7 @@ class SupabaseUserService: ObservableObject {
         
         try await supabase.client
             .from("following")
-            .insert(record)
+            .upsert(record)
             .execute()
     }
     
@@ -596,7 +596,24 @@ class SupabaseUserService: ObservableObject {
             throw error
         }
     }
-    
+
+    /// Fetches the owner user ID for a given place list.
+    func fetchListOwnerId(listId: String) async throws -> String {
+        struct ListOwnerRecord: Codable {
+            let user_id: String
+        }
+
+        let record: ListOwnerRecord = try await supabase.client
+            .from("place_lists")
+            .select("user_id")
+            .eq("id", value: listId)
+            .single()
+            .execute()
+            .value
+
+        return record.user_id
+    }
+
     /// Fetch user's place lists without location sorting (fallback when location unavailable)
     /// Returns lists ordered by creation date (newest first) with place counts
     func fetchPlaceListsWithoutLocation(userId: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {

@@ -33,22 +33,9 @@ struct ExternalUserProfileListsView: View {
     @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            sectionHeader
-
-            if viewModel.isSearchingLists {
-                searchBar
-            }
-
+        VStack(alignment: .leading, spacing: 12) {
+            searchBar
             listContent
-        }
-        .onChange(of: viewModel.isSearchingLists) { _, isSearching in
-            if !isSearching {
-                viewModel.listSearchText = ""
-                Task {
-                    await viewModel.reloadListsAfterSearch()
-                }
-            }
         }
         .sheet(isPresented: $viewModel.shouldShowListPopup, onDismiss: {
             viewModel.onListPopupDismissed()
@@ -78,33 +65,7 @@ struct ExternalUserProfileListsView: View {
 
     // MARK: - View Components
 
-    /// Header with "Lists" label and search toggle button.
-    private var sectionHeader: some View {
-        HStack {
-            Text("Lists")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Button {
-                withAnimation {
-                    viewModel.isSearchingLists.toggle()
-                }
-            } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(viewModel.isSearchingLists ? .white : .gray)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(viewModel.isSearchingLists ? Color.primary : Color(.systemGray5)))
-                    .contentShape(Circle())
-            }
-        }
-        .padding(.horizontal, 16)
-    }
-
-    /// Inline search bar for filtering lists by name.
+    /// Always-visible search bar for filtering lists by name.
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -128,11 +89,12 @@ struct ExternalUserProfileListsView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(Color(.systemGray5).opacity(0.6))
+        )
         .padding(.horizontal, 20)
-        .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -415,13 +377,12 @@ struct ExternalUserListPopupView: View {
 
     // MARK: - Data Loading
 
-    /// Loads places for the current list if not already loaded or empty.
+    /// Loads places for the current list if not already fetched.
     private func loadPlacesIfNeeded() {
         let list = lists[currentListIndex]
         let existingPlaces = viewModel.placeListPlaces[list.list_id]
 
-        // Load if nil OR empty (empty array might exist from failed previous attempt)
-        if existingPlaces == nil || existingPlaces?.isEmpty == true {
+        if existingPlaces == nil {
             isLoadingInitial = true
             viewModel.loadPlacesForList(list)
         } else {
@@ -465,62 +426,68 @@ struct ExternalUserListContentScrollView: View {
         viewModel.placeListPlaces[list.list_id] ?? []
     }
 
+    /// Whether the ViewModel has finished loading places for this list.
+    private var hasLoadedPlaces: Bool {
+        viewModel.placeListPlaces[list.list_id] != nil
+    }
+
     var body: some View {
-        if !places.isEmpty {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                        PopupPlaceCard(
-                            place: place,
-                            preferExternalThumbnail: true,
-                            onNavigate: { placeId in
-                                onNavigateToPlace?(placeId)
-                            }
-                        )
-                        .onAppear {
-                            if index == places.count - 3 {
-                                onLoadMore()
+        Group {
+            if !places.isEmpty {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
+                            PopupPlaceCard(
+                                place: place,
+                                preferExternalThumbnail: true,
+                                onNavigate: { placeId in
+                                    onNavigateToPlace?(placeId)
+                                }
+                            )
+                            .onAppear {
+                                if index == places.count - 3 {
+                                    onLoadMore()
+                                }
                             }
                         }
                     }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
 
-                if isLoadingMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .padding()
-                        Spacer()
+                    if isLoadingMore {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .padding()
+                            Spacer()
+                        }
                     }
                 }
-            }
-            .onAppear {
-                // Places loaded, clear loading state
-                if isLoadingInitial {
-                    isLoadingInitial = false
+            } else if isLoadingInitial {
+                VStack(spacing: 12) {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading places...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 8) {
+                    Spacer()
+                    Text("No places in this list")
+                        .foregroundColor(.gray)
+                    Spacer()
+                }
+                .padding(.vertical, 30)
             }
-        } else if isLoadingInitial {
-            VStack(spacing: 12) {
-                Spacer()
-                ProgressView()
-                    .scaleEffect(1.2)
-                Text("Loading places...")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                Spacer()
+        }
+        .onChange(of: hasLoadedPlaces) { _, loaded in
+            if loaded && isLoadingInitial {
+                isLoadingInitial = false
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            VStack(spacing: 8) {
-                Spacer()
-                Text("No places in this list")
-                    .foregroundColor(.gray)
-                Spacer()
-            }
-            .padding(.vertical, 30)
         }
     }
 }

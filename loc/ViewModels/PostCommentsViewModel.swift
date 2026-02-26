@@ -17,6 +17,7 @@ class PostCommentsViewModel: ObservableObject {
 
     // MARK: - Dependencies
     private let postService = ServiceContainer.shared.supabasePostService
+    private let postsCacheService = PlacePostsCacheService.shared
 
     // MARK: - Actions
 
@@ -49,6 +50,7 @@ class PostCommentsViewModel: ObservableObject {
             )
             comments.append(comment)
             commentText = ""
+            postsCacheService.incrementCommentCount(forPostId: reviewId, inPlaceId: placeId)
         } catch {
             print("Failed to add comment: \(error)")
         }
@@ -56,13 +58,14 @@ class PostCommentsViewModel: ObservableObject {
     }
 
     /// Deletes a comment if the current user owns it and removes it from the local array.
-    func deleteComment(commentId: String, userId: String) async {
+    func deleteComment(commentId: String, reviewId: String, placeId: String, userId: String) async {
         guard let comment = comments.first(where: { $0.id == commentId }),
               comment.userId == userId else { return }
 
         do {
             try await postService.deleteComment(commentId: commentId)
             comments.removeAll { $0.id == commentId }
+            postsCacheService.decrementCommentCount(forPostId: reviewId, inPlaceId: placeId)
         } catch {
             print("Failed to delete comment: \(error)")
         }
