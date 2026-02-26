@@ -45,6 +45,7 @@ struct SuggestedProfilesPopupView: View {
             await viewModel.loadSuggestedProfiles()
             if let currentUserId = userSession.currentUserId {
                 await viewModel.checkFollowStates(currentUserId: currentUserId)
+                await viewModel.loadContactMatches(currentUserId: currentUserId)
             }
         }
     }
@@ -95,6 +96,26 @@ struct SuggestedProfilesPopupView: View {
                 .padding(.bottom, 16)
 
             Divider()
+
+            // Contacts-matched profiles section
+            ContactsMatchSection(
+                contactMatches: viewModel.contactMatches,
+                isLoading: viewModel.isLoadingContacts,
+                contactsAccessDenied: viewModel.contactsAccessDenied,
+                followStates: viewModel.followStates,
+                onProfileTap: { profile in
+                    navigationPath.append(profile)
+                },
+                onFollowTap: { profileId in
+                    guard let currentUserId = userSession.currentUserId else { return }
+                    Task {
+                        await viewModel.toggleFollow(
+                            profileId: profileId,
+                            currentUserId: currentUserId
+                        )
+                    }
+                }
+            )
 
             ForEach(viewModel.suggestedProfiles) { profile in
                 SuggestedProfileRowView(

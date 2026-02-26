@@ -295,6 +295,7 @@ class LoginViewModel: ObservableObject {
                 // For existing users, keep using the original UID as the session ID
                 // but they're now authenticated via Supabase
                 userSession.setUserLoggedIn(uid: existingUser.id)
+                userSession.needsPhoneOnboarding = !UserSession.hasCompletedPhoneOnboarding
                 userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
                 userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                 await self.dataManager.initializeProfileData(userId: existingUser.id)
@@ -460,6 +461,7 @@ class LoginViewModel: ObservableObject {
                     Task { @MainActor in
                         // For new users, the profile ID is the same as supabaseUserId
                         userSession.setUserLoggedIn(uid: supabaseUserId)
+                        userSession.needsPhoneOnboarding = !UserSession.hasCompletedPhoneOnboarding
                         userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
                         userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                         await self.dataManager.initializeProfileData(userId: supabaseUserId)
@@ -587,6 +589,7 @@ class LoginViewModel: ObservableObject {
                 Task { @MainActor in
                     // For existing users, use the existing profile ID, not the Supabase auth UID
                     userSession.setUserLoggedIn(uid: existingUser.id)
+                    userSession.needsPhoneOnboarding = !UserSession.hasCompletedPhoneOnboarding
                     userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
                     userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                     await self.dataManager.initializeProfileData(userId: existingUser.id)
@@ -620,6 +623,7 @@ class LoginViewModel: ObservableObject {
                             print("✅ Apple profile created successfully")
                             Task { @MainActor in
                                 userSession.setUserLoggedIn(uid: supabaseUserId)
+                                userSession.needsPhoneOnboarding = !UserSession.hasCompletedPhoneOnboarding
                                 userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
                                 userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
                             }
