@@ -377,13 +377,12 @@ struct ExternalUserListPopupView: View {
 
     // MARK: - Data Loading
 
-    /// Loads places for the current list if not already loaded or empty.
+    /// Loads places for the current list if not already fetched.
     private func loadPlacesIfNeeded() {
         let list = lists[currentListIndex]
         let existingPlaces = viewModel.placeListPlaces[list.list_id]
 
-        // Load if nil OR empty (empty array might exist from failed previous attempt)
-        if existingPlaces == nil || existingPlaces?.isEmpty == true {
+        if existingPlaces == nil {
             isLoadingInitial = true
             viewModel.loadPlacesForList(list)
         } else {
@@ -427,62 +426,68 @@ struct ExternalUserListContentScrollView: View {
         viewModel.placeListPlaces[list.list_id] ?? []
     }
 
+    /// Whether the ViewModel has finished loading places for this list.
+    private var hasLoadedPlaces: Bool {
+        viewModel.placeListPlaces[list.list_id] != nil
+    }
+
     var body: some View {
-        if !places.isEmpty {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                        PopupPlaceCard(
-                            place: place,
-                            preferExternalThumbnail: true,
-                            onNavigate: { placeId in
-                                onNavigateToPlace?(placeId)
-                            }
-                        )
-                        .onAppear {
-                            if index == places.count - 3 {
-                                onLoadMore()
+        Group {
+            if !places.isEmpty {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
+                            PopupPlaceCard(
+                                place: place,
+                                preferExternalThumbnail: true,
+                                onNavigate: { placeId in
+                                    onNavigateToPlace?(placeId)
+                                }
+                            )
+                            .onAppear {
+                                if index == places.count - 3 {
+                                    onLoadMore()
+                                }
                             }
                         }
                     }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
 
-                if isLoadingMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .padding()
-                        Spacer()
+                    if isLoadingMore {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .padding()
+                            Spacer()
+                        }
                     }
                 }
-            }
-            .onAppear {
-                // Places loaded, clear loading state
-                if isLoadingInitial {
-                    isLoadingInitial = false
+            } else if isLoadingInitial {
+                VStack(spacing: 12) {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading places...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 8) {
+                    Spacer()
+                    Text("No places in this list")
+                        .foregroundColor(.gray)
+                    Spacer()
+                }
+                .padding(.vertical, 30)
             }
-        } else if isLoadingInitial {
-            VStack(spacing: 12) {
-                Spacer()
-                ProgressView()
-                    .scaleEffect(1.2)
-                Text("Loading places...")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                Spacer()
+        }
+        .onChange(of: hasLoadedPlaces) { _, loaded in
+            if loaded && isLoadingInitial {
+                isLoadingInitial = false
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            VStack(spacing: 8) {
-                Spacer()
-                Text("No places in this list")
-                    .foregroundColor(.gray)
-                Spacer()
-            }
-            .padding(.vertical, 30)
         }
     }
 }

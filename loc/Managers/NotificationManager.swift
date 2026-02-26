@@ -43,6 +43,17 @@ class NotificationManager: ObservableObject {
             )
         }
     }
+
+    /// Handles place-added-to-list notification tap by posting notification for UserProfileNavigationViewModel to observe.
+    func handleListNotificationTap(listId: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("NavigateToListFromNotification"),
+                object: nil,
+                userInfo: ["listId": listId]
+            )
+        }
+    }
 }
 
 struct PendingNavigation {
