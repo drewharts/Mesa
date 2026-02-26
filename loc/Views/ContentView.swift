@@ -48,8 +48,8 @@ struct ContentView: View {
                 dataManager: dataManager,
                 serviceContainer: serviceContainer
             )
-            .opacity(userSession.isUserLoggedIn && !userSession.needsProfilePhoto && !userSession.needsListOnboarding ? 1 : 0)
-            .allowsHitTesting(userSession.isUserLoggedIn && !userSession.needsProfilePhoto && !userSession.needsListOnboarding)
+            .opacity(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding ? 1 : 0)
+            .allowsHitTesting(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding)
             .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
                 handleNotificationNavigation(pendingNavigation)
             }
@@ -65,14 +65,20 @@ struct ContentView: View {
                 .transition(.opacity)
             }
 
-            // Profile photo onboarding overlays after login but before main app
-            if userSession.isUserLoggedIn && userSession.needsProfilePhoto {
+            // Phone number onboarding overlays first after login
+            if userSession.isUserLoggedIn && userSession.needsPhoneOnboarding {
+                PhoneOnboardingView(userId: userSession.currentUserId ?? "")
+                    .transition(.opacity)
+            }
+
+            // Profile photo onboarding overlays after phone step
+            if userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && userSession.needsProfilePhoto {
                 ProfilePhotoOnboardingView(userId: userSession.currentUserId ?? "")
                     .transition(.opacity)
             }
 
             // List creation onboarding overlays after photo onboarding but before main app
-            if userSession.isUserLoggedIn && !userSession.needsProfilePhoto && userSession.needsListOnboarding {
+            if userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && userSession.needsListOnboarding {
                 ListOnboardingView()
                     .transition(.opacity)
             }
@@ -109,7 +115,7 @@ struct ContentView: View {
         }
         .onChange(of: userSession.isUserLoggedIn) { oldValue, newValue in
             // Show suggested profiles on login only if all onboarding is already complete
-            if !oldValue && newValue && !userSession.needsProfilePhoto && !userSession.needsListOnboarding && SuggestedProfilesViewModel.shouldShowPopup {
+            if !oldValue && newValue && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding && SuggestedProfilesViewModel.shouldShowPopup {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     PresentationService.shared.present(.suggestedProfiles)
                 }

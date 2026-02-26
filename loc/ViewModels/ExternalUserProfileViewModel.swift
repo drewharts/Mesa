@@ -528,7 +528,12 @@ class ExternalUserProfileViewModel: ObservableObject {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
-                    await self?.performListSearch()
+                    guard let self else { return }
+                    if self.listSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        await self.reloadListsAfterSearch()
+                    } else {
+                        await self.performListSearch()
+                    }
                 }
             }
     }

@@ -32,16 +32,13 @@ struct ProfileListCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Photo collage button
-            Button(action: onTap) {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 8) {
                 listCardImage
+                listCardInfo
             }
-            .buttonStyle(PlainButtonStyle())
-
-            // List info
-            listCardInfo
         }
+        .buttonStyle(PlainButtonStyle())
     }
 
     // MARK: - List Card Image

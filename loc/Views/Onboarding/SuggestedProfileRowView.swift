@@ -3,14 +3,16 @@
 //  loc
 //
 //  DUMB Component: Displays a single suggested profile row.
-//  Single Responsibility: Render profile photo, name, and chevron indicator.
+//  Single Responsibility: Render profile photo, name, and follow button.
 //
 
 import SwiftUI
 
 struct SuggestedProfileRowView: View {
     let profile: ProfileData
+    let isFollowing: Bool
     let onTap: () -> Void
+    let onFollowTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
@@ -27,9 +29,14 @@ struct SuggestedProfileRowView: View {
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.gray)
+                if !isFollowing {
+                    Button(action: onFollowTap) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
             }
             .padding(.vertical, 8)
             .contentShape(Rectangle())
@@ -54,7 +61,9 @@ struct SuggestedProfileRowView: View {
                 firebaseUid: nil,
                 supabaseUid: nil
             ),
-            onTap: {}
+            isFollowing: false,
+            onTap: {},
+            onFollowTap: {}
         )
         .padding(.horizontal)
     }

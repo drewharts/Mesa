@@ -18,6 +18,8 @@ struct GoogleMapsImportView: View {
     let userId: String
     let existingLists: [LightweightPlaceList]
     var onImportCompleted: ((_ listId: String) -> Void)?
+    var cancelLabel: String = "Cancel"
+    var onCancel: (() -> Void)? = nil
 
     @State private var useExistingList = false
     @State private var selectedExistingListId: String? = nil
@@ -52,7 +54,13 @@ struct GoogleMapsImportView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(cancelLabel) {
+                        if let onCancel {
+                            onCancel()
+                        } else {
+                            dismiss()
+                        }
+                    }
                 }
             }
         }
@@ -150,42 +158,79 @@ struct GoogleMapsImportView: View {
 
     private var previewResultsView: some View {
         VStack(spacing: 0) {
-            // Summary
-            HStack {
-                Label("\(viewModel.resolvedPlaces.count) places found", systemImage: "mappin.and.ellipse")
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                Spacer()
-                if !viewModel.resolveErrors.isEmpty {
-                    Text("\(viewModel.resolveErrors.count) unresolved")
-                        .font(.caption)
-                        .foregroundColor(.orange)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    summaryCard
+                    modeToggle
+
+                    if useExistingList {
+                        existingListSelectionView
+                    } else {
+                        newListNameField
+                    }
+
+                    placeListView
                 }
-            }
-            .padding(.horizontal)
-            .padding(.top, 12)
-
-            // Segmented picker: Create New vs Add to Existing
-            Picker("", selection: $useExistingList) {
-                Text("Create New List").tag(false)
-                Text("Add to Existing").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 12)
-
-            // Destination section
-            if useExistingList {
-                existingListSelectionView
-            } else {
-                newListNameField
+                .padding(.horizontal)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
             }
 
-            // Place list
-            placeListView
-
-            // Action button
+            Divider()
             actionButton
+        }
+    }
+
+    // MARK: - Summary Card
+
+    /// Displays a summary card showing the number of resolved places and any errors.
+    private var summaryCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.accentColor)
+                .frame(width: 40, height: 40)
+                .background(Color.accentColor.opacity(0.12))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(viewModel.resolvedPlaces.count) places found")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Text("Ready to import")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if !viewModel.resolveErrors.isEmpty {
+                Text("\(viewModel.resolveErrors.count) !")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(14)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+    }
+
+    // MARK: - Mode Toggle
+
+    /// Displays capsule pill buttons for toggling between create-new and add-to-existing modes.
+    private var modeToggle: some View {
+        HStack(spacing: 8) {
+            NearbyFilterButton(title: "Create New List", isSelected: !useExistingList) {
+                withAnimation(.easeInOut(duration: 0.2)) { useExistingList = false }
+            }
+            NearbyFilterButton(title: "Add to Existing", isSelected: useExistingList) {
+                withAnimation(.easeInOut(duration: 0.2)) { useExistingList = true }
+            }
         }
     }
 
@@ -195,9 +240,10 @@ struct GoogleMapsImportView: View {
     private var newListNameField: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("List Name")
-                .font(.subheadline)
+                .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
+                .textCase(.uppercase)
 
             TextField("Enter list name", text: $viewModel.listName)
                 .padding(14)
@@ -208,15 +254,19 @@ struct GoogleMapsImportView: View {
                         .stroke(Color(.systemGray4), lineWidth: 1)
                 )
         }
-        .padding(.horizontal)
-        .padding(.top, 12)
     }
 
     // MARK: - Existing List Selection
 
     /// Displays a scrollable list of the user's existing lists for selection, or an empty state.
     private var existingListSelectionView: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Choose a List")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+
             if existingLists.isEmpty {
                 existingListEmptyState
             } else {
@@ -237,17 +287,26 @@ struct GoogleMapsImportView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 
-    /// Displays a scrollable picker of the user's existing lists with single-selection checkmark.
+    /// Displays a scrollable picker of the user's existing lists with single-selection indicators.
     private var existingListPicker: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(existingLists) { list in
+                ForEach(Array(existingLists.enumerated()), id: \.element.id) { index, list in
                     Button {
                         selectedExistingListId = list.list_id
                     } label: {
-                        HStack {
+                        HStack(spacing: 12) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                                .frame(width: 28, height: 28)
+                                .background(Color(.systemGray5))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(list.name)
                                     .font(.subheadline)
@@ -257,63 +316,114 @@ struct GoogleMapsImportView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+
                             Spacer()
-                            if selectedExistingListId == list.list_id {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.accentColor)
-                            }
+
+                            Image(systemName: selectedExistingListId == list.list_id
+                                  ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(selectedExistingListId == list.list_id
+                                                 ? .accentColor : Color(.systemGray3))
+                                .font(.system(size: 20))
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .background(
                             selectedExistingListId == list.list_id
-                                ? Color.accentColor.opacity(0.08)
+                                ? Color.accentColor.opacity(0.06)
                                 : Color.clear
                         )
                     }
-                    Divider().padding(.leading)
+                    .buttonStyle(.plain)
+
+                    if index < existingLists.count - 1 {
+                        Divider().padding(.leading, 52)
+                    }
                 }
             }
+            .padding(.vertical, 4)
         }
-        .frame(maxHeight: 160)
-        .padding(.top, 8)
+        .frame(maxHeight: 200)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 
     // MARK: - Place List
 
-    /// Displays the list of resolved places and any unresolved errors.
+    /// Displays the resolved places and any unresolved errors in a card-styled list.
     private var placeListView: some View {
-        List {
-            ForEach(viewModel.resolvedPlaces) { place in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(place.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    if !place.address.isEmpty {
-                        Text(place.address)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Places")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+
+            LazyVStack(spacing: 0) {
+                ForEach(Array(viewModel.resolvedPlaces.enumerated()), id: \.element.id) { index, place in
+                    HStack(spacing: 12) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.accentColor)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(place.name)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            if !place.address.isEmpty {
+                                Text(place.address)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+
+                    if index < viewModel.resolvedPlaces.count - 1 || !viewModel.resolveErrors.isEmpty {
+                        Divider().padding(.leading, 44)
+                    }
+                }
+
+                if !viewModel.resolveErrors.isEmpty {
+                    unresolvedErrorsSection
                 }
             }
+            .padding(.vertical, 4)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
 
-            if !viewModel.resolveErrors.isEmpty {
-                Section("Could not resolve") {
-                    ForEach(viewModel.resolveErrors, id: \.self) { error in
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                    }
-                }
+    /// Displays the unresolved place errors at the bottom of the places card.
+    private var unresolvedErrorsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.orange)
+                Text("Could not resolve (\(viewModel.resolveErrors.count))")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.orange)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+
+            ForEach(viewModel.resolveErrors, id: \.self) { error in
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
             }
         }
-        .listStyle(.plain)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Action Button
 
-    /// Displays the primary action button that creates a new list or adds places to an existing one.
+    /// Displays the primary sticky action button that creates a new list or adds places to an existing one.
     private var actionButton: some View {
         Button {
             Task {
@@ -328,12 +438,17 @@ struct GoogleMapsImportView: View {
             }
         } label: {
             Text(useExistingList ? "Add Places" : "Create List")
-                .fontWeight(.semibold)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(Color(.systemBackground))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .frame(height: 50)
+                .background(
+                    Capsule().fill(Color.primary)
+                )
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.plain)
         .disabled(actionButtonDisabled)
+        .opacity(actionButtonDisabled ? 0.3 : 1.0)
         .padding(.horizontal)
         .padding(.vertical, 12)
     }
