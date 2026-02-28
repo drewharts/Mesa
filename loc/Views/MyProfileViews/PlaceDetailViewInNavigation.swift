@@ -2,35 +2,35 @@
 //  PlaceDetailViewInNavigation.swift
 //  loc
 //
-//  Created by Assistant on navigation integration
-//
-//  Wrapper view for PlaceDetailView when used in NavigationStack
-//  Single Responsibility: Load place details and present PlaceDetailView without NavigationView wrapper
-//  MVVM: Coordinates between SelectedPlaceViewModel and PlaceDetailView
+//  Wrapper view for PlaceDetailView when used in NavigationStack.
+//  Single Responsibility: Present PlaceDetailView without NavigationView wrapper.
+//  MVVM: Uses PlaceDetailNavigationViewModel for data fetching,
+//  coordinates with SelectedPlaceViewModel via .task modifier.
 
 import SwiftUI
 
 struct PlaceDetailViewInNavigation: View {
-    let placeId: String
     let minSheetHeight: CGFloat
 
+    @StateObject private var viewModel: PlaceDetailNavigationViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-    
-    @State private var isLoading = true
-    @State private var loadError: Error?
-    @State private var originalAllowAutoPresent: Bool = true // Store original value to restore later
-    
+
+    init(placeId: String, minSheetHeight: CGFloat) {
+        self.minSheetHeight = minSheetHeight
+        self._viewModel = StateObject(wrappedValue: PlaceDetailNavigationViewModel(placeId: placeId))
+    }
+
     var body: some View {
         Group {
-            if isLoading {
+            if viewModel.isLoading {
                 ProgressView("Loading place details...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let error = loadError {
+            } else if let error = viewModel.loadError {
                 VStack(spacing: 16) {
                     Text("Error loading place")
                         .font(.headline)
@@ -40,7 +40,6 @@ struct PlaceDetailViewInNavigation: View {
                 }
                 .padding()
             } else {
-                // PlaceDetailView without NavigationView wrapper (we're already in NavigationStack)
                 PlaceDetailViewContent(minSheetHeight: minSheetHeight)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(profile)
@@ -52,50 +51,15 @@ struct PlaceDetailViewInNavigation: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await loadPlace()
-        }
-        .onDisappear {
-            // Restore allowAutoPresent when leaving this view
-            // MVVM: Clean up state when view is dismissed
-            selectedPlaceVM.allowAutoPresent = originalAllowAutoPresent
-
-            // Clear selected place to remove selection indicator when navigating back to list
-            selectedPlaceVM.selectedPlace = nil
-        }
-    }
-    
-    /// Loads place details and sets up SelectedPlaceViewModel
-    /// MVVM: Business logic - coordinates place loading
-    /// Staff Engineer: Prevents auto-presentation of sheet when navigating within NavigationStack
-    private func loadPlace() async {
-        do {
-            // Fetch the full place details using PlaceService
-            let fullPlace = try await PlaceService.shared.fetchPlace(withId: placeId)
-            
-            // Set up place in SelectedPlaceViewModel WITHOUT triggering sheet presentation
-            // MVVM: We're in NavigationStack, so we don't want to trigger the sheet in MainView
+            await viewModel.loadPlace()
             await MainActor.run {
-                // Disable auto-present to prevent sheet from showing in MainView
-                // Keep it disabled - loadData() runs asynchronously and will check this
-                // We'll restore it in onDisappear when this view is dismissed
-                originalAllowAutoPresent = selectedPlaceVM.allowAutoPresent
-                selectedPlaceVM.allowAutoPresent = false
-                
-                // Set up place (this will load data but won't auto-present sheet)
-                // Animate map to place location when navigating from list popup
-                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
-                
-                // Ensure sheet is NOT presented (we're using NavigationStack)
-                selectedPlaceVM.isDetailSheetPresented = false
-                
-                isLoading = false
+                if let place = viewModel.loadedPlace {
+                    selectedPlaceVM.allowAutoPresent = false
+                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+                    selectedPlaceVM.allowAutoPresent = true
+                    selectedPlaceVM.isDetailSheetPresented = false
+                }
             }
-        } catch {
-            await MainActor.run {
-                loadError = error
-                isLoading = false
-            }
-            print("❌ [PlaceDetailViewInNavigation] Error loading place details: \(error)")
         }
     }
 }

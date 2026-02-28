@@ -19,12 +19,9 @@ struct LightweightProfileListSection: View {
     let places: [LightweightPlace]
     let allLists: [LightweightPlaceList]
     let currentIndex: Int
+    let placeCount: Int
     @Binding var placeColors: [UUID: Color]
     let onTap: () -> Void
-
-    private var totalPlaceCount: Int {
-        return list.place_count
-    }
 
     var body: some View {
         Button(action: onTap) {
@@ -33,7 +30,7 @@ struct LightweightProfileListSection: View {
 
                 ListCardInfo(
                     list: list,
-                    totalPlaceCount: totalPlaceCount
+                    totalPlaceCount: placeCount
                 )
             }
         }
