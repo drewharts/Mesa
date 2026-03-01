@@ -26,6 +26,7 @@ class PlaceSaversViewModel: ObservableObject {
     @Published private(set) var currentUserSaved: Bool = false
     @Published private(set) var totalSaverCount: Int = 0  // Count of all savers (excluding current user)
     @Published private(set) var totalGlobalSaveCount: Int = 0  // Total saves from ALL users (for display)
+    @Published private(set) var reviewedSaverIds: Set<String> = []  // IDs of savers who left a review
 
     /// All savers combined (for backward compatibility)
     var savers: [ProfileData] {
@@ -131,6 +132,12 @@ class PlaceSaversViewModel: ObservableObject {
         currentUserSaved ? totalGlobalSaveCount > 1 : totalGlobalSaveCount > 0
     }
 
+    /// Whether the current user has reviewed this place
+    var currentUserReviewed: Bool {
+        guard let currentUserId = userSession.currentUserId else { return false }
+        return reviewedSaverIds.contains(currentUserId)
+    }
+
     /// Whether there are any followed savers to display (excluding current user)
     var hasFollowedSavers: Bool {
         displayableFollowedSavers.count > 0
@@ -184,12 +191,16 @@ class PlaceSaversViewModel: ObservableObject {
                     userSaved = false
                 }
 
+                // Build set of saver IDs who left a review
+                let reviewed = Set(saverProfiles.filter { $0.hasReviewed == true }.map { $0.userId })
+
                 // Update state
                 self.followedSavers = followed
                 self.unfollowedSavers = unfollowed
                 self.totalSaverCount = saverProfiles.count
                 self.totalGlobalSaveCount = saverProfiles.count  // Now we have all savers
                 self.currentUserSaved = userSaved
+                self.reviewedSaverIds = reviewed
 
                 // Notify parent of savers update (for consistency with map annotations)
                 let saverIds = saverProfiles.map { $0.userId }
@@ -226,6 +237,7 @@ class PlaceSaversViewModel: ObservableObject {
         currentUserSaved = false
         totalSaverCount = 0
         totalGlobalSaveCount = 0
+        reviewedSaverIds = []
     }
 }
 

@@ -710,6 +710,7 @@ struct PlaceSaverProfile: Codable, Identifiable {
     let fullName: String?
     let profilePhotoUrl: String?
     let isFollowed: Bool
+    let hasReviewed: Bool?
 
     var id: String { userId }
 
@@ -718,6 +719,7 @@ struct PlaceSaverProfile: Codable, Identifiable {
         case fullName = "full_name"
         case profilePhotoUrl = "profile_photo_url"
         case isFollowed = "is_followed"
+        case hasReviewed = "has_reviewed"
     }
 
     /// Convert to ProfileData for compatibility with existing UI components
