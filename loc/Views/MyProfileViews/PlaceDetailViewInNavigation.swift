@@ -54,9 +54,7 @@ struct PlaceDetailViewInNavigation: View {
             await viewModel.loadPlace()
             await MainActor.run {
                 if let place = viewModel.loadedPlace {
-                    selectedPlaceVM.allowAutoPresent = false
-                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-                    selectedPlaceVM.allowAutoPresent = true
+                    selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
                     selectedPlaceVM.isDetailSheetPresented = false
                 }
             }
