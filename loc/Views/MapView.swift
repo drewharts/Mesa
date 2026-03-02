@@ -195,7 +195,6 @@ struct MapView: View {
         mapViewModel.tapDiscoveryViewModel.resetState()
 
         // Skip if this place is already selected AND detail sheet is visible
-        // Allow re-tap if sheet was swiped away (isDetailSheetPresented = false)
         if selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id &&
            selectedPlaceVM.isDetailSheetPresented {
             return
@@ -203,30 +202,27 @@ struct MapView: View {
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
-                    // Preserve the annotation so it survives zoom-out density culling
                     mapViewModel.setPreservedAnnotation(for: place)
-
-                    // Check if any popup sheet is open - if so, navigate within the sheet instead
-                    // MVVM: View coordinates navigation based on ViewModel state
-                    if mapViewModel.showingListPopup ||
-                       mapViewModel.showingExternalPlacesPopup ||
-                       mapViewModel.showingReviewsPopup ||
-                       mapViewModel.showingFavoritesPopup ||
-                       mapViewModel.showingExternalListPopup ||
-                       mapViewModel.showingExternalReviewsPopup ||
-                       mapViewModel.showingExternalFavoritesPopup ||
-                       mapViewModel.showingKeywordPopup {
-                        // Set pending navigation - popup view will observe this and push to NavigationStack
-                        // This makes annotation taps behave the same as clicking a place tile in the popup
-                        mapViewModel.pendingPlaceNavigation = place.id.uuidString
-                    } else {
-                        // Normal behavior: show place detail sheet
-                        // Use selectPlace since data is already complete from backend
-                        selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
-                        selectedPlaceVM.isDetailSheetPresented = true
-                    }
+                    navigateToPlace(place)
                 }
             }
+        }
+    }
+
+    /// Routes place navigation through popup sheet or direct detail sheet.
+    private func navigateToPlace(_ place: DetailPlace) {
+        if mapViewModel.showingListPopup ||
+           mapViewModel.showingExternalPlacesPopup ||
+           mapViewModel.showingReviewsPopup ||
+           mapViewModel.showingFavoritesPopup ||
+           mapViewModel.showingExternalListPopup ||
+           mapViewModel.showingExternalReviewsPopup ||
+           mapViewModel.showingExternalFavoritesPopup ||
+           mapViewModel.showingKeywordPopup {
+            mapViewModel.pendingPlaceNavigation = place.id.uuidString
+        } else {
+            selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
+            selectedPlaceVM.isDetailSheetPresented = true
         }
     }
     

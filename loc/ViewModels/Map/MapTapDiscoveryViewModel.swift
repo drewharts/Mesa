@@ -74,31 +74,40 @@ class MapTapDiscoveryViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 50_000_000)
             guard !Task.isCancelled else { return }
 
-            self.discoveryState = .searching
-            self.onDiscoveryStarted?()
+            await self.performDiscovery(at: coordinate)
+        }
+    }
 
-            do {
-                let mapItems = try await self.searchNearbyPlaces(at: coordinate)
+    /// Executes the MKLocalSearch and delivers results via callbacks.
+    private func performDiscovery(at coordinate: CLLocationCoordinate2D) async {
+        discoveryState = .searching
+        onDiscoveryStarted?()
 
-                guard !Task.isCancelled else { return }
+        do {
+            let mapItems = try await searchNearbyPlaces(at: coordinate)
 
-                if mapItems.isEmpty {
-                    self.showNoResults()
-                    return
-                }
+            guard !Task.isCancelled else { return }
 
-                self.discoveryState = .idle
-
-                if mapItems.count == 1 {
-                    self.onSinglePlaceFound?(mapItems[0])
-                } else {
-                    self.onNearbyPlacesFound?(mapItems, coordinate)
-                }
-            } catch {
-                if !Task.isCancelled {
-                    self.showNoResults()
-                }
+            if mapItems.isEmpty {
+                showNoResults()
+                return
             }
+
+            discoveryState = .idle
+            deliverResults(mapItems, coordinate: coordinate)
+        } catch {
+            if !Task.isCancelled {
+                showNoResults()
+            }
+        }
+    }
+
+    /// Delivers search results via the appropriate callback based on result count.
+    private func deliverResults(_ mapItems: [MKMapItem], coordinate: CLLocationCoordinate2D) {
+        if mapItems.count == 1 {
+            onSinglePlaceFound?(mapItems[0])
+        } else {
+            onNearbyPlacesFound?(mapItems, coordinate)
         }
     }
 

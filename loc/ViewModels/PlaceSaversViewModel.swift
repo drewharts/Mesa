@@ -162,73 +162,62 @@ class PlaceSaversViewModel: ObservableObject {
     
     // MARK: - Private Methods
 
-    /// Fetches place savers from database in real-time
+    /// Fetches place savers from database in real-time.
     private func fetchSaversFromDatabase(placeId: String) {
         fetchTask = Task { [weak self] in
-            guard let self = self else { return }
-
+            guard let self else { return }
             do {
-                let requestingUserId = self.userSession.currentUserId
-
-                // Fetch ALL savers (database now returns everyone with is_followed flag)
                 let saverProfiles = try await self.userService.fetchPlaceSavers(
                     placeId: placeId,
-                    requestingUserId: requestingUserId
+                    requestingUserId: self.userSession.currentUserId
                 )
-
-                // Check if task was cancelled
                 guard !Task.isCancelled else { return }
-
-                // Separate followed and unfollowed savers based on is_followed flag
-                let followed = saverProfiles.filter { $0.isFollowed }.map { $0.toProfileData() }
-                let unfollowed = saverProfiles.filter { !$0.isFollowed }.map { $0.toProfileData() }
-
-                // Check if current user is in the savers list
-                let userSaved: Bool
-                if let currentUserId = requestingUserId {
-                    userSaved = saverProfiles.contains { $0.userId == currentUserId }
-                } else {
-                    userSaved = false
-                }
-
-                // Build set of saver IDs who left a review
-                let reviewed = Set(saverProfiles.filter { $0.hasReviewed == true }.map { $0.userId })
-
-                // Update state
-                self.followedSavers = followed
-                self.unfollowedSavers = unfollowed
-                self.totalSaverCount = saverProfiles.count
-                self.totalGlobalSaveCount = saverProfiles.count  // Now we have all savers
-                self.currentUserSaved = userSaved
-                self.reviewedSaverIds = reviewed
-
-                // Notify parent of savers update (for consistency with map annotations)
-                let saverIds = saverProfiles.map { $0.userId }
-                if !saverIds.isEmpty {
-                    self.onSaversUpdated?(placeId, saverIds)
-                }
-
-                self.error = nil
-                self.isLoading = false
-
-                let followedCount = followed.count
-                let unfollowedCount = unfollowed.count
-                print("✅ [PlaceSavers] Fetched \(saverProfiles.count) savers (\(followedCount) followed, \(unfollowedCount) unfollowed) for place \(placeId.prefix(8))...")
-
+                self.applyFetchedSavers(saverProfiles, placeId: placeId)
             } catch {
                 guard !Task.isCancelled else { return }
-
-                print("❌ [PlaceSavers] Error fetching savers: \(error.localizedDescription)")
-                self.error = error
-                self.isLoading = false
-                self.totalSaverCount = 0
-                self.totalGlobalSaveCount = 0
-                self.followedSavers = []
-                self.unfollowedSavers = []
+                self.applyFetchError(error)
             }
         }
     }
+
+    /// Updates published state from successfully fetched saver profiles.
+    private func applyFetchedSavers(_ saverProfiles: [PlaceSaverProfile], placeId: String) {
+        let followed = saverProfiles.filter { $0.isFollowed }.map { $0.toProfileData() }
+        let unfollowed = saverProfiles.filter { !$0.isFollowed }.map { $0.toProfileData() }
+
+        let userSaved: Bool
+        if let currentUserId = userSession.currentUserId {
+            userSaved = saverProfiles.contains { $0.userId == currentUserId }
+        } else {
+            userSaved = false
+        }
+
+        followedSavers = followed
+        unfollowedSavers = unfollowed
+        totalSaverCount = saverProfiles.count
+        totalGlobalSaveCount = saverProfiles.count
+        currentUserSaved = userSaved
+        reviewedSaverIds = Set(saverProfiles.filter { $0.hasReviewed == true }.map { $0.userId })
+        error = nil
+        isLoading = false
+
+        let saverIds = saverProfiles.map { $0.userId }
+        if !saverIds.isEmpty {
+            onSaversUpdated?(placeId, saverIds)
+        }
+    }
+
+    /// Updates published state when fetching savers fails.
+    private func applyFetchError(_ error: Error) {
+        self.error = error
+        isLoading = false
+        totalSaverCount = 0
+        totalGlobalSaveCount = 0
+        followedSavers = []
+        unfollowedSavers = []
+    }
     
+    /// Clears all saver data and resets loading state.
     private func resetState() {
         followedSavers = []
         unfollowedSavers = []

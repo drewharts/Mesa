@@ -107,24 +107,34 @@ class MapViewModel: ObservableObject {
 
     /// Wires up callbacks between child ViewModels.
     private func setupCallbacks() {
-        // Forward tap discovery state changes so MapView overlay updates
+        setupTapDiscoveryForwarding()
+        setupFilterCallbacks()
+        setupExternalUserCallbacks()
+        setupAnnotationCallbacks()
+    }
+
+    /// Forwards tap discovery state changes so MapView overlay updates.
+    private func setupTapDiscoveryForwarding() {
         tapDiscoveryViewModel.objectWillChange
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
+    }
 
-        // When filtering changes, clear annotations and reset region for reload
+    /// Clears annotations when filtering changes so the viewport reloads.
+    private func setupFilterCallbacks() {
         filteringViewModel.onFilterChanged = { [weak self] in
             self?.viewportViewModel.clearAnnotations()
             self?.viewportViewModel.resetLastLoadedRegion()
         }
 
-        // When external user filtering changes, clear annotations and reset region for reload
         externalUserViewModel.onFilterChanged = { [weak self] in
             self?.viewportViewModel.clearAnnotations()
             self?.viewportViewModel.resetLastLoadedRegion()
         }
+    }
 
-        // When external user is selected, load their profile photo
+    /// Loads external user profile photo when selected.
+    private func setupExternalUserCallbacks() {
         externalUserViewModel.onExternalUserSelected = { [weak self] userId, photoUrl in
             guard let photoUrl = photoUrl else { return }
             Task { [weak self] in
@@ -132,8 +142,10 @@ class MapViewModel: ObservableObject {
                 self?.photoViewModel.generateAnnotationImages(for: self?.viewportViewModel.viewportAnnotations ?? [])
             }
         }
+    }
 
-        // When annotations are loaded, regenerate annotation images
+    /// Regenerates annotation images when annotations are loaded.
+    private func setupAnnotationCallbacks() {
         viewportViewModel.onAnnotationsLoaded = { [weak self] annotations in
             self?.photoViewModel.generateAnnotationImages(for: annotations)
         }
@@ -236,7 +248,7 @@ class MapViewModel: ObservableObject {
         // Note: activeSheet is NOT cleared here - it's managed by the sheet presentation logic
     }
 
-    /// Clears only user filters (not external user filters).
+    /// Clears only the current user's filters without affecting external user filters.
     private func clearUserFilters() {
         filteringViewModel.clearAllFilters()
     }
