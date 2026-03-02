@@ -47,6 +47,7 @@ class PlaceRepository {
     }
 
     /// Resolves a place by name and coordinate, then fetches full details using the resolved ID.
+    /// Validates the resolved place is within 200m of the expected coordinate.
     private func resolveByNameAndCoordinate(_ existingPlace: DetailPlace, coordinate: CLLocationCoordinate2D) async throws -> DetailPlace {
         let result = try await importService.resolvePlace(
             name: existingPlace.name,
@@ -62,7 +63,26 @@ class PlaceRepository {
             placeId: importedPlace.googlePlacesId,
             source: "google"
         )
-        return PlaceDataAssembler.merge(base: existingPlace, overlay: freshPlace)
+
+        let merged = PlaceDataAssembler.merge(base: existingPlace, overlay: freshPlace)
+
+        if let freshCoordinate = merged.coordinate,
+           !isWithinDistance(freshCoordinate, of: coordinate, thresholdMeters: 200) {
+            throw PlaceResolutionError.couldNotResolve(name: existingPlace.name)
+        }
+
+        return merged
+    }
+
+    /// Returns true if two coordinates are within the given distance threshold.
+    private func isWithinDistance(
+        _ coord1: CLLocationCoordinate2D,
+        of coord2: CLLocationCoordinate2D,
+        thresholdMeters: Double
+    ) -> Bool {
+        let loc1 = CLLocation(latitude: coord1.latitude, longitude: coord1.longitude)
+        let loc2 = CLLocation(latitude: coord2.latitude, longitude: coord2.longitude)
+        return loc1.distance(from: loc2) <= thresholdMeters
     }
 }
 

@@ -47,6 +47,14 @@ struct MainView: View {
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profileViewModel.externalContentViewModel }
 
+    /// Binding that drives the resolution error alert presentation.
+    private var resolutionErrorBinding: Binding<Bool> {
+        Binding(
+            get: { selectedPlaceVM.resolutionErrorMessage != nil },
+            set: { if !$0 { selectedPlaceVM.resolutionErrorMessage = nil } }
+        )
+    }
+
     // MARK: - Initialization
     init(
         selectedPlaceVM: SelectedPlaceViewModel,
@@ -170,6 +178,11 @@ struct MainView: View {
                 }
             } message: {
                 Text(deepLinkViewModel.noLocationAlertMessage)
+            }
+            .alert("Error", isPresented: resolutionErrorBinding) {
+                Button("OK") { selectedPlaceVM.resolutionErrorMessage = nil }
+            } message: {
+                Text(selectedPlaceVM.resolutionErrorMessage ?? "")
             }
         }
         .onAppear {

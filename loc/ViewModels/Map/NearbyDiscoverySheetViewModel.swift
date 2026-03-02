@@ -64,12 +64,12 @@ class NearbyDiscoverySheetViewModel: ObservableObject {
     }
 
     /// Creates a minimal DetailPlace from an MKMapItem for immediate display.
-    /// Used by both sheet selection and auto-navigate (single result) flows.
+    /// Includes phone and website when available from MapKit for richer placeholder content.
     func createPlaceholderFromMapItem(_ mapItem: MKMapItem) -> DetailPlace {
         let coordinate = mapItem.placemark.coordinate
         let address = formatAddress(from: mapItem.placemark)
 
-        return DetailPlace(
+        var placeholder = DetailPlace(
             googlePlaceId: "",
             name: mapItem.name ?? "Unknown Place",
             address: address,
@@ -79,6 +79,11 @@ class NearbyDiscoverySheetViewModel: ObservableObject {
             ),
             source: "apple"
         )
+
+        placeholder.phone = mapItem.phoneNumber
+        placeholder.websiteUrl = mapItem.url?.absoluteString
+
+        return placeholder
     }
 
     /// Formats an address string from a placemark's components.
