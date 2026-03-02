@@ -47,6 +47,14 @@ struct MainView: View {
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profileViewModel.externalContentViewModel }
 
+    /// Binding that drives the resolution error alert presentation.
+    private var resolutionErrorBinding: Binding<Bool> {
+        Binding(
+            get: { selectedPlaceVM.resolutionErrorMessage != nil },
+            set: { if !$0 { selectedPlaceVM.resolutionErrorMessage = nil } }
+        )
+    }
+
     // MARK: - Initialization
     init(
         selectedPlaceVM: SelectedPlaceViewModel,
@@ -94,8 +102,7 @@ struct MainView: View {
                     userProfileNavigationViewModel: userProfileNavigationViewModel,
                     mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                     serviceContainer: serviceContainer,
-                    notificationManager: notificationManager,
-                    onMapTap: handleMapTap
+                    notificationManager: notificationManager
                 )
 
                 // UI Overlay (Top Controls, FABs)
@@ -172,6 +179,11 @@ struct MainView: View {
             } message: {
                 Text(deepLinkViewModel.noLocationAlertMessage)
             }
+            .alert("Error", isPresented: resolutionErrorBinding) {
+                Button("OK") { selectedPlaceVM.resolutionErrorMessage = nil }
+            } message: {
+                Text(selectedPlaceVM.resolutionErrorMessage ?? "")
+            }
         }
         .onAppear {
             locationManager.requestLocationPermission()
@@ -246,6 +258,10 @@ struct MainView: View {
             // Search Results
             case .keywordResults(let keyword, let types):
                 keywordResultsSheet(keyword: keyword, types: types)
+
+            // Nearby Discovery
+            case .nearbyDiscovery:
+                nearbyDiscoverySheet
 
             // Onboarding
             case .suggestedProfiles:
@@ -387,6 +403,13 @@ struct MainView: View {
         .applyMapPopupEnvironment(from: self)
         .applyMapPopupPresentation()
         .onDisappear { handleMapPopupDisappear() }
+    }
+
+    /// Nearby discovery popup sheet content.
+    private var nearbyDiscoverySheet: some View {
+        NearbyDiscoverySheet()
+            .applyMapPopupEnvironment(from: self)
+            .applyMapPopupPresentation()
     }
 
     /// Keyword results popup sheet content.
@@ -625,12 +648,6 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Actions
-
-    /// Handle map tap - no-op since search is now fullScreenCover.
-    private func handleMapTap() {
-        // Search is now presented as fullScreenCover, no need to collapse
-    }
 }
 
 // MARK: - View Extensions for Map Popup Sheets

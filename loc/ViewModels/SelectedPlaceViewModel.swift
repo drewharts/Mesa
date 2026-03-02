@@ -27,6 +27,11 @@ class SelectedPlaceViewModel: ObservableObject {
     let metadata: PlaceMetadataViewModel
     let creation: PlaceCreationViewModel
 
+    // MARK: - Published State
+
+    /// Error message shown when a place cannot be resolved (e.g. MKMapItem not found in backend).
+    @Published var resolutionErrorMessage: String?
+
     // MARK: - Services
 
     private let postsCacheService = ServiceContainer.shared.postsCacheService
@@ -357,6 +362,13 @@ class SelectedPlaceViewModel: ObservableObject {
         postsCacheService.loadPosts(forPlaceId: place.id.uuidString)
     }
 
+    /// Dismisses the detail sheet and shows an error when an MKMapItem-sourced place cannot be resolved.
+    private func handleUnresolvablePlaceholder() {
+        isDetailSheetPresented = false
+        selectionState.selectedPlace = nil
+        resolutionErrorMessage = "Unable to find this place"
+    }
+
     /// Enriches a place with backend data and continues with setup.
     private func enrichAndSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
         guard place.isCustom != true else {
@@ -404,7 +416,12 @@ class SelectedPlaceViewModel: ObservableObject {
                 print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
                 guard self.selectedPlace?.id == place.id else { return }
                 selectionState.markFetchComplete()
-                metadata.computeMetadata(for: place)
+
+                if place.hasPlaceholderID && (place.googlePlaceId ?? "").isEmpty {
+                    handleUnresolvablePlaceholder()
+                } else {
+                    metadata.computeMetadata(for: place)
+                }
             }
         }
     }

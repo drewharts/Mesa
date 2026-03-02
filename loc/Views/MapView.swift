@@ -29,7 +29,7 @@ struct MapView: View {
     @State private var hasLoadedInitialViewport = false
     @State private var hasCenteredOnUserLocation = false
     
-    var onMapTap: (() -> Void)?
+    var onMapTap: ((CLLocationCoordinate2D) -> Void)?
     
     // Check when a place is actively selected (detail sheet or any popup)
     private var isPlaceSelected: Bool {
@@ -160,6 +160,8 @@ struct MapView: View {
     
     // Handle community marker tap
     private func handleCommunityMarkerTap(_ marker: CommunityPlaceMarker) {
+        // Cancel any in-flight tap discovery (SpatialTapGesture fires simultaneously)
+        mapViewModel.tapDiscoveryViewModel.resetState()
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: marker) {
                 await MainActor.run {
@@ -189,8 +191,10 @@ struct MapView: View {
     
     // Handle annotation tap
     private func handleAnnotationTap(_ annotation: PlaceAnnotation) {
+        // Cancel any in-flight tap discovery (SpatialTapGesture fires simultaneously)
+        mapViewModel.tapDiscoveryViewModel.resetState()
+
         // Skip if this place is already selected AND detail sheet is visible
-        // Allow re-tap if sheet was swiped away (isDetailSheetPresented = false)
         if selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id &&
            selectedPlaceVM.isDetailSheetPresented {
             return
@@ -198,30 +202,27 @@ struct MapView: View {
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
-                    // Preserve the annotation so it survives zoom-out density culling
                     mapViewModel.setPreservedAnnotation(for: place)
-
-                    // Check if any popup sheet is open - if so, navigate within the sheet instead
-                    // MVVM: View coordinates navigation based on ViewModel state
-                    if mapViewModel.showingListPopup ||
-                       mapViewModel.showingExternalPlacesPopup ||
-                       mapViewModel.showingReviewsPopup ||
-                       mapViewModel.showingFavoritesPopup ||
-                       mapViewModel.showingExternalListPopup ||
-                       mapViewModel.showingExternalReviewsPopup ||
-                       mapViewModel.showingExternalFavoritesPopup ||
-                       mapViewModel.showingKeywordPopup {
-                        // Set pending navigation - popup view will observe this and push to NavigationStack
-                        // This makes annotation taps behave the same as clicking a place tile in the popup
-                        mapViewModel.pendingPlaceNavigation = place.id.uuidString
-                    } else {
-                        // Normal behavior: show place detail sheet
-                        // Use selectPlace since data is already complete from backend
-                        selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
-                        selectedPlaceVM.isDetailSheetPresented = true
-                    }
+                    navigateToPlace(place)
                 }
             }
+        }
+    }
+
+    /// Routes place navigation through popup sheet or direct detail sheet.
+    private func navigateToPlace(_ place: DetailPlace) {
+        if mapViewModel.showingListPopup ||
+           mapViewModel.showingExternalPlacesPopup ||
+           mapViewModel.showingReviewsPopup ||
+           mapViewModel.showingFavoritesPopup ||
+           mapViewModel.showingExternalListPopup ||
+           mapViewModel.showingExternalReviewsPopup ||
+           mapViewModel.showingExternalFavoritesPopup ||
+           mapViewModel.showingKeywordPopup {
+            mapViewModel.pendingPlaceNavigation = place.id.uuidString
+        } else {
+            selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
+            selectedPlaceVM.isDetailSheetPresented = true
         }
     }
     
@@ -263,9 +264,11 @@ struct MapView: View {
                         }
                 )
                 .simultaneousGesture(
-                    TapGesture()
-                        .onEnded {
-                            onMapTap?()
+                    SpatialTapGesture()
+                        .onEnded { value in
+                            if let coordinate = mapProxy.convert(value.location, from: .local) {
+                                onMapTap?(coordinate)
+                            }
                         }
                 )
             }
@@ -332,7 +335,9 @@ struct MapView: View {
                 }
                 Spacer()
             }
-            
+
+            // Tap-to-discover overlay
+            tapDiscoveryOverlay
         }
         .sheet(isPresented: $showCreatePlacePopup) {
             if let coordinate = newPlaceCoordinate {
@@ -472,8 +477,49 @@ struct MapView: View {
         }
     }
     
+    // Tap-to-discover status overlay (searching / no results)
+    private var tapDiscoveryOverlay: some View {
+        VStack {
+            Spacer()
+            Group {
+                switch mapViewModel.tapDiscoveryViewModel.discoveryState {
+                case .searching:
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .tint(.white)
+                        Text("Finding place...")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.75))
+                    .clipShape(Capsule())
+                    .transition(.opacity.combined(with: .scale))
+
+                case .noResults:
+                    Text("No place found here")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.75))
+                        .clipShape(Capsule())
+                        .transition(.opacity.combined(with: .scale))
+
+                default:
+                    EmptyView()
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: mapViewModel.tapDiscoveryViewModel.discoveryState)
+            .padding(.bottom, 120)
+        }
+    }
+
     // MARK: - Private Methods
-    
+
     // Listen for notifications about place changes
     private func setupNotificationObservers() {
         NotificationCenter.default.addObserver(

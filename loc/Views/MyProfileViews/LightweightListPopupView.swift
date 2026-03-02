@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct LightweightListPopupView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -36,6 +37,7 @@ struct LightweightListPopupView: View {
     @State private var deleteErrorMessage: String = ""
     @State private var showEditListSheet: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
+    @State private var hasInitiallyAppeared = false
 
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = [], onViewOnMap: (() -> Void)? = nil) {
@@ -100,24 +102,26 @@ struct LightweightListPopupView: View {
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { placeId in
                 // Navigate to place detail when place ID is pushed onto path
-                // Environment objects are inherited from parent hierarchy
+                // .id(placeId) forces full view re-creation when the path is replaced
+                // with a different placeId, ensuring @StateObject re-initializes
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+                    .id(placeId)
             }
         }
-        .onChange(of: presentationService.pendingPlaceNavigation) { oldValue, newValue in
-            // When map annotation is tapped while list sheet is open, navigate to that place
-            // MVVM: View coordinates navigation based on PresentationService state
-            // This makes annotation taps behave the same as clicking a place tile in the list sheet
-            if let placeId = newValue {
-                navigationPath.append(placeId)
-                // Clear the pending navigation after handling it
-                presentationService.pendingPlaceNavigation = nil
-            }
+        .onReceive(presentationService.$pendingPlaceNavigation.compactMap { $0 }) { placeId in
+            // When map annotation is tapped while list sheet is open, navigate to that place.
+            // Uses onReceive (Combine) instead of onChange for reliable delivery even when
+            // a navigation destination is pushed on the stack.
+            var newPath = NavigationPath()
+            newPath.append(placeId)
+            navigationPath = newPath
+            presentationService.pendingPlaceNavigation = nil
         }
         .onAppear {
-            // Clear navigation path when sheet appears (ensures fresh state each time)
-            // MVVM: View manages its own navigation state - reset on each presentation
-            // Best Practice: Clear in onAppear rather than onDisappear for reliability
+            // Clear navigation path only on the first appearance (when the sheet opens).
+            // Guard prevents this from interfering if onAppear re-fires during navigation transitions.
+            guard !hasInitiallyAppeared else { return }
+            hasInitiallyAppeared = true
             navigationPath = NavigationPath()
 
             // Set dependencies for pagination ViewModel

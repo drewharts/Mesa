@@ -38,6 +38,10 @@ enum AppSheetType: Identifiable, Equatable {
 
     case keywordResults(keyword: String, types: [String])
 
+    // MARK: - Nearby Discovery
+
+    case nearbyDiscovery
+
     // MARK: - Onboarding
 
     case suggestedProfiles
@@ -70,6 +74,8 @@ enum AppSheetType: Identifiable, Equatable {
             return "externalFavorites"
         case .keywordResults(let keyword, _):
             return "keywordResults-\(keyword)"
+        case .nearbyDiscovery:
+            return "nearbyDiscovery"
         case .suggestedProfiles:
             return "suggestedProfiles"
         }
@@ -103,6 +109,8 @@ enum AppSheetType: Identifiable, Equatable {
             return true
         case (.keywordResults(let lhsKeyword, let lhsTypes), .keywordResults(let rhsKeyword, let rhsTypes)):
             return lhsKeyword == rhsKeyword && lhsTypes == rhsTypes
+        case (.nearbyDiscovery, .nearbyDiscovery):
+            return true
         case (.suggestedProfiles, .suggestedProfiles):
             return true
         default:

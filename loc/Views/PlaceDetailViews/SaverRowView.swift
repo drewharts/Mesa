@@ -11,22 +11,41 @@ import SwiftUI
 struct SaverRowView: View {
     // MARK: - Parameters Only (No ViewModel!)
     let user: ProfileData
+    let hasReviewed: Bool
     let onTap: () -> Void
-    
+
+    init(user: ProfileData, hasReviewed: Bool = false, onTap: @escaping () -> Void) {
+        self.user = user
+        self.hasReviewed = hasReviewed
+        self.onTap = onTap
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 // Profile image - uses AsyncImage with URL from ProfileData
                 profileImageView
-                
+
                 // Name
                 Text(user.fullName)
                     .font(.body)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
-                
+
+                // Reviewed badge
+                if hasReviewed {
+                    Text("Reviewed")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color(.systemGray6))
+                        .clipShape(Capsule())
+                }
+
                 Spacer()
-                
+
                 // Chevron
                 Image(systemName: "chevron.right")
                     .font(.caption)
@@ -92,10 +111,18 @@ struct SaverRowView: View {
         supabaseUid: nil
     )
     
-    return SaverRowView(
-        user: mockUser,
-        onTap: { print("Tapped!") }
-    )
+    return VStack {
+        SaverRowView(
+            user: mockUser,
+            hasReviewed: true,
+            onTap: { print("Tapped!") }
+        )
+        SaverRowView(
+            user: mockUser,
+            hasReviewed: false,
+            onTap: { print("Tapped!") }
+        )
+    }
     .padding()
 }
 
