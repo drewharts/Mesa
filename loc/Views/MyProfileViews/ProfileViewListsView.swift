@@ -197,6 +197,7 @@ struct ProfileViewListsView: View {
                     places: listsVM.lightweightPlaceListPlaces[list.list_id] ?? [],
                     allLists: listsVM.filteredPlaceLists,
                     currentIndex: index,
+                    placeCount: listsVM.lightweightPlaceListCounts[list.list_id] ?? list.place_count,
                     placeColors: $placeColors,
                     onTap: { selectedListIndex = index }
                 )

@@ -22,6 +22,7 @@
 //  )
 
 import SwiftUI
+import Combine
 
 struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     // MARK: - Configuration
@@ -100,14 +101,17 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { placeId in
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+                    .id(placeId)
             }
         }
-        .onChange(of: presentationService.pendingPlaceNavigation) { oldValue, newValue in
-            // When map annotation is tapped while sheet is open, navigate to that place
-            if let placeId = newValue {
-                navigationPath.append(placeId)
-                presentationService.pendingPlaceNavigation = nil
-            }
+        .onReceive(presentationService.$pendingPlaceNavigation.compactMap { $0 }) { placeId in
+            // When map annotation is tapped while sheet is open, replace the current place detail.
+            // Uses onReceive (Combine) instead of onChange for reliable delivery even when
+            // a navigation destination is pushed on the stack.
+            var newPath = NavigationPath()
+            newPath.append(placeId)
+            navigationPath = newPath
+            presentationService.pendingPlaceNavigation = nil
         }
     }
 

@@ -120,6 +120,7 @@ struct PlaceSaversSheetView: View {
                     ForEach(viewModel.displayableFollowedSavers, id: \.id) { user in
                         SaverRowView(
                             user: user,
+                            hasReviewed: viewModel.reviewedSaverIds.contains(user.id),
                             onTap: {
                                 viewModel.selectUser(user, dismiss: { dismiss() })
                             }
@@ -137,6 +138,7 @@ struct PlaceSaversSheetView: View {
                     ForEach(viewModel.displayableUnfollowedSavers, id: \.id) { user in
                         SaverRowView(
                             user: user,
+                            hasReviewed: viewModel.reviewedSaverIds.contains(user.id),
                             onTap: {
                                 viewModel.selectUser(user, dismiss: { dismiss() })
                             }
@@ -191,12 +193,23 @@ struct PlaceSaversSheetView: View {
                 Text(profile.user?.fullName ?? "You")
                     .font(.body)
                     .fontWeight(.medium)
-                
+
                 Text("You")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
-            
+
+            if viewModel.currentUserReviewed {
+                Text("Reviewed")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color(.systemGray6))
+                    .clipShape(Capsule())
+            }
+
             Spacer()
         }
         .padding(.vertical, 12)

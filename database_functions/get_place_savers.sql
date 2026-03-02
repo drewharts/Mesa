@@ -8,6 +8,7 @@
 -- 4. Reviews (reviewed the place)
 --
 -- Returns is_followed flag so UI can separate friends from non-friends.
+-- Returns has_reviewed flag to indicate if user left a review.
 -- Friends (followed users) appear first in results.
 -- ============================================================================
 
@@ -19,7 +20,8 @@ RETURNS TABLE(
     user_id TEXT,
     full_name TEXT,
     profile_photo_url TEXT,
-    is_followed BOOLEAN
+    is_followed BOOLEAN,
+    has_reviewed BOOLEAN
 )
 LANGUAGE plpgsql
 STABLE
@@ -68,7 +70,13 @@ BEGIN
                 WHERE f.follower_id = p_requesting_user_id
                 AND f.following_id = u.id
             )
-        END AS is_followed
+        END AS is_followed,
+        -- Check if this saver has reviewed the place
+        EXISTS (
+            SELECT 1 FROM reviews r
+            WHERE r.user_id = u.id
+            AND r.place_id = p_place_id
+        ) AS has_reviewed
     FROM all_savers s
     INNER JOIN users u ON s.user_id = u.id
     GROUP BY u.id, u.full_name, u.profile_photo_url
@@ -90,4 +98,5 @@ $function$;
 COMMENT ON FUNCTION public.get_place_savers(TEXT, TEXT) IS
 'Returns ALL users who saved a place via favorites, lists, TikToks, or reviews.
 Includes is_followed flag to separate friends from non-friends in UI.
+Includes has_reviewed flag to indicate if user left a review for the place.
 Results ordered: current user first, then followed users, then others alphabetically.';

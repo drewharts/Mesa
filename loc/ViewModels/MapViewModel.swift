@@ -5,6 +5,7 @@
 //  Coordinator ViewModel that composes child ViewModels for map functionality.
 //
 
+import Combine
 import Foundation
 import MapKit
 import SwiftUI
@@ -18,6 +19,9 @@ class MapViewModel: ObservableObject {
     let photoViewModel: MapPhotoViewModel
     let viewportViewModel: MapViewportViewModel
     let selectionViewModel: MapAnnotationSelectionViewModel
+    let tapDiscoveryViewModel: MapTapDiscoveryViewModel
+
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Proxy Properties for Backward Compatibility
 
@@ -96,25 +100,41 @@ class MapViewModel: ObservableObject {
         self.photoViewModel = MapPhotoViewModel(placeService: placeService)
         self.viewportViewModel = MapViewportViewModel(placeService: placeService)
         self.selectionViewModel = MapAnnotationSelectionViewModel()
+        self.tapDiscoveryViewModel = MapTapDiscoveryViewModel()
 
         setupCallbacks()
     }
 
     /// Wires up callbacks between child ViewModels.
     private func setupCallbacks() {
-        // When filtering changes, clear annotations and reset region for reload
+        setupTapDiscoveryForwarding()
+        setupFilterCallbacks()
+        setupExternalUserCallbacks()
+        setupAnnotationCallbacks()
+    }
+
+    /// Forwards tap discovery state changes so MapView overlay updates.
+    private func setupTapDiscoveryForwarding() {
+        tapDiscoveryViewModel.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
+
+    /// Clears annotations when filtering changes so the viewport reloads.
+    private func setupFilterCallbacks() {
         filteringViewModel.onFilterChanged = { [weak self] in
             self?.viewportViewModel.clearAnnotations()
             self?.viewportViewModel.resetLastLoadedRegion()
         }
 
-        // When external user filtering changes, clear annotations and reset region for reload
         externalUserViewModel.onFilterChanged = { [weak self] in
             self?.viewportViewModel.clearAnnotations()
             self?.viewportViewModel.resetLastLoadedRegion()
         }
+    }
 
-        // When external user is selected, load their profile photo
+    /// Loads external user profile photo when selected.
+    private func setupExternalUserCallbacks() {
         externalUserViewModel.onExternalUserSelected = { [weak self] userId, photoUrl in
             guard let photoUrl = photoUrl else { return }
             Task { [weak self] in
@@ -122,8 +142,10 @@ class MapViewModel: ObservableObject {
                 self?.photoViewModel.generateAnnotationImages(for: self?.viewportViewModel.viewportAnnotations ?? [])
             }
         }
+    }
 
-        // When annotations are loaded, regenerate annotation images
+    /// Regenerates annotation images when annotations are loaded.
+    private func setupAnnotationCallbacks() {
         viewportViewModel.onAnnotationsLoaded = { [weak self] annotations in
             self?.photoViewModel.generateAnnotationImages(for: annotations)
         }
@@ -210,7 +232,7 @@ class MapViewModel: ObservableObject {
         switch sheet {
         case .list, .externalVideos, .reviews, .favorites, .myPlaces,
              .externalReviews, .externalList, .externalFavorites,
-             .keywordResults:
+             .keywordResults, .nearbyDiscovery:
             return true
         default:
             return false
@@ -226,7 +248,7 @@ class MapViewModel: ObservableObject {
         // Note: activeSheet is NOT cleared here - it's managed by the sheet presentation logic
     }
 
-    /// Clears only user filters (not external user filters).
+    /// Clears only the current user's filters without affecting external user filters.
     private func clearUserFilters() {
         filteringViewModel.clearAllFilters()
     }
@@ -284,6 +306,13 @@ class MapViewModel: ObservableObject {
     /// Returns all place annotations to display on map.
     func getAllDisplayAnnotations() -> [PlaceAnnotation] {
         return viewportViewModel.getAllDisplayAnnotations()
+    }
+
+    // MARK: - Tap Discovery (Delegated)
+
+    /// Discovers the nearest POI at the given coordinate via MKLocalSearch and backend resolution.
+    func discoverPlaceAtCoordinate(_ coordinate: CLLocationCoordinate2D) {
+        tapDiscoveryViewModel.discoverPlace(at: coordinate)
     }
 
     // MARK: - Private Helpers
