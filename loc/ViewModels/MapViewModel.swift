@@ -5,6 +5,7 @@
 //  Coordinator ViewModel that composes child ViewModels for map functionality.
 //
 
+import Combine
 import Foundation
 import MapKit
 import SwiftUI
@@ -18,6 +19,9 @@ class MapViewModel: ObservableObject {
     let photoViewModel: MapPhotoViewModel
     let viewportViewModel: MapViewportViewModel
     let selectionViewModel: MapAnnotationSelectionViewModel
+    let tapDiscoveryViewModel: MapTapDiscoveryViewModel
+
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Proxy Properties for Backward Compatibility
 
@@ -96,12 +100,18 @@ class MapViewModel: ObservableObject {
         self.photoViewModel = MapPhotoViewModel(placeService: placeService)
         self.viewportViewModel = MapViewportViewModel(placeService: placeService)
         self.selectionViewModel = MapAnnotationSelectionViewModel()
+        self.tapDiscoveryViewModel = MapTapDiscoveryViewModel()
 
         setupCallbacks()
     }
 
     /// Wires up callbacks between child ViewModels.
     private func setupCallbacks() {
+        // Forward tap discovery state changes so MapView overlay updates
+        tapDiscoveryViewModel.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
         // When filtering changes, clear annotations and reset region for reload
         filteringViewModel.onFilterChanged = { [weak self] in
             self?.viewportViewModel.clearAnnotations()
@@ -210,7 +220,7 @@ class MapViewModel: ObservableObject {
         switch sheet {
         case .list, .externalVideos, .reviews, .favorites, .myPlaces,
              .externalReviews, .externalList, .externalFavorites,
-             .keywordResults:
+             .keywordResults, .nearbyDiscovery:
             return true
         default:
             return false
@@ -284,6 +294,13 @@ class MapViewModel: ObservableObject {
     /// Returns all place annotations to display on map.
     func getAllDisplayAnnotations() -> [PlaceAnnotation] {
         return viewportViewModel.getAllDisplayAnnotations()
+    }
+
+    // MARK: - Tap Discovery (Delegated)
+
+    /// Discovers the nearest POI at the given coordinate via MKLocalSearch and backend resolution.
+    func discoverPlaceAtCoordinate(_ coordinate: CLLocationCoordinate2D) {
+        tapDiscoveryViewModel.discoverPlace(at: coordinate)
     }
 
     // MARK: - Private Helpers

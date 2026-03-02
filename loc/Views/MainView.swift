@@ -94,8 +94,7 @@ struct MainView: View {
                     userProfileNavigationViewModel: userProfileNavigationViewModel,
                     mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                     serviceContainer: serviceContainer,
-                    notificationManager: notificationManager,
-                    onMapTap: handleMapTap
+                    notificationManager: notificationManager
                 )
 
                 // UI Overlay (Top Controls, FABs)
@@ -247,6 +246,10 @@ struct MainView: View {
             case .keywordResults(let keyword, let types):
                 keywordResultsSheet(keyword: keyword, types: types)
 
+            // Nearby Discovery
+            case .nearbyDiscovery:
+                nearbyDiscoverySheet
+
             // Onboarding
             case .suggestedProfiles:
                 suggestedProfilesSheet
@@ -387,6 +390,13 @@ struct MainView: View {
         .applyMapPopupEnvironment(from: self)
         .applyMapPopupPresentation()
         .onDisappear { handleMapPopupDisappear() }
+    }
+
+    /// Nearby discovery popup sheet content.
+    private var nearbyDiscoverySheet: some View {
+        NearbyDiscoverySheet()
+            .applyMapPopupEnvironment(from: self)
+            .applyMapPopupPresentation()
     }
 
     /// Keyword results popup sheet content.
@@ -625,12 +635,6 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Actions
-
-    /// Handle map tap - no-op since search is now fullScreenCover.
-    private func handleMapTap() {
-        // Search is now presented as fullScreenCover, no need to collapse
-    }
 }
 
 // MARK: - View Extensions for Map Popup Sheets

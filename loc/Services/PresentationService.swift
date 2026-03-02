@@ -81,7 +81,8 @@ class PresentationService: ObservableObject {
         guard let sheet = activeSheet else { return false }
         switch sheet {
         case .list, .externalVideos, .reviews, .favorites, .myPlaces,
-             .externalReviews, .externalList, .externalFavorites, .keywordResults:
+             .externalReviews, .externalList, .externalFavorites, .keywordResults,
+             .nearbyDiscovery:
             return true
         default:
             return false

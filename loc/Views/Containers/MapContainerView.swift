@@ -30,7 +30,6 @@ struct MapContainerView: View {
     let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     let serviceContainer: ServiceContainer
     let notificationManager: NotificationManager
-    let onMapTap: () -> Void
 
     init(
         mapPosition: Binding<MapCameraPosition>,
@@ -46,8 +45,7 @@ struct MapContainerView: View {
         userProfileNavigationViewModel: UserProfileNavigationViewModel,
         mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel,
         serviceContainer: ServiceContainer,
-        notificationManager: NotificationManager,
-        onMapTap: @escaping () -> Void
+        notificationManager: NotificationManager
     ) {
         self._mapPosition = mapPosition
         self._recenterMap = recenterMap
@@ -62,7 +60,6 @@ struct MapContainerView: View {
         self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
         self.serviceContainer = serviceContainer
         self.notificationManager = notificationManager
-        self.onMapTap = onMapTap
 
         // Create MapViewModel scoped to this container
         // Note: MapViewModel no longer observes ProfileViewModel directly
@@ -87,6 +84,29 @@ struct MapContainerView: View {
             }
             .onAppear {
                 mapViewModel.currentUserId = userSession.currentUserId
+
+                let nearbyVM = NearbyDiscoverySheetViewModel.shared
+                mapViewModel.tapDiscoveryViewModel.onDiscoveryStarted = {
+                    nearbyVM.setLoading()
+                    PresentationService.shared.present(.nearbyDiscovery)
+                }
+                mapViewModel.tapDiscoveryViewModel.onNearbyPlacesFound = { mapItems, coordinate in
+                    nearbyVM.setResults(mapItems, searchCoordinate: coordinate)
+                }
+                mapViewModel.tapDiscoveryViewModel.onSinglePlaceFound = { [selectedPlaceViewModel] mapItem in
+                    PresentationService.shared.dismiss()
+                    let placeholder = NearbyDiscoverySheetViewModel.shared.createPlaceholderFromMapItem(mapItem)
+                    selectedPlaceViewModel.selectPlaceAndFetchDetails(placeholder, shouldAnimateMap: false)
+                    selectedPlaceViewModel.isDetailSheetPresented = true
+                }
+                mapViewModel.tapDiscoveryViewModel.onDiscoveryFailed = {
+                    PresentationService.shared.dismiss()
+                }
+                nearbyVM.onPlaceResolved = { [selectedPlaceViewModel] place in
+                    PresentationService.shared.dismiss()
+                    selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                    selectedPlaceViewModel.isDetailSheetPresented = true
+                }
             }
             .onChange(of: userSession.currentUserId) { _, newValue in
                 mapViewModel.currentUserId = newValue
@@ -117,7 +137,12 @@ struct MapContainerView: View {
                 recenterMap: $recenterMap,
                 mapPosition: $mapPosition,
                 isCreatePlacePopupActive: $isCreatePlacePopupActive,
-                onMapTap: onMapTap
+                onMapTap: { coordinate in
+                    // Skip discovery if a detail sheet or popup is already showing
+                    guard !selectedPlaceViewModel.isDetailSheetPresented,
+                          presentationService.activeSheet == nil else { return }
+                    mapViewModel.discoverPlaceAtCoordinate(coordinate)
+                }
             )
             .environmentObject(mapViewModel)
             .environmentObject(selectedPlaceViewModel)
