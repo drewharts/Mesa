@@ -25,6 +25,17 @@ struct FeedCardFrontView: View {
         "\(item.userFirstName) \(item.userLastName)".trimmingCharacters(in: .whitespaces)
     }
 
+    private var relativeTimestamp: String {
+        let seconds = Date().timeIntervalSince(item.timestamp)
+        if seconds < 60 { return "Just now" }
+        let minutes = Int(seconds / 60)
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = Int(seconds / 3600)
+        if hours < 24 { return "\(hours)h" }
+        let days = Int(seconds / 86400)
+        return "\(days)d"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             headerRow
@@ -128,18 +139,24 @@ struct FeedCardFrontView: View {
 
     @ViewBuilder
     private var captionRow: some View {
-        if !item.caption.isEmpty {
-            Button(action: onComment) {
-                Text(item.caption)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                    .lineLimit(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 4) {
+            if !item.caption.isEmpty {
+                Button(action: onComment) {
+                    Text(item.caption)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+
+            Text(relativeTimestamp)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
     }
 
     // MARK: - Action Bar
