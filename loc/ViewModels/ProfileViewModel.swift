@@ -15,6 +15,8 @@ import CoreLocation
 class ProfileViewModel: ObservableObject {
     @Published var user: ProfileData?
     @Published var userPicture: UIImage?
+    @Published var bannerImage: UIImage? = nil
+    @Published var isUploadingBannerPhoto: Bool = false
 
     // Map filtering triggers
     @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
@@ -455,6 +457,64 @@ class ProfileViewModel: ObservableObject {
          return image
      }
     
+    /// Uploads a new banner photo, providing instant local preview during upload.
+    func changeBannerPhoto(_ newImage: UIImage) async {
+        isUploadingBannerPhoto = true
+        let cropped = cropToBanner(newImage)
+        bannerImage = cropped
+
+        guard let userId = user?.id else {
+            isUploadingBannerPhoto = false
+            return
+        }
+
+        do {
+            let url = try await imageService.updateBannerPhoto(userId: userId, image: cropped)
+            try? await updateBannerPhotoInDatabase(userId: userId, photoURL: url)
+            user?.bannerPhotoURL = url
+            isUploadingBannerPhoto = false
+        } catch {
+            print("❌ [ProfileViewModel] Failed to upload banner photo: \(error)")
+            isUploadingBannerPhoto = false
+        }
+    }
+
+    /// Updates the users table with the new banner photo URL.
+    private func updateBannerPhotoInDatabase(userId: String, photoURL: URL) async throws {
+        let supabase = SupabaseManager.shared
+        try await supabase.client
+            .from("users")
+            .update(["banner_photo_url": photoURL.absoluteString])
+            .eq("id", value: userId)
+            .execute()
+    }
+
+    /// Crops an image to a 3:1 banner aspect ratio from the center.
+    private func cropToBanner(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+        let w = CGFloat(cgImage.width)
+        let h = CGFloat(cgImage.height)
+
+        let targetRatio: CGFloat = 3.0
+        let currentRatio = w / h
+
+        let cropRect: CGRect
+        if currentRatio > targetRatio {
+            // Image is wider than 3:1 — crop width
+            let newW = h * targetRatio
+            let x = (w - newW) / 2
+            cropRect = CGRect(x: x, y: 0, width: newW, height: h)
+        } else {
+            // Image is taller than 3:1 — crop height
+            let newH = w / targetRatio
+            let y = (h - newH) / 2
+            cropRect = CGRect(x: 0, y: y, width: w, height: newH)
+        }
+
+        guard let cropped = cgImage.cropping(to: cropRect) else { return image }
+        return UIImage(cgImage: cropped, scale: image.scale, orientation: image.imageOrientation)
+    }
+
     /// Toggles follow/unfollow state for a user - delegates to socialViewModel.
     func toggleFollowUser(userId: String) {
         socialViewModel.toggleFollowUser(userId: userId, currentUserId: user?.id)
@@ -604,6 +664,7 @@ class ProfileViewModel: ObservableObject {
         // Clear user profile data
         user = nil
         userPicture = nil
+        bannerImage = nil
         
         // Clear external places data (delegated to child ViewModel)
         externalContentViewModel.resetAllData()
@@ -634,6 +695,7 @@ class ProfileViewModel: ObservableObject {
 
         // Clear UI state flags
         isUploadingProfilePhoto = false
+        isUploadingBannerPhoto = false
         // Note: External content UI flags are reset via externalContentViewModel.resetAllData() above
         // Note: showFollowError and followErrorMessage are reset via socialViewModel.resetAllData() above
 

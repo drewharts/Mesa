@@ -833,7 +833,8 @@ class SupabaseUserService: ObservableObject {
             fullName: fullName,
             fcmToken: record.fcm_token,
             instagramUsername: record.instagram_username,
-            tiktokUsername: record.tiktok_username
+            tiktokUsername: record.tiktok_username,
+            bannerPhotoURL: record.banner_photo_url.flatMap { URL(string: $0) }
         )
     }
 
@@ -851,7 +852,8 @@ class SupabaseUserService: ObservableObject {
             firebaseUid: nil,
             supabaseUid: record.supabase_uid,
             instagramUsername: record.instagram_username,
-            tiktokUsername: record.tiktok_username
+            tiktokUsername: record.tiktok_username,
+            bannerPhotoURL: record.banner_photo_url.flatMap { URL(string: $0) }
         )
     }
 
@@ -1076,6 +1078,7 @@ struct ProfileDataRecord: Codable {
     let fcm_token: String?
     let instagram_username: String?
     let tiktok_username: String?
+    let banner_photo_url: String?
 }
 
 /// Response type for following/followers RPC calls - handles nullable database fields
@@ -1093,6 +1096,7 @@ private struct FollowingProfileRecord: Codable {
     let supabase_uid: String?
     let instagram_username: String?
     let tiktok_username: String?
+    let banner_photo_url: String?
 }
 
 /// Lightweight favorite place data for display

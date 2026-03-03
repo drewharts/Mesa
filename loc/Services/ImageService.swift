@@ -76,6 +76,34 @@ class ImageService {
         }
     }
 
+    /// Uploads a banner photo to Supabase Storage and returns its public URL.
+    func updateBannerPhoto(userId: String, image: UIImage) async throws -> URL {
+        let supabase = await SupabaseManager.shared
+
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            throw NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert banner image to JPEG data"])
+        }
+
+        let currentUser = try await supabase.auth.user()
+        let supabaseUserId = currentUser.id.uuidString
+
+        let filePath = "\(supabaseUserId)/banner.jpg"
+        let bucket = await supabase.storage.from("profile_photos")
+
+        _ = try await bucket.upload(
+            filePath,
+            data: imageData,
+            options: FileOptions(
+                cacheControl: "3600",
+                contentType: "image/jpeg",
+                upsert: true
+            )
+        )
+
+        let publicURL = try bucket.getPublicURL(path: filePath)
+        return publicURL
+    }
+
     func updateProfilePhoto(userId: String, image: UIImage, completion: @escaping (Result<URL, Error>) -> Void) {
         Task {
             do {
