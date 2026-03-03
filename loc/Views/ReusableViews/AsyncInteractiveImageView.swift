@@ -48,7 +48,6 @@ struct AsyncInteractiveImageView: View {
 
     private var loadingView: some View {
         ProgressView()
-            .progressViewStyle(CircularProgressViewStyle(tint: .white))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -58,10 +57,10 @@ struct AsyncInteractiveImageView: View {
         VStack(spacing: 12) {
             Image(systemName: "photo")
                 .font(.system(size: 40))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(.secondary)
             Text("Failed to load")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -5,7 +5,7 @@
 //  DUMB Component: Translucent bottom navigation bar for the map view
 //  Single Responsibility: Render profile button + search capsule in a bottom bar
 //
-//  Layout: [Profile photo 36x36] [Search capsule button]
+//  Layout: [Profile photo 36x36] [Feed button 36x36] [Search capsule button]
 //
 
 import SwiftUI
@@ -19,6 +19,7 @@ struct MapBottomNavigationBar: View {
 
     @Binding var showSearchPage: Bool
     @Binding var shouldNavigateToProfile: Bool
+    @Binding var shouldNavigateToFeed: Bool
 
     // MARK: - Body
 
@@ -36,6 +37,7 @@ struct MapBottomNavigationBar: View {
     private var barContent: some View {
         HStack(spacing: 12) {
             profileButton
+            feedButton
             searchCapsule
         }
         .padding(.horizontal, 14)
@@ -72,6 +74,23 @@ struct MapBottomNavigationBar: View {
                         .clipShape(Circle())
                 }
             }
+        }
+    }
+
+    // MARK: - Feed Button
+
+    private var feedButton: some View {
+        Button {
+            shouldNavigateToFeed = true
+        } label: {
+            Image(systemName: "photo.stack")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 20, height: 20)
+                .foregroundColor(.secondary)
+                .frame(width: 36, height: 36)
+                .background(Color(.systemGray5).opacity(0.6))
+                .clipShape(Circle())
         }
     }
 

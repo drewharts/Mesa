@@ -23,7 +23,7 @@ struct FullscreenMediaGalleryView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(.systemBackground).ignoresSafeArea()
 
             TabView(selection: $currentIndex) {
                 ForEach(Array(mediaItems.enumerated()), id: \.element.id) { index, item in
@@ -65,7 +65,7 @@ struct FullscreenMediaGalleryView: View {
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .frame(width: 32, height: 32)
                         .background(.ultraThinMaterial)
                         .clipShape(Circle())
@@ -76,7 +76,7 @@ struct FullscreenMediaGalleryView: View {
                 Text("\(currentIndex + 1)/\(mediaItems.count)")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.white)
+                    .foregroundColor(.secondary)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -95,7 +95,7 @@ struct FullscreenMediaGalleryView: View {
                 HStack(spacing: 6) {
                     ForEach(0..<mediaItems.count, id: \.self) { index in
                         Circle()
-                            .fill(index == currentIndex ? Color.white : Color.white.opacity(0.4))
+                            .fill(index == currentIndex ? Color.primary : Color.secondary.opacity(0.4))
                             .frame(width: 7, height: 7)
                     }
                 }
