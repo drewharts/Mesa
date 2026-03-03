@@ -23,6 +23,13 @@ Mesa (Loc) is a social iOS app for sharing and discovering places. Built with Sw
 - **CLEAR BOUNDARIES**: If a component has multiple responsibilities, split it immediately
 - **NO GOD OBJECTS**: Avoid classes/structs that know or do too much
 
+### Database Migration Safety
+- **NEVER BREAK PRODUCTION**: Database migrations must NEVER break functionality for users who have not yet updated to the latest frontend
+- **BACKWARD COMPATIBLE**: Every migration must be backward compatible with the currently live app version
+- **ADDITIVE ONLY**: Prefer additive changes (new columns, new functions) over destructive ones (dropping columns, changing return types)
+- **COORDINATE DEPLOYS**: If a migration changes RPC return types, column names, or removes schema elements that the current frontend depends on, the frontend MUST be deployed first or simultaneously
+- **TEST BOTH VERSIONS**: Before applying a migration, consider whether the old frontend will still work after it runs — if not, do NOT apply it until the frontend is ready
+
 ### Code Quality Standards
 - **STAFF ENGINEER LEVEL**: All code must meet staff engineer quality standards:
   - Clean, readable, and self-documenting code
