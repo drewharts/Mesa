@@ -22,6 +22,7 @@ struct ProfileData: Codable, Identifiable, Hashable {
     var supabaseUid: String?
     var instagramUsername: String?
     var tiktokUsername: String?
+    var bannerPhotoURL: URL?
 
     // Map camelCase properties to snake_case database columns
     enum CodingKeys: String, CodingKey {
@@ -38,5 +39,6 @@ struct ProfileData: Codable, Identifiable, Hashable {
         case supabaseUid = "supabase_uid"
         case instagramUsername = "instagram_username"
         case tiktokUsername = "tiktok_username"
+        case bannerPhotoURL = "banner_photo_url"
     }
 }

@@ -23,12 +23,23 @@ struct ExternalUserProfileContentView: View {
     @State private var showFollowers = false
     @State private var showFollowing = false
 
+    // MARK: - Constants
+    private let profilePicSize: CGFloat = 120
+    private var profilePicOverlap: CGFloat { profilePicSize / 2 }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Profile Picture, Name, Followers
-                VStack(spacing: 16) {
-                    // Profile Picture
+                // Banner + overlapping profile picture
+                ZStack(alignment: .bottom) {
+                    ProfileBannerView(
+                        bannerPhotoURL: viewModel.user.bannerPhotoURL,
+                        localBannerImage: nil,
+                        isUploading: false,
+                        isEditable: false,
+                        onTapChange: nil
+                    )
+
                     UserProfileProfilePictureView(
                         profilePhotoURL: viewModel.user.profilePhotoURL,
                         isFollowing: viewModel.isFollowing,
@@ -46,12 +57,16 @@ struct ExternalUserProfileContentView: View {
                         totalPlacesCount: viewModel.totalPlacesCount,
                         userName: viewModel.user.firstName ?? viewModel.user.fullName
                     )
+                    .offset(y: profilePicOverlap)
+                }
 
+                VStack(spacing: 16) {
                     // Name
                     Text(viewModel.user.fullName)
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
+                        .padding(.top, profilePicOverlap + 6)
 
                     // Clickable Followers/Following counts & Social Links
                     ProfileFollowCountsView(
@@ -65,7 +80,6 @@ struct ExternalUserProfileContentView: View {
                         onFollowingTap: { showFollowing = true }
                     )
                 }
-                .padding(.top, -8)
                 .padding(.bottom, 16)
 
                 Divider()

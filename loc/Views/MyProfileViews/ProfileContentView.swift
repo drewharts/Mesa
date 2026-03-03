@@ -21,51 +21,71 @@ struct ProfileContentView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(\.presentationMode) var presentationMode
     @State private var showEditProfileForSocials = false
+    @State private var showingBannerPicker = false
+    @State private var bannerInputImage: [UIImage] = []
+    @State private var hasProcessedBannerImage = false
+
+    // MARK: - Constants
+    private let profilePicSize: CGFloat = 100
+    private var profilePicOverlap: CGFloat { profilePicSize / 2 }
 
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: 12) {
-                    // Profile Picture
-                    ProfilePictureView()
+                VStack(spacing: 0) {
+                    // Banner + overlapping profile picture
+                    ZStack(alignment: .bottom) {
+                        ProfileBannerView(
+                            bannerPhotoURL: profile.user?.bannerPhotoURL,
+                            localBannerImage: profile.bannerImage,
+                            isUploading: profile.isUploadingBannerPhoto,
+                            isEditable: true,
+                            onTapChange: { showingBannerPicker = true }
+                        )
 
-                    // Name
-                    let firstName = profile.user?.firstName ?? ""
-                    let lastName = profile.user?.lastName ?? ""
-                    Text("\(firstName) \(lastName)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-
-                    // Follow Counts & Social Links
-                    ProfileFollowCountsView(
-                        data: .myProfile(
-                            followers: socialVM.followersCount,
-                            following: socialVM.followingCount,
-                            isFollowersLoading: socialVM.isFollowersLoading,
-                            isFollowingLoading: socialVM.isFollowingLoading,
-                            instagramUsername: profile.user?.instagramUsername,
-                            tiktokUsername: profile.user?.tiktokUsername
-                        ),
-                        onFollowersTap: {
-                            navigationPath.append(ProfileView.FollowListDestination.followers)
-                        },
-                        onFollowingTap: {
-                            navigationPath.append(ProfileView.FollowListDestination.following)
-                        },
-                        onAddSocialsTap: {
-                            showEditProfileForSocials = true
-                        }
-                    )
-                    .onAppear {
-                        Task {
-                            await profile.loadProfileCounts()
-                        }
+                        ProfilePictureView()
+                            .offset(y: profilePicOverlap)
                     }
 
-                    Divider()
-                        .padding(.top, 15)
-                        .padding(.horizontal, 20)
+                    VStack(spacing: 12) {
+                        // Name
+                        let firstName = profile.user?.firstName ?? ""
+                        let lastName = profile.user?.lastName ?? ""
+                        Text("\(firstName) \(lastName)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                            .padding(.top, profilePicOverlap + 6)
+
+                        // Follow Counts & Social Links
+                        ProfileFollowCountsView(
+                            data: .myProfile(
+                                followers: socialVM.followersCount,
+                                following: socialVM.followingCount,
+                                isFollowersLoading: socialVM.isFollowersLoading,
+                                isFollowingLoading: socialVM.isFollowingLoading,
+                                instagramUsername: profile.user?.instagramUsername,
+                                tiktokUsername: profile.user?.tiktokUsername
+                            ),
+                            onFollowersTap: {
+                                navigationPath.append(ProfileView.FollowListDestination.followers)
+                            },
+                            onFollowingTap: {
+                                navigationPath.append(ProfileView.FollowListDestination.following)
+                            },
+                            onAddSocialsTap: {
+                                showEditProfileForSocials = true
+                            }
+                        )
+                        .onAppear {
+                            Task {
+                                await profile.loadProfileCounts()
+                            }
+                        }
+
+                        Divider()
+                            .padding(.top, 15)
+                            .padding(.horizontal, 20)
                     
                     // Favorites/Videos (tabbed) & Lists
                     ProfileFavoritesExternalPlacesView(
@@ -177,10 +197,10 @@ struct ProfileContentView: View {
                         .shadow(radius: 10)
                     }
 
-                    // Account actions (logout/delete) moved to toolbar AccountMenuView
+                        // Account actions (logout/delete) moved to toolbar AccountMenuView
+                    }
+                    .padding(.bottom, 40)
                 }
-                .padding(.top, 20)
-                .padding(.bottom, 40)
             }
             .refreshable {
                 await profile.refreshProfile()
@@ -190,6 +210,20 @@ struct ProfileContentView: View {
             if let user = profile.user {
                 EditProfileView(user: user) { updatedUser in
                     profile.user = updatedUser
+                }
+            }
+        }
+        .sheet(isPresented: $showingBannerPicker) {
+            ImagePicker(images: $bannerInputImage, selectionLimit: 1)
+        }
+        .onChange(of: bannerInputImage) { _, newValue in
+            guard !newValue.isEmpty, !hasProcessedBannerImage, let newImage = newValue.first else { return }
+            hasProcessedBannerImage = true
+            Task {
+                await profile.changeBannerPhoto(newImage)
+                await MainActor.run {
+                    hasProcessedBannerImage = false
+                    bannerInputImage.removeAll()
                 }
             }
         }
