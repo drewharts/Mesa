@@ -127,6 +127,13 @@ class PostService: ObservableObject {
         }
     }
     
+    // MARK: - User Feed
+
+    /// Fetches the photo feed for a user (reviews with photos from followed users and self).
+    func fetchUserFeed(userId: String, limit: Int = 50, offset: Int = 0) async throws -> [FeedItem] {
+        return try await supabase.fetchUserFeed(userId: userId, limit: limit, offset: offset)
+    }
+
     // MARK: - Reviewed Place Checks
     
     func getPostedPlaceIds(userId: String, placeIds: [String]) async throws -> Set<String> {
