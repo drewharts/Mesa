@@ -37,6 +37,8 @@ struct MainView: View {
 
     // MARK: - Local UI State
     @State private var shouldNavigateToProfile = false
+    @State private var shouldNavigateToFeed = false
+    @State private var pendingFeedProfileUserId: String?
     @State private var showSearchPage = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
@@ -171,6 +173,27 @@ struct MainView: View {
                     .environmentObject(deepLinkManager)
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
+            }
+            .fullScreenCover(isPresented: $shouldNavigateToFeed) {
+                PhotoFeedView(
+                    userId: userSession.currentUserId ?? "",
+                    onNavigateToProfile: { userId in
+                        pendingFeedProfileUserId = userId
+                        shouldNavigateToFeed = false
+                    }
+                )
+            }
+            .onChange(of: shouldNavigateToFeed) { _, newValue in
+                guard !newValue, let userId = pendingFeedProfileUserId else { return }
+                pendingFeedProfileUserId = nil
+                if userId == userSession.currentUserId {
+                    shouldNavigateToProfile = true
+                } else {
+                    userProfileNavigationViewModel.fetchAndSelectUser(
+                        userId: userId,
+                        currentUserId: userSession.currentUserId ?? ""
+                    )
+                }
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -550,7 +573,8 @@ struct MainView: View {
             if shouldShowBottomNavigationBar {
                 MapBottomNavigationBar(
                     showSearchPage: $showSearchPage,
-                    shouldNavigateToProfile: $shouldNavigateToProfile
+                    shouldNavigateToProfile: $shouldNavigateToProfile,
+                    shouldNavigateToFeed: $shouldNavigateToFeed
                 )
                 .environmentObject(profileViewModel)
             }

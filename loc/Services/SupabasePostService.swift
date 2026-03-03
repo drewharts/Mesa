@@ -358,6 +358,49 @@ class SupabasePostService: ObservableObject {
             .execute()
     }
 
+    // MARK: - User Feed
+
+    /// Fetches the photo feed for a user (reviews with photos from followed users and self).
+    func fetchUserFeed(userId: String, limit: Int = 50, offset: Int = 0) async throws -> [FeedItem] {
+        struct Params: Encodable {
+            let p_user_id: String
+            let p_limit: Int
+            let p_offset: Int
+        }
+
+        let params = Params(p_user_id: userId, p_limit: limit, p_offset: offset)
+
+        let records: [FeedItemRecord] = try await supabase.client
+            .rpc("get_user_feed", params: params)
+            .execute()
+            .value
+
+        return records.compactMap { record -> FeedItem? in
+            let validUrls = (record.images ?? []).filter { !$0.isEmpty }
+            guard !validUrls.isEmpty else { return nil }
+
+            let timestamp = parseTimestamp(record.review_timestamp)
+
+            return FeedItem(
+                id: record.review_id,
+                userId: record.user_id,
+                userFirstName: record.user_first_name ?? "",
+                userLastName: record.user_last_name ?? "",
+                profilePhotoUrl: record.profile_photo_url ?? "",
+                placeId: record.place_id,
+                placeName: record.place_name ?? "",
+                caption: record.review_text ?? "",
+                imageUrls: validUrls,
+                timestamp: timestamp,
+                likes: record.likes ?? 0,
+                commentCount: record.comment_count ?? 0,
+                wouldReturn: record.would_return,
+                latitude: record.latitude ?? 0,
+                longitude: record.longitude ?? 0
+            )
+        }
+    }
+
     // MARK: - Helper Methods
     
     private func parseTimestamp(_ timestampString: String) -> Date {
@@ -486,6 +529,26 @@ struct PostWithUserRecord: Codable {
     let review_video_urls: [String]?
     let review_video_thumbnails: [String]?
     let review_comment_count: Int?
+}
+
+// MARK: - Feed Records
+
+struct FeedItemRecord: Codable {
+    let review_id: String
+    let user_id: String
+    let user_first_name: String?
+    let user_last_name: String?
+    let profile_photo_url: String?
+    let place_id: String
+    let place_name: String?
+    let review_text: String?
+    let images: [String]?
+    let review_timestamp: String
+    let likes: Int?
+    let would_return: Bool?
+    let latitude: Double?
+    let longitude: Double?
+    let comment_count: Int?
 }
 
 // MARK: - Comment Records
