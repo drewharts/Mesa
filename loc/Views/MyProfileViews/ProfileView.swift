@@ -35,9 +35,7 @@ struct ProfileView: View {
     @State private var navigationPath = NavigationPath()
 
     init() {
-        // Configure navigation bar appearance to remove the bottom border
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground() // Use opaque background
+        // Navigation bar transparency is handled by .toolbarBackground(.hidden) modifier
     }
 
     var body: some View {
@@ -46,6 +44,7 @@ struct ProfileView: View {
                 .navigationBarBackButtonHidden(true)
                 .preferredColorScheme(.light)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(.hidden, for: .navigationBar)
                 .modifier(ToolbarModifier(
                     presentationMode: presentationMode,
                     photoImportVM: photoImportVM,
@@ -244,10 +243,10 @@ struct ToolbarModifier: ViewModifier {
         }) {
             HStack {
                 Image(systemName: "chevron.left")
-                    .foregroundColor(.black)
                 Text("Back")
-                    .foregroundColor(.black)
             }
+            .foregroundColor(.white)
+            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
         }
     }
 
@@ -270,12 +269,13 @@ struct ToolbarModifier: ViewModifier {
                 photoLibrary: .shared()
             ) {
                 Image(systemName: "photo.badge.plus")
-                    .foregroundColor(.black)
                     .font(.body)
             }
 
             AccountMenuView()
         }
+        .foregroundColor(.white)
+        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
     }
 }
 

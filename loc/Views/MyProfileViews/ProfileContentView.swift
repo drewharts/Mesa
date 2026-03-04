@@ -25,9 +25,18 @@ struct ProfileContentView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: 12) {
-                    // Profile Picture
+                VStack(spacing: 0) {
+                    // World Map Banner (extends to top of screen)
+                    WorldMapBannerView(
+                        visitedCountryCodes: CountryISOMapping.isoCodesFromNames(profile.visitedCountries),
+                        height: 230
+                    )
+
+                    VStack(spacing: 12) {
+                    // Profile Picture (overlapping banner bottom)
                     ProfilePictureView()
+                        .offset(y: -50)
+                        .padding(.bottom, -50)
 
                     // Name
                     let firstName = profile.user?.firstName ?? ""
@@ -63,10 +72,6 @@ struct ProfileContentView: View {
                         }
                     }
 
-                    Divider()
-                        .padding(.top, 15)
-                        .padding(.horizontal, 20)
-                    
                     // Favorites/Videos (tabbed) & Lists
                     ProfileFavoritesExternalPlacesView(
                         favoritesVM: favoritesVM,
@@ -178,13 +183,14 @@ struct ProfileContentView: View {
                     }
 
                     // Account actions (logout/delete) moved to toolbar AccountMenuView
+                    }
                 }
-                .padding(.top, 20)
                 .padding(.bottom, 40)
             }
             .refreshable {
                 await profile.refreshProfile()
             }
+            .ignoresSafeArea(edges: .top)
         }
         .sheet(isPresented: $showEditProfileForSocials) {
             if let user = profile.user {

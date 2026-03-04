@@ -448,6 +448,16 @@ class UserService: ObservableObject {
     func getTotalPlacesCount(forUserId userId: String) async throws -> Int {
         return try await supabase.getTotalPlacesCount(forUserId: userId)
     }
+
+    /// Returns the count of distinct countries where a user has reviewed places.
+    func getCountriesCount(forUserId userId: String) async throws -> Int {
+        return try await supabase.getCountriesCount(forUserId: userId)
+    }
+
+    /// Fetches the list of distinct country names where the user has reviewed places.
+    func fetchUserVisitedCountries(userId: String) async throws -> [String] {
+        return try await supabase.fetchUserVisitedCountries(userId: userId)
+    }
     
     /// Fetch user favorites using optimized SQL function
     func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {

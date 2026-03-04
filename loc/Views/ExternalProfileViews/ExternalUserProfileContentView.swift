@@ -26,9 +26,15 @@ struct ExternalUserProfileContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
+                // World Map Banner (extends to top of screen)
+                WorldMapBannerView(
+                    visitedCountryCodes: CountryISOMapping.isoCodesFromNames(viewModel.visitedCountries),
+                    height: 230
+                )
+
                 // Profile Picture, Name, Followers
                 VStack(spacing: 16) {
-                    // Profile Picture
+                    // Profile Picture (overlapping banner bottom)
                     UserProfileProfilePictureView(
                         profilePhotoURL: viewModel.user.profilePhotoURL,
                         isFollowing: viewModel.isFollowing,
@@ -46,6 +52,8 @@ struct ExternalUserProfileContentView: View {
                         totalPlacesCount: viewModel.totalPlacesCount,
                         userName: viewModel.user.firstName ?? viewModel.user.fullName
                     )
+                    .offset(y: -50)
+                    .padding(.bottom, -50)
 
                     // Name
                     Text(viewModel.user.fullName)
@@ -65,11 +73,7 @@ struct ExternalUserProfileContentView: View {
                         onFollowingTap: { showFollowing = true }
                     )
                 }
-                .padding(.top, -8)
                 .padding(.bottom, 16)
-
-                Divider()
-                    .padding(.horizontal, 20)
 
                 // Content section
                 VStack(spacing: 20) {
@@ -84,7 +88,10 @@ struct ExternalUserProfileContentView: View {
                 }
             }
         }
+        .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .background(
             Group {
                 NavigationLink(

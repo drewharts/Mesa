@@ -56,6 +56,10 @@ class ExternalUserProfileViewModel: ObservableObject {
     @Published var followers: Int = 0
     @Published var followingCount: Int = 0
     @Published var totalPlacesCount: Int = 0
+    @Published var visitedCountries: [String] = []
+
+    /// Derived count of visited countries for display.
+    var countriesVisitedCount: Int { visitedCountries.count }
 
     // MARK: - Followers/Following for Nested Navigation
     @Published var externalUserFollowers: [ProfileData] = []
@@ -173,8 +177,9 @@ class ExternalUserProfileViewModel: ObservableObject {
         async let followersLoad: () = fetchFollowers()
         async let followingCountLoad: () = fetchFollowingCount()
         async let placesCountLoad: () = fetchTotalPlacesCount()
+        async let countriesLoad: () = fetchVisitedCountries()
 
-        _ = await (profileRefresh, followingCheck, favoritesLoad, listsLoad, followersLoad, followingCountLoad, placesCountLoad)
+        _ = await (profileRefresh, followingCheck, favoritesLoad, listsLoad, followersLoad, followingCountLoad, placesCountLoad, countriesLoad)
     }
 
     /// Refreshes the user profile data to ensure all fields (including social links) are current.
@@ -361,6 +366,16 @@ class ExternalUserProfileViewModel: ObservableObject {
             self.totalPlacesCount = count
         } catch {
             print("ExternalUserProfileViewModel Error fetching total places count: \(error)")
+        }
+    }
+
+    /// Fetches the list of distinct countries where this user has reviewed places.
+    private func fetchVisitedCountries() async {
+        do {
+            let countries = try await userService.fetchUserVisitedCountries(userId: userId)
+            self.visitedCountries = countries
+        } catch {
+            print("ExternalUserProfileViewModel Error fetching visited countries: \(error)")
         }
     }
 

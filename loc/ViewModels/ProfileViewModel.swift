@@ -73,6 +73,10 @@ class ProfileViewModel: ObservableObject {
      var profileCountsLoadingState: ProfileDataLoadingState = .idle
 
      @Published var totalUniquePlacesCount: Int = 0  // Total unique places (saved + reviewed + created)
+     @Published var visitedCountries: [String] = []  // Distinct country names with reviewed places
+
+    /// Derived count of visited countries for display.
+    var countriesVisitedCount: Int { visitedCountries.count }
 
     // List search cancellable
     private var listSearchCancellable: AnyCancellable?
@@ -631,6 +635,7 @@ class ProfileViewModel: ObservableObject {
 
         // Clear other state
         totalUniquePlacesCount = 0
+        visitedCountries = []
 
         // Clear UI state flags
         isUploadingProfilePhoto = false
@@ -670,12 +675,14 @@ class ProfileViewModel: ObservableObject {
         async let following: Int = resilientFetch(fallbacks.following) { try await self.userService.getNumberFollowing(forUserId: userId) }
         async let favorites: [FavoritePlace] = resilientFetch(fallbacks.favorites) { try await self.userService.fetchUserFavorites(userId: userId) }
         async let totalUniquePlaces: Int = resilientFetch(fallbacks.uniquePlaces) { try await self.userService.getTotalPlacesCount(forUserId: userId) }
+        async let countries: [String] = resilientFetch(fallbacks.countries) { try await self.userService.fetchUserVisitedCountries(userId: userId) }
 
-        let (followersCount, followingCount, favoritePlaces, uniquePlacesCount) = await (followers, following, favorites, totalUniquePlaces)
+        let (followersCount, followingCount, favoritePlaces, uniquePlacesCount, countryNames) = await (followers, following, favorites, totalUniquePlaces, countries)
 
         socialViewModel.followersCount = followersCount
         socialViewModel.followingCount = followingCount
         totalUniquePlacesCount = uniquePlacesCount
+        visitedCountries = countryNames
         favoritesViewModel.lightweightFavorites = favoritePlaces
         socialViewModel.isFollowersLoading = false
         socialViewModel.isFollowingLoading = false
@@ -689,17 +696,18 @@ class ProfileViewModel: ObservableObject {
     }
 
     /// Captures current count values as fallbacks so cancelled queries preserve existing data.
-    private func captureCurrentCountFallbacks() -> (followers: Int, following: Int, favorites: [FavoritePlace], uniquePlaces: Int) {
+    private func captureCurrentCountFallbacks() -> (followers: Int, following: Int, favorites: [FavoritePlace], uniquePlaces: Int, countries: [String]) {
         return (
             socialViewModel.followersCount,
             socialViewModel.followingCount,
             favoritesViewModel.lightweightFavorites,
-            totalUniquePlacesCount
+            totalUniquePlacesCount,
+            visitedCountries
         )
     }
 
     /// Shows loading indicators only on initial load (refresh already shows pull-to-refresh spinner).
-    private func showLoadingIndicatorsIfInitialLoad(_ fallbacks: (followers: Int, following: Int, favorites: [FavoritePlace], uniquePlaces: Int)) {
+    private func showLoadingIndicatorsIfInitialLoad(_ fallbacks: (followers: Int, following: Int, favorites: [FavoritePlace], uniquePlaces: Int, countries: [String])) {
         if fallbacks.followers == 0 && fallbacks.following == 0 {
             socialViewModel.isFollowersLoading = true
             socialViewModel.isFollowingLoading = true

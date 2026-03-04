@@ -7,21 +7,6 @@ import Foundation
 import SwiftUI
 import UIKit
 
-// Debug logging flag - set to true for verbose logging, false for production
-private let DEBUG_LOGGING = {
-    #if DEBUG
-        return true
-    #else
-        return false
-    #endif
-}()
-
-func debugLog(_ message: String) {
-    if DEBUG_LOGGING {
-        print(message)
-    }
-}
-
 @MainActor
 class ExternalVideoViewModel: ObservableObject {
     @Published var externalVideo: ExternalVideo

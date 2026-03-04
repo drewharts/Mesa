@@ -84,8 +84,6 @@ struct ProfileFavoritesReviewsSection: View {
                 onHelpTap: config.showExternalPlacesTab ? onExternalPlacesHelpTap : nil
             )
             contentGrid
-            Divider()
-                .padding(.horizontal, 20)
         }
         .onChange(of: initialTabId) { _, newValue in
             selectedTabId = newValue

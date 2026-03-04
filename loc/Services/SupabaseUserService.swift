@@ -477,6 +477,34 @@ class SupabaseUserService: ObservableObject {
         return response.first?.total_places_count ?? 0
     }
     
+    /// Gets the count of distinct countries where a user has reviewed places.
+    func getCountriesCount(forUserId userId: String) async throws -> Int {
+        struct CountriesCount: Codable {
+            let countries_count: Int
+        }
+
+        let response: [CountriesCount] = try await supabase.client
+            .rpc("get_user_countries_count", params: ["p_user_id": userId])
+            .execute()
+            .value
+
+        return response.first?.countries_count ?? 0
+    }
+
+    /// Fetches the list of distinct country names where the user has reviewed places.
+    func fetchUserVisitedCountries(userId: String) async throws -> [String] {
+        struct CountryRow: Codable {
+            let country: String
+        }
+
+        let response: [CountryRow] = try await supabase.client
+            .rpc("get_user_countries_visited", params: ["p_user_id": userId])
+            .execute()
+            .value
+
+        return response.map { $0.country }
+    }
+
     /// Check if a user is following another user
     func isFollowingUser(followerId: String, followingId: String) async throws -> Bool {
         struct FollowingRecord: Codable {
