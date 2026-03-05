@@ -62,7 +62,6 @@ struct ProfileViewListsView: View {
         .sheet(isPresented: $showingGoogleMapsImport) {
             GoogleMapsImportView(
                 userId: profile.user?.id ?? "",
-                existingLists: listsVM.lightweightPlaceLists,
                 onImportCompleted: { listId in
                     Task {
                         await listsVM.reloadListsAfterSearch()
