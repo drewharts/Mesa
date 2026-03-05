@@ -31,7 +31,9 @@ struct ListsSearchBar: View {
             searchCapsule
             plusMenu
         }
+        .contentShape(Rectangle())
         .padding(.horizontal, 20)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Shared Filter Button
@@ -97,6 +99,7 @@ struct ListsSearchBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .frame(minHeight: 44)
         .background(
             Capsule()
                 .fill(Color(.systemGray5).opacity(0.6))

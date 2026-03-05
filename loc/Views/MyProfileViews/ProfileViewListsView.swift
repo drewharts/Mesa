@@ -59,20 +59,11 @@ struct ProfileViewListsView: View {
             .presentationDetents([.height(200)])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingGoogleMapsImport) {
-            GoogleMapsImportView(
-                userId: profile.user?.id ?? "",
-                existingLists: listsVM.lightweightPlaceLists,
-                onImportCompleted: { listId in
-                    Task {
-                        await listsVM.reloadListsAfterSearch()
-                        // Open the newly created list
-                        if let index = listsVM.filteredPlaceLists.firstIndex(where: { $0.list_id == listId }) {
-                            selectedListIndex = index
-                        }
-                    }
-                }
-            )
+        .sheet(isPresented: $showingGoogleMapsImport, onDismiss: {
+            Task { await listsVM.reloadListsAfterSearch() }
+        }) {
+            GoogleMapsImportView()
+                .environmentObject(profile)
         }
         .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
             deepLinkManager.clearPendingList()

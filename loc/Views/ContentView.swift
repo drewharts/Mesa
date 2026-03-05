@@ -80,6 +80,7 @@ struct ContentView: View {
             // List creation onboarding overlays after photo onboarding but before main app
             if userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && userSession.needsListOnboarding {
                 ListOnboardingView()
+                    .environmentObject(profileViewModel)
                     .transition(.opacity)
             }
         }

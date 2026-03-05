@@ -9,31 +9,21 @@
 import SwiftUI
 
 struct ListOnboardingView: View {
-    @StateObject private var viewModel = ListOnboardingViewModel()
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var profile: ProfileViewModel
 
     @State private var showContent = false
 
     var body: some View {
-        GoogleMapsImportView(
-            userId: userSession.currentUserId ?? "",
-            existingLists: viewModel.existingLists,
-            onImportCompleted: { _ in
-                userSession.completeListOnboarding()
-            },
-            cancelLabel: "Skip",
-            onCancel: {
-                userSession.completeListOnboarding()
-            }
-        )
+        GoogleMapsImportView(onClose: {
+            userSession.completeListOnboarding()
+        })
+        .environmentObject(profile)
         .opacity(showContent ? 1 : 0)
         .onAppear {
             withAnimation(.easeIn(duration: 0.4).delay(0.2)) {
                 showContent = true
             }
-        }
-        .task {
-            await viewModel.fetchExistingLists(userId: userSession.currentUserId ?? "")
         }
     }
 }

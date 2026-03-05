@@ -14,7 +14,6 @@ class PlaceRepository {
     static let shared = PlaceRepository()
 
     private let mesaBackendService = MesaBackendService.shared
-    private let importService = GoogleMapsImportService()
 
     private init() {}
 
@@ -46,22 +45,24 @@ class PlaceRepository {
         return PlaceDataAssembler.merge(base: existingPlace, overlay: freshPlace)
     }
 
-    /// Resolves a place by name and coordinate, then fetches full details using the resolved ID.
+    /// Resolves a place by name and coordinate via backend search, then fetches full details.
     /// Validates the resolved place is within 200m of the expected coordinate.
     private func resolveByNameAndCoordinate(_ existingPlace: DetailPlace, coordinate: CLLocationCoordinate2D) async throws -> DetailPlace {
-        let result = try await importService.resolvePlace(
-            name: existingPlace.name,
+        let suggestions = try await mesaBackendService.fetchSuggestions(
+            query: existingPlace.name,
+            limit: 3,
+            provider: "google",
             latitude: coordinate.latitude,
             longitude: coordinate.longitude
         )
 
-        guard result.resolved, let importedPlace = result.place else {
+        guard let bestMatch = suggestions.first else {
             throw PlaceResolutionError.couldNotResolve(name: existingPlace.name)
         }
 
         let freshPlace = try await mesaBackendService.fetchPlaceDetails(
-            placeId: importedPlace.googlePlacesId,
-            source: "google"
+            placeId: bestMatch.id,
+            source: bestMatch.source
         )
 
         let merged = PlaceDataAssembler.merge(base: existingPlace, overlay: freshPlace)
