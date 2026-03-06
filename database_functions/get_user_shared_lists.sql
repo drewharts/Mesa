@@ -31,7 +31,7 @@ BEGIN
         pl.is_public,
         pl.image,
         (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
-        NULL::TEXT AS city,
+        pl.city,
         ST_AsText(pl.average_location) AS average_location,
         pl.user_id AS owner_id,
         u.full_name AS owner_name,

@@ -17,7 +17,9 @@ struct ListsSearchBar: View {
     var showOnlyShared: Bool
     var hasSharedLists: Bool
     var isFilterEnabled: Bool
+    var isGroupingEnabled: Bool
     var onToggleFilter: () -> Void
+    var onToggleGrouping: () -> Void
     var onAddList: () -> Void
     var onImportGoogleMapsList: () -> Void
 
@@ -27,6 +29,9 @@ struct ListsSearchBar: View {
         HStack(spacing: 10) {
             if hasSharedLists || !isFilterEnabled {
                 sharedButton
+            }
+            if searchText.isEmpty {
+                groupingButton
             }
             searchCapsule
             plusMenu
@@ -69,6 +74,27 @@ struct ListsSearchBar: View {
             return Color(.systemGray5).opacity(0.6)
         }
         return showOnlyShared ? Color.primary : Color(.systemGray5).opacity(0.6)
+    }
+
+    // MARK: - Grouping Toggle Button
+
+    private var groupingButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                onToggleGrouping()
+            }
+        } label: {
+            Image(systemName: isGroupingEnabled ? "building.2.fill" : "building.2")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(isGroupingEnabled ? .white : .primary)
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle()
+                        .fill(isGroupingEnabled ? Color.primary : Color(.systemGray5).opacity(0.6))
+                )
+        }
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Circle())
     }
 
     // MARK: - Search Capsule

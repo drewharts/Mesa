@@ -24,7 +24,8 @@ RETURNS TABLE(
     place_count BIGINT,
     collaborator_count BIGINT,
     collaborator_photos TEXT[],
-    description TEXT
+    description TEXT,
+    city TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -52,7 +53,8 @@ BEGIN
                 LIMIT 5
             ) collab_photos
         ) AS collaborator_photos,
-        pl.description
+        pl.description,
+        pl.city
     FROM place_lists pl
     WHERE pl.user_id = p_user_id
         AND pl.name ILIKE '%' || p_search_term || '%'

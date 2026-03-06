@@ -630,6 +630,7 @@ class SupabaseUserService: ObservableObject {
             let created_at: String?
             let updated_at: String?
             let average_location: String?
+            let city: String?
             let place_list_items: [PlaceListItemCount]
         }
 
@@ -644,6 +645,7 @@ class SupabaseUserService: ObservableObject {
                 created_at,
                 updated_at,
                 average_location::text,
+                city,
                 place_list_items(count)
             """)
             .eq("user_id", value: userId)
@@ -662,7 +664,7 @@ class SupabaseUserService: ObservableObject {
                 updated_at: record.updated_at,
                 distance_meters: nil,
                 place_count: record.place_list_items.first?.count ?? 0,
-                city: nil,
+                city: record.city,
                 average_location_raw: record.average_location
             )
         }
@@ -678,12 +680,13 @@ class SupabaseUserService: ObservableObject {
             let created_at: String?
             let updated_at: String?
             let average_location: String?
+            let city: String?
         }
 
         // Fetch matching lists from database
         let response: [SearchListRecord] = try await supabase.client
             .from("place_lists")
-            .select("id, name, is_public, image, created_at, updated_at, average_location::text")
+            .select("id, name, is_public, image, created_at, updated_at, average_location::text, city")
             .eq("user_id", value: userId)
             .ilike("name", pattern: "%\(query)%")
             .order("name", ascending: true)
@@ -702,7 +705,7 @@ class SupabaseUserService: ObservableObject {
                 updated_at: record.updated_at ?? ISO8601DateFormatter().string(from: Date()),
                 distance_meters: nil,
                 place_count: 0,
-                city: nil,
+                city: record.city,
                 average_location_raw: record.average_location
             )
         }
@@ -752,6 +755,23 @@ class SupabaseUserService: ObservableObject {
         return places
     }
     
+    // MARK: - Recommended Users
+
+    /// Fetches recommended users ordered by total places count, excluding self and already-followed users.
+    func fetchRecommendedUsers(userId: String, limit: Int = 15) async throws -> [ProfileData] {
+        struct Params: Encodable {
+            let p_user_id: String
+            let p_limit: Int
+        }
+
+        let profiles: [ProfileData] = try await supabase.client
+            .rpc("get_recommended_users", params: Params(p_user_id: userId, p_limit: limit))
+            .execute()
+            .value
+
+        return profiles
+    }
+
     // MARK: - Follower/Following Profile Data (Lazy - Load on Demand!)
     
     /// Fetch follower profiles - LAZY! Only call when user clicks "Followers"
