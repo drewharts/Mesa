@@ -36,9 +36,6 @@ class ProfileListsViewModel: ObservableObject {
     /// Pagination of places within individual lists.
     let placePaginationViewModel: ListsPlacePaginationViewModel
 
-    /// City-based grouping and collapse state.
-    let cityGroupingViewModel: ListsCityGroupingViewModel
-
     // MARK: - Combine Subscriptions
 
     /// Stores subscriptions to child ViewModels for change propagation.
@@ -233,11 +230,6 @@ class ProfileListsViewModel: ObservableObject {
         distanceSortingViewModel.hasCompletedInitialSort
     }
 
-    /// Returns filtered lists grouped by city.
-    var groupedPlaceLists: [CityListGroup] {
-        cityGroupingViewModel.groupedLists(from: filteredPlaceLists)
-    }
-
     // MARK: - Initialization
 
     /// Initializes the lists view model with required dependencies.
@@ -250,8 +242,6 @@ class ProfileListsViewModel: ObservableObject {
         let distanceSortingVM = ListsDistanceSortingViewModel(userSession: userSession, locationManager: locationManager, dataViewModel: dataVM)
         let legacyLoadingVM = ListsLegacyLoadingViewModel(placeService: placeService, dataViewModel: dataVM)
         let placePaginationVM = ListsPlacePaginationViewModel(placeService: placeService, dataViewModel: dataVM)
-        let cityGroupingVM = ListsCityGroupingViewModel(searchViewModel: searchVM)
-
         // Store references
         self.dataViewModel = dataVM
         self.loadingViewModel = loadingVM
@@ -260,7 +250,6 @@ class ProfileListsViewModel: ObservableObject {
         self.distanceSortingViewModel = distanceSortingVM
         self.legacyLoadingViewModel = legacyLoadingVM
         self.placePaginationViewModel = placePaginationVM
-        self.cityGroupingViewModel = cityGroupingVM
 
         // Wire up cross-ViewModel references
         mutationsVM.setDistanceSortingViewModel(distanceSortingVM)
@@ -315,10 +304,6 @@ class ProfileListsViewModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
-        // City grouping state changes
-        cityGroupingViewModel.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
     }
 
     // MARK: - Callback Propagation
@@ -481,18 +466,6 @@ class ProfileListsViewModel: ObservableObject {
         distanceSortingViewModel.recalculateAverageCoordinates(for: listId)
     }
 
-    // MARK: - Delegated Methods - City Grouping
-
-    /// Toggles the collapsed state of a city group section.
-    func toggleCityGroup(_ city: String) {
-        cityGroupingViewModel.toggleCity(city)
-    }
-
-    /// Returns whether a city group section is collapsed.
-    func isCityCollapsed(_ city: String) -> Bool {
-        cityGroupingViewModel.isCityCollapsed(city)
-    }
-
     // MARK: - Delegated Methods - Loading
 
     /// Loads the initial page of lists.
@@ -591,6 +564,5 @@ class ProfileListsViewModel: ObservableObject {
         distanceSortingViewModel.resetSortingState()
         legacyLoadingViewModel.resetLegacyLoadingState()
         placePaginationViewModel.resetPaginationState()
-        cityGroupingViewModel.resetGroupingState()
     }
 }

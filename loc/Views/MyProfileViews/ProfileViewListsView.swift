@@ -139,12 +139,8 @@ struct ProfileViewListsView: View {
             showOnlyShared: listsVM.showOnlySharedLists,
             hasSharedLists: listsVM.hasSharedLists,
             isFilterEnabled: listsVM.canInteractWithSharedFilter,
-            isGroupingEnabled: listsVM.cityGroupingViewModel.isGroupingEnabled,
             onToggleFilter: {
                 listsVM.showOnlySharedLists.toggle()
-            },
-            onToggleGrouping: {
-                listsVM.cityGroupingViewModel.isGroupingEnabled.toggle()
             },
             onAddList: {
                 showingNewListSheet = true
@@ -162,11 +158,7 @@ struct ProfileViewListsView: View {
         if listsVM.isLoadingInitialLists {
             initialLoadingView
         } else if !listsVM.filteredPlaceLists.isEmpty {
-            if listsVM.cityGroupingViewModel.shouldShowGrouped {
-                groupedListView
-            } else {
-                flatListView
-            }
+            listView
         } else {
             emptyStateView
         }
@@ -185,7 +177,7 @@ struct ProfileViewListsView: View {
         .padding(.vertical, 40)
     }
     
-    // MARK: - List Views
+    // MARK: - List View
 
     // 2-column grid for displaying lists side by side
     private let listColumns = [
@@ -193,62 +185,7 @@ struct ProfileViewListsView: View {
         GridItem(.flexible(), spacing: 12)
     ]
 
-    // MARK: - Grouped List View
-
-    private var groupedListView: some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
-            ForEach(listsVM.groupedPlaceLists) { group in
-                CityGroupHeaderView(
-                    city: group.city,
-                    listCount: group.lists.count,
-                    isCollapsed: listsVM.isCityCollapsed(group.city),
-                    onTap: { listsVM.toggleCityGroup(group.city) }
-                )
-
-                if !listsVM.isCityCollapsed(group.city) {
-                    LazyVGrid(columns: listColumns, spacing: 16) {
-                        ForEach(Array(group.lists.enumerated()), id: \.element.id) { _, list in
-                            groupedListCard(for: list)
-                        }
-                    }
-                }
-            }
-
-            paginationTrigger
-        }
-        .padding(.horizontal, 16)
-    }
-
-    /// Renders a single list card within a grouped section, resolving the flat index for the popup.
-    private func groupedListCard(for list: LightweightPlaceList) -> some View {
-        let flatIndex = listsVM.filteredPlaceLists.firstIndex(where: { $0.list_id == list.list_id })
-        return LightweightProfileListSection(
-            list: list,
-            places: listsVM.lightweightPlaceListPlaces[list.list_id] ?? [],
-            allLists: listsVM.filteredPlaceLists,
-            currentIndex: flatIndex ?? 0,
-            placeCount: listsVM.lightweightPlaceListCounts[list.list_id] ?? list.place_count,
-            placeColors: $placeColors,
-            onTap: {
-                if let idx = flatIndex { selectedListIndex = idx }
-            }
-        )
-        .contextMenu {
-            Button(role: .destructive) {
-                listToDelete = list
-                showDeleteConfirmation = true
-            } label: {
-                Label("Delete List", systemImage: "trash")
-            }
-        }
-        .onAppear {
-            handleListAppear(list: list)
-        }
-    }
-
-    // MARK: - Flat List View
-
-    private var flatListView: some View {
+    private var listView: some View {
         LazyVGrid(columns: listColumns, spacing: 16) {
             ForEach(Array(listsVM.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
                 LightweightProfileListSection(
@@ -292,25 +229,6 @@ struct ProfileViewListsView: View {
         .padding(.horizontal, 16)
     }
     
-    // MARK: - Pagination Trigger
-
-    @ViewBuilder
-    private var paginationTrigger: some View {
-        if listsVM.hasMorePlaceLists && !listsVM.isLoadingMorePlaceLists {
-            Color.clear
-                .frame(height: 1)
-                .onAppear {
-                    Task {
-                        await listsVM.loadMoreLists()
-                    }
-                }
-        }
-
-        if listsVM.isLoadingMorePlaceLists {
-            paginationLoadingView
-        }
-    }
-
     // MARK: - Empty State View
     
     private var emptyStateView: some View {
