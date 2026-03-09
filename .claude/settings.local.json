@@ -35,7 +35,14 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix TikTok no-places-found flow: navigation, post loading, and review schema\n\n- Navigate to place detail after manual place assignment via SelectedPlaceViewModel\n- Update get_place_reviews_with_tiktoks to match current schema \\(text, photo_urls, would_recommend\\)\n- Make review_text optional in PostWithUserRecord to handle NULL values\n- Fix AnyCodable null decoding \\(decodeNil → NSNull\\) to prevent \"data not in correct format\" errors\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(cat:*)",
       "Bash(gh pr view:*)",
-      "mcp__supabase__search_docs"
+      "mcp__supabase__search_docs",
+      "Bash(do echo:*)",
+      "Bash(git rm:*)",
+      "Bash(git fetch:*)",
+      "Bash(git restore:*)",
+      "Bash(git diff:*)",
+      "Read(//Users/drewhartsfield/.claude/**)",
+      "Read(//Users/drewhartsfield/**)"
     ],
     "deny": []
   },
