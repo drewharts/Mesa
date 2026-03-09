@@ -252,6 +252,9 @@ struct MainView: View {
             case .noPlacesFound(let contentUrl):
                 noPlacesFoundSheet(contentUrl: contentUrl)
 
+            case .importPlaceConfirmation(let placeId, let contentUrl):
+                importPlaceConfirmationSheet(placeId: placeId, contentUrl: contentUrl)
+
             // Map Popups (User's Own Data)
             case .list(let listId):
                 listSheet(listId: listId)
@@ -333,6 +336,28 @@ struct MainView: View {
             .environmentObject(userSession)
             .environmentObject(detailPlaceViewModel)
             .presentationDragIndicator(.visible)
+    }
+
+    /// Import place confirmation sheet content.
+    private func importPlaceConfirmationSheet(placeId: String, contentUrl: String) -> some View {
+        Group {
+            if let place = detailPlaceViewModel.places[placeId] {
+                ImportPlaceConfirmationView(place: place, contentUrl: contentUrl)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(detailPlaceViewModel)
+                    .presentationDetents([.height(340)])
+            } else {
+                VStack {
+                    ProgressView()
+                        .padding()
+                    Text("Loading place...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
     }
 
     /// User's list popup sheet content.

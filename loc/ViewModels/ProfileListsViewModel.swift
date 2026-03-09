@@ -242,7 +242,6 @@ class ProfileListsViewModel: ObservableObject {
         let distanceSortingVM = ListsDistanceSortingViewModel(userSession: userSession, locationManager: locationManager, dataViewModel: dataVM)
         let legacyLoadingVM = ListsLegacyLoadingViewModel(placeService: placeService, dataViewModel: dataVM)
         let placePaginationVM = ListsPlacePaginationViewModel(placeService: placeService, dataViewModel: dataVM)
-
         // Store references
         self.dataViewModel = dataVM
         self.loadingViewModel = loadingVM
@@ -304,6 +303,7 @@ class ProfileListsViewModel: ObservableObject {
         placePaginationViewModel.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+
     }
 
     // MARK: - Callback Propagation

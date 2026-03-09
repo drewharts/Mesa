@@ -25,6 +25,7 @@ struct locApp: App {
     private let dataManager: DataManager
     private let searchViewModel: SearchViewModel  // ✅ Staff Engineer: Create VM at app level
     private let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator for search interactions
+    private let splashScreenViewModel: SplashScreenViewModel
     
     init() {
         // Supabase is initialized via SupabaseManager.shared
@@ -151,6 +152,7 @@ struct locApp: App {
         self.dataManager = dataMgr
         self.searchViewModel = searchVM
         self.searchCoordinator = searchCoord
+        self.splashScreenViewModel = SplashScreenViewModel(userSession: userSess, dataManager: dataMgr)
 
         // TODO: Remove after testing - resets suggested profiles popup
         SuggestedProfilesViewModel.resetPopupSeenStatus()
@@ -163,6 +165,7 @@ struct locApp: App {
     var body: some Scene {
         WindowGroup {
             SplashScreenView(
+                viewModel: splashScreenViewModel,
                 selectedPlaceViewModel: selectedPlaceViewModel,
                 profileViewModel: profileViewModel,
                 userProfileNavigationViewModel: userProfileNavigationViewModel,
@@ -173,8 +176,8 @@ struct locApp: App {
                 notificationManager: notificationManager,
                 dataManager: dataManager,
                 serviceContainer: serviceContainer,
-                searchViewModel: searchViewModel,  // ✅ Pass to children
-                searchCoordinator: searchCoordinator  // ✅ Pass coordinator
+                searchViewModel: searchViewModel,
+                searchCoordinator: searchCoordinator
             )
                 // Only 3 environment objects at the root!
                 .environmentObject(userSession)

@@ -102,6 +102,8 @@ final class SessionCleanupService {
     private func clearUserActivityCaches() {
         // Clear recent search history (persisted in UserDefaults)
         RecentSearchesService.shared.clearAll()
+        // Clear cached profile ID so next login fetches fresh
+        UserSession.clearCachedProfileId()
     }
 }
 

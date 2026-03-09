@@ -138,16 +138,35 @@ URL scheme: `loc://`
 - Handled in `Loc/AppDelegate.swift` and `Loc/LocApp.swift`
 - Routes: `/profile/{userId}`, `/place/{placeId}`, `/list/{listId}`
 
-## Testing Considerations
+## Testing
 
-### Unit Tests
-- Test ViewModels with mock services
-- Deep link URL parsing tests
+### Test Structure
+Tests live in `locTests/` and are organized to mirror the main source:
+```
+locTests/
+  Models/          — Model Codable decoding, computed properties, parsing
+  Utilities/       — Pure utility function tests (normalizers, mappers)
+  ViewModels/      — ViewModel business logic tests (future)
+  Services/        — Service layer tests with mocks (future)
+```
 
-### UI Tests
-- Test navigation flows
-- Map interaction testing
-- List creation/editing flows
+The `locTests` target uses `PBXFileSystemSynchronizedRootGroup` — new `.swift` files added anywhere under `locTests/` are automatically discovered by Xcode. No manual pbxproj edits needed.
+
+### Running Tests
+Run tests from **Xcode** (Cmd+U or Product → Test). Do not run xcodebuild test from CLI.
+
+### Writing Tests
+- **One test file per source file** — name it `{SourceFile}Tests.swift` in the matching subdirectory
+- **Use `@testable import loc`** to access internal types
+- **Helper methods** — add `private` decode/factory helpers at the top of each test class to reduce boilerplate
+- **Test naming**: `test{What}_{Condition}` or `test{Behavior}` (e.g., `testDecodeCoordinatesBackendFormat`, `testNormalizeTooShortReturnsNil`)
+- **No external dependencies** — Phase 1 tests are pure logic; no network, no Supabase, no mocks needed
+- **Test edge cases** — empty inputs, nil optionals, legacy field name variants, format fallbacks
+
+### Test Priority (Phase 1 → Phase 3)
+1. **Phase 1 — Pure logic models & utilities** (no mocking): `DetailPlace`, `LightweightPlaceList`, `PlaceAnnotation`, `PhoneNumberNormalizer`, `PlaceTypeEmoji`
+2. **Phase 2 — Service logic** (needs URLSession/Supabase mocks): `GoogleMapsImportService`, `FavoritesService`, `PlacePostsCacheService`, `DeepLinkManager`
+3. **Phase 3 — ViewModel logic** (needs protocol-based DI): `LoginViewModel`, `PlaceDetailTabsViewModel`
 
 ## Common Issues and Solutions
 

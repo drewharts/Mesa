@@ -18,6 +18,17 @@ import Foundation
 import CoreLocation
 import Combine
 
+/// Typed confirmation for list save/remove toast display.
+struct ListConfirmation: Equatable {
+    enum ActionType {
+        case added
+        case removed
+    }
+
+    let message: String
+    let type: ActionType
+}
+
 @MainActor
 class PlaceListSelectionViewModel: ObservableObject {
     // MARK: - Published State (Own Pagination)
@@ -28,6 +39,9 @@ class PlaceListSelectionViewModel: ObservableObject {
     @Published var placeMembership: [String: Bool] = [:] // listId -> isPlaceInList
     @Published var isFavorited: Bool = false
     
+    // MARK: - Confirmation Toast State
+    @Published var confirmation: ListConfirmation? = nil
+
     // MARK: - Filter State
     @Published var showOnlyShared: Bool = false
     @Published var searchText: String = ""
@@ -61,6 +75,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     private var sharedLists: [LightweightPlaceList] = [] // Cached shared lists (don't paginate)
     private var searchCancellable: AnyCancellable?
     private var filterCancellable: AnyCancellable?
+    private var confirmationDismissTask: Task<Void, Never>?
     
     // MARK: - Init
     init(profile: ProfileViewModel,
@@ -93,6 +108,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     deinit {
         searchCancellable?.cancel()
         filterCancellable?.cancel()
+        confirmationDismissTask?.cancel()
     }
     
     // MARK: - Public API
@@ -416,12 +432,14 @@ class PlaceListSelectionViewModel: ObservableObject {
             updateLocalListCount(listId: currentList.list_id, delta: -1)
             profile.listsViewModel.removePlaceFromLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
             placeMembership[currentList.list_id] = false
+            showConfirmation("Removed from \(currentList.name)", type: .removed)
         } else {
             // Calculate new count from CURRENT state (not stale parameter)
             let newCount = currentList.place_count + 1
             updateLocalListCount(listId: currentList.list_id, delta: +1)
             profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
             placeMembership[currentList.list_id] = true
+            showConfirmation("Saved to \(currentList.name)", type: .added)
         }
         
         // ✅ STAFF ENGINEER: Clear recently created flag on user interaction
@@ -434,12 +452,26 @@ class PlaceListSelectionViewModel: ObservableObject {
     func toggleFavorite(place: DetailPlace) {
         if isFavorited {
             profile.favoritesViewModel.removeFavoritePlace(place: place)
+            showConfirmation("Removed from Favorites", type: .removed)
         } else {
             profile.favoritesViewModel.addFavoritePlace(place: place)
+            showConfirmation("Added to Favorites", type: .added)
         }
         isFavorited.toggle()
     }
     
+    /// Shows a confirmation toast and auto-clears it after 1.5 seconds.
+    private func showConfirmation(_ message: String, type: ListConfirmation.ActionType) {
+        confirmationDismissTask?.cancel()
+        confirmation = ListConfirmation(message: message, type: type)
+        confirmationDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if !Task.isCancelled {
+                self?.confirmation = nil
+            }
+        }
+    }
+
     /// Update the place count for a list in our local state
     /// Follows SRP: PlaceListSelectionViewModel owns its list state
     private func updateLocalListCount(listId: String, delta: Int) {

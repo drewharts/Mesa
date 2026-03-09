@@ -50,11 +50,21 @@ class GoogleMapsImportViewModel: ObservableObject {
     @Published var resolvedPlaces: [ImportedPlace] = []
     @Published var resolveErrors: [String] = []
 
+    // List picker pagination state
+    @Published var availableLists: [LightweightPlaceList] = []
+    @Published var isLoadingLists: Bool = false
+    @Published var hasMoreLists: Bool = true
+
     // MARK: - Dependencies
 
     private let importService = GoogleMapsImportService()
     private let placeService = SupabasePlaceService.shared
     private let userService = SupabaseUserService.shared
+
+    // MARK: - List Pagination
+
+    private var listsCurrentPage: Int = 0
+    private let listsPageSize: Int = 20
 
     // MARK: - URL Extraction & Validation
 
@@ -207,6 +217,51 @@ class GoogleMapsImportViewModel: ObservableObject {
         }
     }
 
+    // MARK: - List Picker Loading
+
+    /// Fetches the first page of the user's lists for the import picker.
+    func loadInitialLists(userId: String) async {
+        guard !userId.isEmpty else { return }
+        listsCurrentPage = 1
+        isLoadingLists = true
+        hasMoreLists = true
+
+        do {
+            let lists = try await userService.fetchPlaceListsWithoutLocation(
+                userId: userId, page: 1, pageSize: listsPageSize
+            )
+            availableLists = lists
+            hasMoreLists = lists.count >= listsPageSize
+        } catch {
+            print("GoogleMapsImportViewModel: Failed to fetch lists: \(error)")
+        }
+
+        isLoadingLists = false
+    }
+
+    /// Fetches the next page of lists and appends to the existing results.
+    func loadMoreLists(userId: String) async {
+        guard !userId.isEmpty, hasMoreLists, !isLoadingLists else { return }
+
+        listsCurrentPage += 1
+        isLoadingLists = true
+
+        do {
+            let lists = try await userService.fetchPlaceListsWithoutLocation(
+                userId: userId, page: listsCurrentPage, pageSize: listsPageSize
+            )
+            let existingIds = Set(availableLists.map(\.list_id))
+            let newLists = lists.filter { !existingIds.contains($0.list_id) }
+            availableLists.append(contentsOf: newLists)
+            hasMoreLists = lists.count >= listsPageSize
+        } catch {
+            print("GoogleMapsImportViewModel: Failed to load more lists: \(error)")
+            listsCurrentPage -= 1
+        }
+
+        isLoadingLists = false
+    }
+
     // MARK: - Reset
 
     /// Resets the import flow back to the initial state.
@@ -217,5 +272,9 @@ class GoogleMapsImportViewModel: ObservableObject {
         extractResult = nil
         resolvedPlaces = []
         resolveErrors = []
+        availableLists = []
+        isLoadingLists = false
+        hasMoreLists = true
+        listsCurrentPage = 0
     }
 }

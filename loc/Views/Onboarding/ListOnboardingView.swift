@@ -9,7 +9,6 @@
 import SwiftUI
 
 struct ListOnboardingView: View {
-    @StateObject private var viewModel = ListOnboardingViewModel()
     @EnvironmentObject var userSession: UserSession
 
     @State private var showContent = false
@@ -17,7 +16,6 @@ struct ListOnboardingView: View {
     var body: some View {
         GoogleMapsImportView(
             userId: userSession.currentUserId ?? "",
-            existingLists: viewModel.existingLists,
             onImportCompleted: { _ in
                 userSession.completeListOnboarding()
             },
@@ -31,9 +29,6 @@ struct ListOnboardingView: View {
             withAnimation(.easeIn(duration: 0.4).delay(0.2)) {
                 showContent = true
             }
-        }
-        .task {
-            await viewModel.fetchExistingLists(userId: userSession.currentUserId ?? "")
         }
     }
 }

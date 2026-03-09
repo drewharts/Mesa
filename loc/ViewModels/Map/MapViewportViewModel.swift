@@ -145,17 +145,20 @@ class MapViewportViewModel: ObservableObject {
                     return
                 }
 
-                let annotations = try await fetchAnnotationsForFilter(
+                async let annotationsResult = fetchAnnotationsForFilter(
                     bounds: bounds,
                     userId: userId,
                     filterState: filterState
                 )
 
-                let community = try await fetchCommunityMarkers(
+                async let communityResult = fetchCommunityMarkers(
                     bounds: bounds,
                     userId: userId,
                     hasActiveFilter: filterState.hasActiveFilter
                 )
+
+                let annotations = try await annotationsResult
+                let community = try await communityResult
 
                 guard !Task.isCancelled else {
                     isLoadingViewportPlaces = false

@@ -6,6 +6,7 @@
 //  Single Responsibility: Manage feed data lifecycle and UI state for photo feed.
 //
 
+import Combine
 import Foundation
 
 @MainActor
@@ -19,6 +20,10 @@ class PhotoFeedViewModel: ObservableObject {
     @Published var flippedCardId: String?
     @Published var currentUserProfile: ProfileData?
 
+    // MARK: - Child ViewModels
+
+    let recommendedUsersViewModel: RecommendedUsersViewModel
+
     // MARK: - Dependencies
 
     private let postService = ServiceContainer.shared.postService
@@ -29,21 +34,30 @@ class PhotoFeedViewModel: ObservableObject {
     // MARK: - Private State
 
     private var currentOffset = 0
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
 
     /// Initializes the feed view model for a specific user.
     init(userId: String) {
         self.userId = userId
+        self.recommendedUsersViewModel = RecommendedUsersViewModel(userId: userId)
+
+        recommendedUsersViewModel.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     // MARK: - Public Methods
 
-    /// Loads the first page of the photo feed and fetches the current user profile.
+    /// Loads the first page of the photo feed, fetches the current user profile, and kicks off recommended users.
     func loadFeed() async {
         guard !isLoading else { return }
         isLoading = true
         currentOffset = 0
+
+        // Recommended users load independently — never blocks the feed spinner
+        Task { await recommendedUsersViewModel.loadRecommendedUsers() }
 
         async let profileFetch: () = loadCurrentUserProfile()
 

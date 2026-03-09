@@ -17,15 +17,16 @@ RETURNS TABLE(
     list_id TEXT,
     name TEXT,
     average_location TEXT,
-    is_public BOOLEAN, 
-    image TEXT, 
-    created_at TIMESTAMP WITHOUT TIME ZONE, 
-    updated_at TIMESTAMP WITHOUT TIME ZONE, 
-    distance_meters DOUBLE PRECISION, 
+    is_public BOOLEAN,
+    image TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE,
+    updated_at TIMESTAMP WITHOUT TIME ZONE,
+    distance_meters DOUBLE PRECISION,
     place_count BIGINT,
     collaborator_count BIGINT,
     collaborator_photos TEXT[],
-    description TEXT
+    description TEXT,
+    city TEXT
 )
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -33,7 +34,7 @@ AS $function$
 BEGIN
     RETURN QUERY
     -- Use a subquery with sort_order to combine lists with and without locations
-    SELECT 
+    SELECT
         combined.list_id,
         combined.name,
         combined.average_location,
@@ -45,7 +46,8 @@ BEGIN
         combined.place_count,
         combined.collaborator_count,
         combined.collaborator_photos,
-        combined.description
+        combined.description,
+        combined.city
     FROM (
         -- Lists WITH average_location (sorted by proximity)
     SELECT
@@ -70,6 +72,7 @@ BEGIN
                 ) collab_photos
             ) AS collaborator_photos,
             pl.description,
+            pl.city,
             0 AS sort_order  -- Lists with location come first
     FROM place_lists pl
     WHERE pl.user_id = p_user_id
@@ -100,6 +103,7 @@ BEGIN
                 ) collab_photos
             ) AS collaborator_photos,
             pl.description,
+            pl.city,
             1 AS sort_order  -- Lists without location come after
         FROM place_lists pl
         WHERE pl.user_id = p_user_id

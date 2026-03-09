@@ -46,18 +46,55 @@ struct PhotoFeedView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if viewModel.feedItems.isEmpty {
-            emptyState
+            emptyFeedContent
         } else {
             feedList
         }
     }
 
+    // MARK: - Empty Feed
+
+    private var emptyFeedContent: some View {
+        VStack(spacing: 0) {
+            recommendedSection
+            emptyState
+                .frame(maxHeight: .infinity)
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    // MARK: - Recommended Users
+
+    @ViewBuilder
+    private var recommendedSection: some View {
+        let vm = viewModel.recommendedUsersViewModel
+        if !vm.isDismissed {
+            RecommendedUsersSection(
+                users: vm.recommendedUsers,
+                followStates: vm.followStates,
+                isLoading: vm.isLoading,
+                onFollowTap: { profileId in
+                    Task { await vm.toggleFollow(profileId: profileId) }
+                },
+                onProfileTap: { profileId in
+                    onNavigateToProfile(profileId)
+                },
+                onDismiss: { vm.dismiss() }
+            )
+        }
+    }
+
     // MARK: - Feed List
+
+    /// Index after which the recommended section is inserted (0-based).
+    private var recommendedInsertionIndex: Int {
+        min(2, viewModel.feedItems.count - 1)
+    }
 
     private var feedList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(viewModel.feedItems) { item in
+                ForEach(Array(viewModel.feedItems.enumerated()), id: \.element.id) { index, item in
                     FeedCardView(
                         item: item,
                         isFlipped: viewModel.flippedCardId == item.id,
@@ -71,6 +108,10 @@ struct PhotoFeedView: View {
                     )
                     .task {
                         await viewModel.loadMoreIfNeeded(currentItem: item)
+                    }
+
+                    if index == recommendedInsertionIndex {
+                        recommendedSection
                     }
                 }
 

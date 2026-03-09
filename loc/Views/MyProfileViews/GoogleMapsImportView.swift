@@ -16,7 +16,6 @@ struct GoogleMapsImportView: View {
     @Environment(\.dismiss) private var dismiss
 
     let userId: String
-    let existingLists: [LightweightPlaceList]
     var onImportCompleted: ((_ listId: String) -> Void)?
     var cancelLabel: String = "Cancel"
     var onCancel: (() -> Void)? = nil
@@ -267,10 +266,15 @@ struct GoogleMapsImportView: View {
                 .foregroundColor(.secondary)
                 .textCase(.uppercase)
 
-            if existingLists.isEmpty {
+            if viewModel.availableLists.isEmpty && !viewModel.isLoadingLists {
                 existingListEmptyState
             } else {
                 existingListPicker
+            }
+        }
+        .task {
+            if viewModel.availableLists.isEmpty {
+                await viewModel.loadInitialLists(userId: userId)
             }
         }
     }
@@ -291,11 +295,11 @@ struct GoogleMapsImportView: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 
-    /// Displays a scrollable picker of the user's existing lists with single-selection indicators.
+    /// Displays a scrollable picker of the user's existing lists with single-selection and pagination.
     private var existingListPicker: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(Array(existingLists.enumerated()), id: \.element.id) { index, list in
+                ForEach(Array(viewModel.availableLists.enumerated()), id: \.element.id) { index, list in
                     Button {
                         selectedExistingListId = list.list_id
                     } label: {
@@ -334,15 +338,26 @@ struct GoogleMapsImportView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .onAppear {
+                        if index == viewModel.availableLists.count - 2 {
+                            Task { await viewModel.loadMoreLists(userId: userId) }
+                        }
+                    }
 
-                    if index < existingLists.count - 1 {
+                    if index < viewModel.availableLists.count - 1 {
                         Divider().padding(.leading, 52)
                     }
+                }
+
+                if viewModel.isLoadingLists {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
             }
             .padding(.vertical, 4)
         }
-        .frame(maxHeight: 200)
+        .frame(maxHeight: 300)
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
@@ -428,7 +443,7 @@ struct GoogleMapsImportView: View {
         Button {
             Task {
                 if useExistingList, let listId = selectedExistingListId,
-                   let list = existingLists.first(where: { $0.list_id == listId }) {
+                   let list = viewModel.availableLists.first(where: { $0.list_id == listId }) {
                     await viewModel.addPlacesToExistingList(
                         listId: listId, listName: list.name, userId: userId
                     )

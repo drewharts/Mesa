@@ -397,18 +397,23 @@ class DeepLinkManager: ObservableObject {
         await MainActor.run {
             print("📱 [DeepLinkManager] On main thread, setting up place detail view")
             detailPlaceViewModel.places[place.id.uuidString] = place
-            
-            // selectPlaceAndFetchDetails will:
-            // 1. Set selectedPlace (triggers didSet)
-            // 2. Load reviews AND external videos for the place
-            // 3. Animate map to place location
-            print("🔄 [DeepLinkManager] Calling selectPlaceAndFetchDetails - this will load reviews & external videos")
-            selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-            selectedPlaceViewModel.isDetailSheetPresented = true
+
+            if let contentUrl = contentUrl {
+                // Import path: show confirmation prompt instead of navigating directly
+                print("🔄 [DeepLinkManager] Showing import place confirmation for: \(place.name)")
+                PresentationService.shared.present(
+                    .importPlaceConfirmation(placeId: place.id.uuidString, contentUrl: contentUrl)
+                )
+            } else {
+                // Regular deep link: navigate directly to place detail
+                print("🔄 [DeepLinkManager] Calling selectPlaceAndFetchDetails - this will load reviews & external videos")
+                selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+                selectedPlaceViewModel.isDetailSheetPresented = true
+            }
             print("✅ [DeepLinkManager] Place detail sheet presented")
             pendingPlace = nil
         }
-        
+
         currentProcessingURL = nil
     }
     

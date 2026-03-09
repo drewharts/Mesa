@@ -9,10 +9,8 @@
 import SwiftUI
 
 struct SplashScreenView: View {
-    @State private var isActive = false
-    @State private var isCheckingSession = true
-    @EnvironmentObject var userSession: UserSession
-    
+    @ObservedObject var viewModel: SplashScreenViewModel
+
     // ViewModels passed as props, not environment objects
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let profileViewModel: ProfileViewModel
@@ -24,12 +22,12 @@ struct SplashScreenView: View {
     let notificationManager: NotificationManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
-    let searchViewModel: SearchViewModel  // ✅ Accept from parent
-    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator for search
+    let searchViewModel: SearchViewModel
+    let searchCoordinator: SearchCoordinatorViewModel
 
     var body: some View {
         Group {
-            if isActive {
+            if viewModel.isActive {
                 ContentView(
                     selectedPlaceViewModel: selectedPlaceViewModel,
                     profileViewModel: profileViewModel,
@@ -41,8 +39,8 @@ struct SplashScreenView: View {
                     notificationManager: notificationManager,
                     dataManager: dataManager,
                     serviceContainer: serviceContainer,
-                    searchViewModel: searchViewModel,  // ✅ Pass to ContentView
-                    searchCoordinator: searchCoordinator  // ✅ Pass coordinator
+                    searchViewModel: searchViewModel,
+                    searchCoordinator: searchCoordinator
                 )
                 .transition(.opacity)
             } else {
@@ -50,11 +48,10 @@ struct SplashScreenView: View {
             }
         }
         .task {
-            // Check session during splash screen
-            await checkSessionAndTransition()
+            await viewModel.checkSessionAndTransition()
         }
     }
-    
+
     private var splashImage: some View {
         GeometryReader { geometry in
             Image("SplashScreen")
@@ -64,39 +61,5 @@ struct SplashScreenView: View {
                 .clipped()
         }
         .edgesIgnoringSafeArea(.all)
-    }
-    
-    private func checkSessionAndTransition() async {
-        // Check for existing Supabase session
-        do {
-            let session = try await SupabaseAuthService.shared.getSession()
-            let profile = try await UserService.shared.fetchUserById(userId: session.user.id.uuidString)
-            
-            // Set user logged in
-            await MainActor.run {
-                userSession.setUserLoggedIn(uid: profile.id)
-                userSession.needsPhoneOnboarding = !UserSession.hasCompletedPhoneOnboarding
-                userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
-                userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
-            }
-            
-            // Load data in background
-            Task.detached(priority: .background) {
-                await dataManager.initializeProfileData(userId: profile.id)
-            }
-            
-            // Quick transition for logged in users
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-        } catch {
-            // No session - show splash a bit longer
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s
-        }
-        
-        // Transition to main app
-        await MainActor.run {
-            withAnimation {
-                isActive = true
-            }
-        }
     }
 }
