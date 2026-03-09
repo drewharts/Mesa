@@ -20,6 +20,22 @@ class UserSession: ObservableObject {
     private static let hasCompletedPhoneOnboardingKey = "hasCompletedPhoneOnboarding"
     private static let hasCompletedPhotoOnboardingKey = "hasCompletedProfilePhotoOnboarding"
     private static let hasCompletedListOnboardingKey = "hasCompletedListOnboarding"
+    private static let cachedProfileIdKey = "cachedProfileId"
+
+    /// Returns the cached profile ID from a previous session, if available.
+    static var cachedProfileId: String? {
+        UserDefaults.standard.string(forKey: cachedProfileIdKey)
+    }
+
+    /// Persists the profile ID to UserDefaults for faster subsequent launches.
+    func cacheProfileId(_ profileId: String) {
+        UserDefaults.standard.set(profileId, forKey: Self.cachedProfileIdKey)
+    }
+
+    /// Clears the cached profile ID (e.g., on logout).
+    static func clearCachedProfileId() {
+        UserDefaults.standard.removeObject(forKey: cachedProfileIdKey)
+    }
 
     /// Checks whether the user has completed phone number onboarding.
     static var hasCompletedPhoneOnboarding: Bool {

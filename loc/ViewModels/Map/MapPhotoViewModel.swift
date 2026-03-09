@@ -16,6 +16,7 @@ class MapPhotoViewModel: ObservableObject {
 
     private var isLoadingPhotos = false
     private(set) var hasLoadedPhotos = false
+    private var currentGenerationTask: Task<Void, Never>?
 
     private let placeService: PlaceService
 
@@ -51,7 +52,7 @@ class MapPhotoViewModel: ObservableObject {
         }
     }
 
-    /// Loads profile pictures from URLs into the cache.
+    /// Loads profile pictures from URLs into the cache, checking ProfilePhotoCache first.
     private func loadProfilePictures(from photos: [FollowedUserPhoto]) async {
         await withTaskGroup(of: (String, UIImage?).self) { group in
             for photo in photos {
@@ -59,6 +60,10 @@ class MapPhotoViewModel: ObservableObject {
                       let url = URL(string: urlString) else { continue }
 
                 group.addTask {
+                    // Check shared cache first (may have been prefetched during startup)
+                    if let cached = await ProfilePhotoCache.shared.photo(for: photo.userId) {
+                        return (photo.userId, cached)
+                    }
                     do {
                         let (data, _) = try await URLSession.shared.data(from: url)
                         return (photo.userId, UIImage(data: data))
@@ -93,33 +98,35 @@ class MapPhotoViewModel: ObservableObject {
 
     // MARK: - Annotation Image Generation
 
-    /// Generates combined annotation images for the given annotations.
+    /// Generates combined annotation images off the main thread, cancelling any in-flight generation.
     func generateAnnotationImages(for annotations: [PlaceAnnotation]) {
-        for annotation in annotations {
-            let profilePictures = annotation.userIds.prefix(3).compactMap { userProfilePictures[$0] }
-
-            guard !profilePictures.isEmpty else {
-                continue
+        currentGenerationTask?.cancel()
+        let pictures = self.userProfilePictures
+        currentGenerationTask = Task.detached(priority: .userInitiated) {
+            let images = Self.renderAnnotationImages(for: annotations, profilePictures: pictures)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                self?.annotationImages = images
             }
-
-            let combinedImage: UIImage
-            switch profilePictures.count {
-            case 1:
-                combinedImage = combinedCircularImage(image1: profilePictures[0])
-            case 2:
-                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1])
-            case 3:
-                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1], image3: profilePictures[2])
-            default:
-                continue
-            }
-
-            annotationImages[annotation.id] = combinedImage
         }
     }
 
-    /// Creates a combined circular image from up to three profile pictures.
-    private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
+    /// Renders annotation images on a background thread (pure computation).
+    private nonisolated static func renderAnnotationImages(
+        for annotations: [PlaceAnnotation],
+        profilePictures: [String: UIImage]
+    ) -> [String: UIImage] {
+        var result: [String: UIImage] = [:]
+        for annotation in annotations {
+            let pics = annotation.userIds.prefix(3).compactMap { profilePictures[$0] }
+            guard !pics.isEmpty else { continue }
+            result[annotation.id] = combinedCircularImage(images: pics)
+        }
+        return result
+    }
+
+    /// Creates a combined circular image from up to three profile pictures (nonisolated).
+    private nonisolated static func combinedCircularImage(images: [UIImage]) -> UIImage {
         let totalSize = CGSize(width: 60, height: 30)
         let singleCircleSize = CGSize(width: 30, height: 30)
         let renderer = UIGraphicsImageRenderer(size: totalSize)
@@ -129,8 +136,7 @@ class MapPhotoViewModel: ObservableObject {
             let secondRect = CGRect(x: 11, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
             let thirdRect = CGRect(x: 22, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
 
-            func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
-                guard let image = image else { return }
+            func drawCircularImage(_ image: UIImage, in rect: CGRect) {
                 context.cgContext.saveGState()
                 let circlePath = UIBezierPath(ovalIn: rect)
                 circlePath.addClip()
@@ -141,9 +147,9 @@ class MapPhotoViewModel: ObservableObject {
                 context.cgContext.restoreGState()
             }
 
-            if image3 != nil { drawCircularImage(image3, in: thirdRect) }
-            if image2 != nil { drawCircularImage(image2, in: secondRect) }
-            if image1 != nil { drawCircularImage(image1, in: firstRect) }
+            if images.count >= 3 { drawCircularImage(images[2], in: thirdRect) }
+            if images.count >= 2 { drawCircularImage(images[1], in: secondRect) }
+            if images.count >= 1 { drawCircularImage(images[0], in: firstRect) }
         }
     }
 }

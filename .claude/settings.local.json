@@ -42,7 +42,8 @@
       "Bash(git restore:*)",
       "Bash(git diff:*)",
       "Read(//Users/drewhartsfield/.claude/**)",
-      "Read(//Users/drewhartsfield/**)"
+      "Read(//Users/drewhartsfield/**)",
+      "Bash(xargs:*)"
     ],
     "deny": []
   },
