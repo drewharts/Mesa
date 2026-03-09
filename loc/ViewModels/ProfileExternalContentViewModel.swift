@@ -1015,19 +1015,12 @@ class ProfileExternalContentViewModel: ObservableObject {
         }
 
         placeVM.places[detailPlace.id.uuidString] = detailPlace
-
-        // Add current user as saver so pin shows with profile
-        Task {
-            if let uid = await SupabaseAuthService.shared.currentUserId {
-                await MainActor.run {
-                    placeVM.placeSavers[detailPlace.id.uuidString] = [uid]
-                }
-            }
-        }
-
         placeVM.calculateAnnotationPlaces()
-        selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
-        selectedPlaceVM.isDetailSheetPresented = true
+
+        // Show confirmation prompt instead of navigating directly
+        PresentationService.shared.present(
+            .importPlaceConfirmation(placeId: detailPlace.id.uuidString, contentUrl: urlString)
+        )
 
         // Clear loading states immediately
         isProcessingContent = false

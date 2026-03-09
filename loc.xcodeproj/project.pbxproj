@@ -12,7 +12,6 @@
 		B054DC612C42F5DA00C98088 /* locApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC602C42F5DA00C98088 /* locApp.swift */; };
 		B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC642C42F5DB00C98088 /* Assets.xcassets */; };
 		B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */; };
-		B054DC722C42F5DB00C98088 /* locTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC712C42F5DB00C98088 /* locTests.swift */; };
 		B054DC7C2C42F5DB00C98088 /* locUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7B2C42F5DB00C98088 /* locUITests.swift */; };
 		B054DC7E2C42F5DB00C98088 /* locUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */; };
 		B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B054DC8F2C4301FB00C98088 /* GoogleMaps */; };
@@ -82,7 +81,6 @@
 		B054DC642C42F5DB00C98088 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		B054DC6D2C42F5DB00C98088 /* locTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = locTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B054DC712C42F5DB00C98088 /* locTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locTests.swift; sourceTree = "<group>"; };
 		B054DC772C42F5DB00C98088 /* locUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = locUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B054DC7B2C42F5DB00C98088 /* locUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITests.swift; sourceTree = "<group>"; };
 		B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITestsLaunchTests.swift; sourceTree = "<group>"; };
@@ -110,6 +108,7 @@
 		B00311FD2CDACD81002AE03B /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
 		B00311FE2CDACD8B002AE03B /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Services; sourceTree = "<group>"; };
 		B00311FF2CDACE01002AE03B /* Managers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Managers; sourceTree = "<group>"; };
+		B054DC702C42F5DB00C98088 /* locTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = locTests; sourceTree = "<group>"; };
 		B0667AA02EB309CA00879683 /* MesaShare */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (B0667AAA2EB309CA00879683 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MesaShare; sourceTree = "<group>"; };
 		B0E659872D39D54300F8527E /* Extensions */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Extensions; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -211,14 +210,6 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		B054DC702C42F5DB00C98088 /* locTests */ = {
-			isa = PBXGroup;
-			children = (
-				B054DC712C42F5DB00C98088 /* locTests.swift */,
-			);
-			path = locTests;
-			sourceTree = "<group>";
-		};
 		B054DC7A2C42F5DB00C98088 /* locUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -291,6 +282,9 @@
 			);
 			dependencies = (
 				B054DC6F2C42F5DB00C98088 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B054DC702C42F5DB00C98088 /* locTests */,
 			);
 			name = locTests;
 			productName = locTests;
@@ -438,7 +432,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B054DC722C42F5DB00C98088 /* locTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

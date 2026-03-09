@@ -29,7 +29,7 @@ BEGIN
         pl.name,
         pl.is_public,
         pl.image,
-        NULL::TEXT AS city,
+        pl.city,
         pl.user_id AS owner_id,
         u.full_name AS owner_name,
         u.profile_photo_url AS owner_photo_url,

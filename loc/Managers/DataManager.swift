@@ -45,6 +45,7 @@ class DataManager: ObservableObject {
         return locationManager.currentLocation?.coordinate
     }
 
+    /// Loads essential profile data, then kicks off viewport places and photo prefetch in parallel.
     func initializeProfileData(userId: String) async {
         startDataLoadingFlags()
         
@@ -53,11 +54,16 @@ class DataManager: ObservableObject {
             await loadEssentialDataOnly(userId: userId)
         }
         
-        // ✅ PHASE 2: Load viewport places in background (non-blocking)
-        Task.detached(priority: .background) { [weak self] in
+        // ✅ PHASE 2: Load viewport places (non-blocking)
+        Task.detached(priority: .userInitiated) { [weak self] in
             await self?.measureLoadingTime("Viewport Places") {
                 await self?.loadViewportPlacesOnly(userId: userId)
             }
+        }
+
+        // ✅ PHASE 3: Prefetch followed users' profile photos for faster map rendering
+        Task.detached(priority: .utility) { [weak self] in
+            await self?.prefetchFollowedUsersPhotos(userId: userId)
         }
     }
     
@@ -202,6 +208,24 @@ class DataManager: ObservableObject {
         }
     }
     
+    /// Prefetches followed users' profile photos into ProfilePhotoCache for faster map rendering.
+    private func prefetchFollowedUsersPhotos(userId: String) async {
+        do {
+            let photos = try await placeService.fetchFollowedUsersPhotos(userId: userId)
+            await withTaskGroup(of: Void.self) { group in
+                for photo in photos {
+                    guard let urlString = photo.profilePhotoUrl,
+                          let url = URL(string: urlString) else { continue }
+                    group.addTask {
+                        await ProfilePhotoCache.shared.loadPhoto(userId: photo.userId, photoURL: url)
+                    }
+                }
+            }
+        } catch {
+            print("[DataManager] Failed to prefetch followed users photos: \(error)")
+        }
+    }
+
     // MARK: - Data Loading Methods
 
     // Sets all relevant loading flags to true before data loading begins
@@ -211,13 +235,9 @@ class DataManager: ObservableObject {
         profileViewModel.myPlacesViewModel.isMyPlacesLoading = true
     }
     
+    /// Triggers map annotation calculation on the main actor.
     func calculateMapAnnotations() {
-        // ✅ Move to background thread to avoid blocking UI
-        Task.detached(priority: .background) {
-            await MainActor.run {
-                self.detailPlaceViewModel.calculateAnnotationPlaces()
-            }
-        }
+        detailPlaceViewModel.calculateAnnotationPlaces()
     }
     
     func loadUserMyPlaces(userId: String, offset: Int = 0) async {

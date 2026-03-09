@@ -359,14 +359,18 @@ struct ListSelectionSheet: View {
         VStack(spacing: 0) {
             // Header with integrated filter
             sheetHeader
-            
+
             // Breathing room
                 Spacer()
                 .frame(height: 16)
-            
+
             // List content
             ListsInSelectionSheet(viewModel: viewModel, place: place, listsVM: listsVM)
         }
+        .overlay(alignment: .bottom) {
+            confirmationToast
+        }
+        .animation(.easeInOut(duration: 0.25), value: viewModel.confirmation)
         .task {
             await viewModel.loadInitialLists(for: place)
         }
@@ -470,6 +474,31 @@ struct ListSelectionSheet: View {
         .padding(.top, 12)
     }
     
+    // MARK: - Confirmation Toast
+
+    @ViewBuilder
+    private var confirmationToast: some View {
+        if let confirmation = viewModel.confirmation {
+            let icon = confirmation.type == .removed ? "minus.circle.fill" : "checkmark.circle.fill"
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(confirmation.message)
+                    .font(.subheadline.weight(.medium))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(Color(.darkGray))
+            )
+            .padding(.bottom, 16)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .allowsHitTesting(false)
+        }
+    }
+
     // MARK: - Shared Filter Button
     
     private var sharedFilterButton: some View {

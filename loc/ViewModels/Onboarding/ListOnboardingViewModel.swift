@@ -2,32 +2,60 @@
 //  ListOnboardingViewModel.swift
 //  loc
 //
-//  ViewModel: Fetches existing lists for the onboarding import flow.
-//  Single Responsibility: Provide the user's existing lists to GoogleMapsImportView during onboarding.
+//  Thin coordinator wrapping GoogleMapsImportViewModel for the onboarding flow.
 //
 
 import Foundation
+import Combine
 
 @MainActor
 class ListOnboardingViewModel: ObservableObject {
 
-    // MARK: - Published State
+    // MARK: - Child ViewModel (Composition)
 
-    @Published var existingLists: [LightweightPlaceList] = []
+    var importViewModel = GoogleMapsImportViewModel()
 
-    // MARK: - Dependencies
+    // MARK: - Combine Forwarding
 
-    private let userService = ServiceContainer.shared.userService
+    private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Data Loading
+    init() {
+        importViewModel.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
 
-    /// Fetches the user's existing lists so they can add imported places to one.
-    func fetchExistingLists(userId: String) async {
-        guard !userId.isEmpty else { return }
-        do {
-            existingLists = try await userService.fetchPlaceListsWithoutLocation(userId: userId)
-        } catch {
-            print("ListOnboardingViewModel: Failed to fetch existing lists: \(error)")
-        }
+    // MARK: - Convenience Computed Properties
+
+    /// Whether the import has resolved at least one place.
+    var hasResults: Bool {
+        !importViewModel.resolvedPlaces.isEmpty
+    }
+
+    /// Whether the URL field contains a valid Google Maps link.
+    var canExtract: Bool {
+        importViewModel.isValidGoogleMapsURL(importViewModel.url)
+    }
+
+    /// Whether the user can create a list (has results and a non-empty name).
+    var canCreateList: Bool {
+        hasResults && !importViewModel.listName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    // MARK: - Delegated Actions
+
+    /// Kicks off the two-phase extract + resolve flow.
+    func startImport() async {
+        await importViewModel.extractPlaces()
+    }
+
+    /// Creates a new list with all resolved places.
+    func createList(userId: String) async {
+        await importViewModel.createListWithPlaces(userId: userId)
+    }
+
+    /// Resets the entire import flow back to the initial state.
+    func reset() {
+        importViewModel.reset()
     }
 }

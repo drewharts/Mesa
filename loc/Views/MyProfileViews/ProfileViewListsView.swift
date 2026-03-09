@@ -62,7 +62,6 @@ struct ProfileViewListsView: View {
         .sheet(isPresented: $showingGoogleMapsImport) {
             GoogleMapsImportView(
                 userId: profile.user?.id ?? "",
-                existingLists: listsVM.lightweightPlaceLists,
                 onImportCompleted: { listId in
                     Task {
                         await listsVM.reloadListsAfterSearch()
@@ -157,13 +156,10 @@ struct ProfileViewListsView: View {
     @ViewBuilder
     private var listContent: some View {
         if listsVM.isLoadingInitialLists {
-            // Initial loading state
             initialLoadingView
         } else if !listsVM.filteredPlaceLists.isEmpty {
-            // Lists available
             listView
         } else {
-            // Empty state
             emptyStateView
         }
     }
@@ -182,13 +178,13 @@ struct ProfileViewListsView: View {
     }
     
     // MARK: - List View
-    
+
     // 2-column grid for displaying lists side by side
     private let listColumns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
-    
+
     private var listView: some View {
         LazyVGrid(columns: listColumns, spacing: 16) {
             ForEach(Array(listsVM.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
