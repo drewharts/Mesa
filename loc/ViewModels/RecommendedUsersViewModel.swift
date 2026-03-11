@@ -63,6 +63,7 @@ class RecommendedUsersViewModel: ObservableObject {
         let merged = Array((contacts + dedupedPopular).prefix(15))
 
         recommendedUsers = merged
+        await checkFollowStates()
         isLoading = false
     }
 
@@ -96,6 +97,20 @@ class RecommendedUsersViewModel: ObservableObject {
     }
 
     // MARK: - Private Methods
+
+    /// Checks current follow status for all recommended users via a single batch query.
+    private func checkFollowStates() async {
+        guard !recommendedUsers.isEmpty else { return }
+        do {
+            let followingIds = try await supabaseUserService.fetchFollowingUserIds(userId: userId)
+            let followingSet = Set(followingIds)
+            for user in recommendedUsers {
+                followStates[user.id] = followingSet.contains(user.id)
+            }
+        } catch {
+            print("[RecommendedUsersVM] Failed to check follow states: \(error.localizedDescription)")
+        }
+    }
 
     /// Loads contact-matched users from the device contacts. Returns empty on failure or denied permission.
     private func loadContactMatches() async -> [ProfileData] {
