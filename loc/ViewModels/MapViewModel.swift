@@ -20,6 +20,7 @@ class MapViewModel: ObservableObject {
     let viewportViewModel: MapViewportViewModel
     let selectionViewModel: MapAnnotationSelectionViewModel
     let tapDiscoveryViewModel: MapTapDiscoveryViewModel
+    let cityAnnotationViewModel: MapCityAnnotationViewModel
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -46,6 +47,11 @@ class MapViewModel: ObservableObject {
     var externalListId: String? { externalUserViewModel.externalListId }
 
     var preservedSelectedAnnotation: PlaceAnnotation? { selectionViewModel.preservedSelectedAnnotation }
+
+    var cityAnnotations: [CityAnnotation] { cityAnnotationViewModel.cityAnnotations }
+
+    /// Whether the map is currently showing city-level annotations instead of place annotations.
+    @Published var showingCityAnnotations: Bool = false
 
     /// Pending place navigation - bridged to PresentationService for sheet views to observe.
     var pendingPlaceNavigation: String? {
@@ -101,6 +107,7 @@ class MapViewModel: ObservableObject {
         self.viewportViewModel = MapViewportViewModel(placeService: placeService)
         self.selectionViewModel = MapAnnotationSelectionViewModel()
         self.tapDiscoveryViewModel = MapTapDiscoveryViewModel()
+        self.cityAnnotationViewModel = MapCityAnnotationViewModel(placeService: placeService)
 
         setupCallbacks()
     }
@@ -111,6 +118,7 @@ class MapViewModel: ObservableObject {
         setupFilterCallbacks()
         setupExternalUserCallbacks()
         setupAnnotationCallbacks()
+        setupCityAnnotationForwarding()
     }
 
     /// Forwards tap discovery state changes so MapView overlay updates.
@@ -149,6 +157,13 @@ class MapViewModel: ObservableObject {
         viewportViewModel.onAnnotationsLoaded = { [weak self] annotations in
             self?.photoViewModel.generateAnnotationImages(for: annotations)
         }
+    }
+
+    /// Forwards city annotation state changes so MapView re-renders.
+    private func setupCityAnnotationForwarding() {
+        cityAnnotationViewModel.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     // MARK: - List Filtering (Coordinator Methods)
@@ -292,10 +307,29 @@ class MapViewModel: ObservableObject {
 
     // MARK: - Viewport Loading (Delegated)
 
-    /// Called when the map camera has settled.
+    /// Called when the map camera has settled. Routes to city or place annotations based on zoom level.
     func onMapCameraSettled(_ newRegion: MKCoordinateRegion, userId: String) async {
         let filterState = buildFilterState()
-        await viewportViewModel.onMapCameraSettled(newRegion, userId: userId, filterState: filterState)
+        let shouldShowCities = MapCityAnnotationViewModel.shouldShowCityAnnotations(
+            latitudeDelta: newRegion.span.latitudeDelta,
+            isCurrentlyShowingCities: showingCityAnnotations
+        )
+
+        if shouldShowCities && !filterState.hasActiveFilter {
+            // Zoomed out + no filter → show city annotations
+            if !showingCityAnnotations {
+                showingCityAnnotations = true
+                viewportViewModel.clearAnnotations()
+            }
+            await cityAnnotationViewModel.fetchCityAnnotations(region: newRegion, userId: userId)
+        } else {
+            // Zoomed in or filter active → show place annotations
+            if showingCityAnnotations {
+                showingCityAnnotations = false
+                cityAnnotationViewModel.clearAnnotations()
+            }
+            await viewportViewModel.onMapCameraSettled(newRegion, userId: userId, filterState: filterState)
+        }
     }
 
     /// Filters annotations for current viewport.
@@ -306,6 +340,13 @@ class MapViewModel: ObservableObject {
     /// Returns all place annotations to display on map.
     func getAllDisplayAnnotations() -> [PlaceAnnotation] {
         return viewportViewModel.getAllDisplayAnnotations()
+    }
+
+    // MARK: - City Annotation Tap (Delegated)
+
+    /// Handles tap on a city annotation by presenting the city detail sheet.
+    func handleCityAnnotationTap(_ city: CityAnnotation) {
+        PresentationService.shared.present(.cityOverview(cityName: city.name))
     }
 
     // MARK: - Tap Discovery (Delegated)

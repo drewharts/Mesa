@@ -448,4 +448,33 @@ class PlaceService: ObservableObject {
     func fetchCustomPlaceCreator(placeId: String) async throws -> CustomPlaceCreator? {
         return try await supabase.fetchCustomPlaceCreator(placeId: placeId)
     }
+
+    // MARK: - City Annotations
+
+    /// Fetches city-level annotations aggregating places by city within the viewport.
+    func fetchCityAnnotationsInViewport(
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double,
+        userId: String
+    ) async throws -> [CityAnnotation] {
+        return try await supabase.fetchCityAnnotationsInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
+        )
+    }
+
+    /// Fetches lists covering a specific city from the user's social graph.
+    func fetchCityDetailLists(userId: String, cityName: String) async throws -> [CityDetailListRecord] {
+        return try await supabase.fetchCityDetailLists(userId: userId, cityName: cityName)
+    }
+
+    /// Fetches top places in a specific city from the user's social graph.
+    func fetchCityTopPlaces(userId: String, cityName: String) async throws -> [CityTopPlace] {
+        return try await supabase.fetchCityTopPlaces(userId: userId, cityName: cityName)
+    }
 }

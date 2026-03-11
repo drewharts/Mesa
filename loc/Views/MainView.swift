@@ -289,6 +289,10 @@ struct MainView: View {
             case .nearbyDiscovery:
                 nearbyDiscoverySheet
 
+            // City Overview
+            case .cityOverview(let cityName):
+                cityOverviewSheet(cityName: cityName)
+
             // Onboarding
             case .suggestedProfiles:
                 suggestedProfilesSheet
@@ -458,6 +462,14 @@ struct MainView: View {
         NearbyDiscoverySheet()
             .applyMapPopupEnvironment(from: self)
             .applyMapPopupPresentation()
+    }
+
+    /// City overview sheet showing lists and top places for a city.
+    private func cityOverviewSheet(cityName: String) -> some View {
+        CityDetailSheet(cityName: cityName)
+            .environmentObject(profileViewModel)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
     }
 
     /// Keyword results popup sheet content.

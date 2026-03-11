@@ -43,6 +43,10 @@ enum AppSheetType: Identifiable, Equatable {
 
     case nearbyDiscovery
 
+    // MARK: - City Overview
+
+    case cityOverview(cityName: String)
+
     // MARK: - Onboarding
 
     case suggestedProfiles
@@ -79,6 +83,8 @@ enum AppSheetType: Identifiable, Equatable {
             return "keywordResults-\(keyword)"
         case .nearbyDiscovery:
             return "nearbyDiscovery"
+        case .cityOverview(let cityName):
+            return "cityOverview-\(cityName)"
         case .suggestedProfiles:
             return "suggestedProfiles"
         }
@@ -118,6 +124,8 @@ enum AppSheetType: Identifiable, Equatable {
             return true
         case (.suggestedProfiles, .suggestedProfiles):
             return true
+        case (.cityOverview(let lhsCity), .cityOverview(let rhsCity)):
+            return lhsCity == rhsCity
         default:
             return false
         }

@@ -1905,6 +1905,91 @@ class SupabasePlaceService: ObservableObject {
             throw error
         }
     }
+
+    // MARK: - City Annotations
+
+    /// Fetches city-level annotations aggregating places by city within the viewport.
+    func fetchCityAnnotationsInViewport(
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double,
+        userId: String
+    ) async throws -> [CityAnnotation] {
+        do {
+            struct CityViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+
+            let params = CityViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+
+            let response: [CityAnnotation] = try await supabase.client
+                .rpc("get_city_annotations_in_viewport", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching city annotations: \(error)")
+            }
+            throw error
+        }
+    }
+
+    /// Fetches lists covering a specific city, filtered to the user's social graph.
+    func fetchCityDetailLists(userId: String, cityName: String) async throws -> [CityDetailListRecord] {
+        do {
+            struct CityListParams: Encodable {
+                let p_user_id: String
+                let p_city_name: String
+            }
+
+            let params = CityListParams(p_user_id: userId, p_city_name: cityName)
+
+            let response: [CityDetailListRecord] = try await supabase.client
+                .rpc("get_city_detail_lists", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            print("❌ [Supabase] Error fetching city detail lists: \(error)")
+            throw error
+        }
+    }
+
+    /// Fetches top places in a specific city from the user's social graph.
+    func fetchCityTopPlaces(userId: String, cityName: String) async throws -> [CityTopPlace] {
+        do {
+            struct CityPlacesParams: Encodable {
+                let p_user_id: String
+                let p_city_name: String
+            }
+
+            let params = CityPlacesParams(p_user_id: userId, p_city_name: cityName)
+
+            let response: [CityTopPlace] = try await supabase.client
+                .rpc("get_city_top_places", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            print("❌ [Supabase] Error fetching city top places: \(error)")
+            throw error
+        }
+    }
 }
 
 // MARK: - Supabase Data Models
@@ -2009,5 +2094,19 @@ struct PlaceListItemRecord: Codable {
     let place_id: String
     let list_id: String
     let sort_order: Int?
+}
+
+/// Record returned from the get_city_detail_lists RPC.
+struct CityDetailListRecord: Codable {
+    let list_id: String
+    let name: String
+    let is_public: Bool
+    let image: String?
+    let created_at: String?
+    let updated_at: String?
+    let place_count: Int
+    let city: String?
+    let description: String?
+    let average_location: String?
 }
 
