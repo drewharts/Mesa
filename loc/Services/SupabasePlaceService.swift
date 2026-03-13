@@ -1948,14 +1948,15 @@ class SupabasePlaceService: ObservableObject {
     }
 
     /// Fetches lists covering a specific city, filtered to the user's social graph.
-    func fetchCityDetailLists(userId: String, cityName: String) async throws -> [CityDetailListRecord] {
+    func fetchCityDetailLists(userId: String, latitude: Double, longitude: Double) async throws -> [CityDetailListRecord] {
         do {
-            struct CityListParams: Encodable {
+            struct Params: Encodable {
                 let p_user_id: String
-                let p_city_name: String
+                let p_lat: Double
+                let p_lon: Double
             }
 
-            let params = CityListParams(p_user_id: userId, p_city_name: cityName)
+            let params = Params(p_user_id: userId, p_lat: latitude, p_lon: longitude)
 
             let response: [CityDetailListRecord] = try await supabase.client
                 .rpc("get_city_detail_lists", params: params)
@@ -1969,15 +1970,16 @@ class SupabasePlaceService: ObservableObject {
         }
     }
 
-    /// Fetches top places in a specific city from the user's social graph.
-    func fetchCityTopPlaces(userId: String, cityName: String) async throws -> [CityTopPlace] {
+    /// Fetches top places near a city coordinate.
+    func fetchCityTopPlaces(userId: String, latitude: Double, longitude: Double) async throws -> [CityTopPlace] {
         do {
-            struct CityPlacesParams: Encodable {
+            struct Params: Encodable {
                 let p_user_id: String
-                let p_city_name: String
+                let p_lat: Double
+                let p_lon: Double
             }
 
-            let params = CityPlacesParams(p_user_id: userId, p_city_name: cityName)
+            let params = Params(p_user_id: userId, p_lat: latitude, p_lon: longitude)
 
             let response: [CityTopPlace] = try await supabase.client
                 .rpc("get_city_top_places", params: params)
@@ -1991,15 +1993,16 @@ class SupabasePlaceService: ObservableObject {
         }
     }
 
-    /// Fetches users from the viewer's social graph who have saved places in this city.
-    func fetchCityActiveUsers(userId: String, cityName: String) async throws -> [CityActiveUser] {
+    /// Fetches users who have saved places near a city coordinate.
+    func fetchCityActiveUsers(userId: String, latitude: Double, longitude: Double) async throws -> [CityActiveUser] {
         do {
-            struct CityUsersParams: Encodable {
+            struct Params: Encodable {
                 let p_user_id: String
-                let p_city_name: String
+                let p_lat: Double
+                let p_lon: Double
             }
 
-            let params = CityUsersParams(p_user_id: userId, p_city_name: cityName)
+            let params = Params(p_user_id: userId, p_lat: latitude, p_lon: longitude)
 
             let response: [CityActiveUser] = try await supabase.client
                 .rpc("get_city_active_users", params: params)

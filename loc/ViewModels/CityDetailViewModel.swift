@@ -67,9 +67,9 @@ class CityDetailViewModel: ObservableObject {
         isLoading = true
         currentUserId = userId
 
-        async let listsResult = placeService.fetchCityDetailLists(userId: userId, cityName: cityName)
-        async let placesResult = placeService.fetchCityTopPlaces(userId: userId, cityName: cityName)
-        async let usersResult = placeService.fetchCityActiveUsers(userId: userId, cityName: cityName)
+        async let listsResult = placeService.fetchCityDetailLists(userId: userId, latitude: coordinate.latitude, longitude: coordinate.longitude)
+        async let placesResult = placeService.fetchCityTopPlaces(userId: userId, latitude: coordinate.latitude, longitude: coordinate.longitude)
+        async let usersResult = placeService.fetchCityActiveUsers(userId: userId, latitude: coordinate.latitude, longitude: coordinate.longitude)
 
         do {
             let (fetchedLists, fetchedPlaces, fetchedUsers) = try await (listsResult, placesResult, usersResult)

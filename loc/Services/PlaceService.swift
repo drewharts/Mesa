@@ -468,19 +468,19 @@ class PlaceService: ObservableObject {
         )
     }
 
-    /// Fetches lists covering a specific city from the user's social graph.
-    func fetchCityDetailLists(userId: String, cityName: String) async throws -> [CityDetailListRecord] {
-        return try await supabase.fetchCityDetailLists(userId: userId, cityName: cityName)
+    /// Fetches lists with places near a city coordinate.
+    func fetchCityDetailLists(userId: String, latitude: Double, longitude: Double) async throws -> [CityDetailListRecord] {
+        return try await supabase.fetchCityDetailLists(userId: userId, latitude: latitude, longitude: longitude)
     }
 
-    /// Fetches top places in a specific city from the user's social graph.
-    func fetchCityTopPlaces(userId: String, cityName: String) async throws -> [CityTopPlace] {
-        return try await supabase.fetchCityTopPlaces(userId: userId, cityName: cityName)
+    /// Fetches top places near a city coordinate.
+    func fetchCityTopPlaces(userId: String, latitude: Double, longitude: Double) async throws -> [CityTopPlace] {
+        return try await supabase.fetchCityTopPlaces(userId: userId, latitude: latitude, longitude: longitude)
     }
 
-    /// Fetches users from the viewer's social graph who have saved places in this city.
-    func fetchCityActiveUsers(userId: String, cityName: String) async throws -> [CityActiveUser] {
-        return try await supabase.fetchCityActiveUsers(userId: userId, cityName: cityName)
+    /// Fetches users who have saved places near a city coordinate.
+    func fetchCityActiveUsers(userId: String, latitude: Double, longitude: Double) async throws -> [CityActiveUser] {
+        return try await supabase.fetchCityActiveUsers(userId: userId, latitude: latitude, longitude: longitude)
     }
 
     /// Searches for cities matching a query within the user's social graph.
