@@ -344,9 +344,10 @@ class MapViewModel: ObservableObject {
 
     // MARK: - City Annotation Tap (Delegated)
 
-    /// Handles tap on a city annotation by presenting the city detail sheet.
+    /// Handles tap on a city annotation by cancelling any in-flight discovery and presenting the city detail sheet.
     func handleCityAnnotationTap(_ city: CityAnnotation) {
-        PresentationService.shared.present(.cityOverview(cityName: city.name))
+        tapDiscoveryViewModel.resetState()
+        PresentationService.shared.present(.cityOverview(cityName: city.name, coordinate: city.coordinate, annotation: city))
     }
 
     // MARK: - Tap Discovery (Delegated)

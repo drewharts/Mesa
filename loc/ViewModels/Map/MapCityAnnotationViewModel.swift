@@ -71,7 +71,7 @@ class MapCityAnnotationViewModel: ObservableObject {
                     return
                 }
 
-                self.cityAnnotations = annotations
+                self.cityAnnotations = Self.filterOverlapping(annotations, latitudeDelta: region.span.latitudeDelta)
                 self.lastLoadedRegion = region
             } catch {
                 let isCancelled = Task.isCancelled || error is CancellationError || (error as NSError).code == NSURLErrorCancelled
@@ -105,6 +105,25 @@ class MapCityAnnotationViewModel: ObservableObject {
     }
 
     // MARK: - Private Methods
+
+    /// Filters out overlapping city annotations by keeping the highest-count city when two are too close.
+    static func filterOverlapping(_ annotations: [CityAnnotation], latitudeDelta: Double) -> [CityAnnotation] {
+        let minDistance = latitudeDelta * 0.18
+        let sorted = annotations.sorted { $0.placeCount > $1.placeCount }
+        var result: [CityAnnotation] = []
+
+        for city in sorted {
+            let tooClose = result.contains { existing in
+                abs(existing.latitude - city.latitude) < minDistance &&
+                abs(existing.longitude - city.longitude) < minDistance
+            }
+            if !tooClose {
+                result.append(city)
+            }
+        }
+
+        return result
+    }
 
     /// Checks if region change is significant enough to reload city annotations.
     private func shouldReloadForRegion(_ newRegion: MKCoordinateRegion, lastRegion: MKCoordinateRegion) -> Bool {

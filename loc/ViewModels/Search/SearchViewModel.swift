@@ -117,6 +117,7 @@ class SearchViewModel: ObservableObject {
     
     // MARK: - Callbacks (instead of direct ViewModel references)
     var onPlaceSelected: ((DetailPlace) -> Void)?
+    var onCitySelected: ((CitySearchResult) -> Void)?
     
     // MARK: - Initialization
     init(placeService: PlaceService, userService: UserService, locationManager: LocationManager) {
@@ -215,7 +216,6 @@ class SearchViewModel: ObservableObject {
             searchResults = cachedResults
             showNoPlaceFound = cachedResults.isEmpty
             // Still run keyword search even with cached results
-            // (keyword results depend on viewport and aren't cached)
             await searchByKeyword(query: query)
             isSearching = false
             return
@@ -433,7 +433,7 @@ class SearchViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Handles selection of a place suggestion with immediate navigation.
+    /// Handles selection of a place suggestion, intercepting city matches to show the city sheet.
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         recentSearchesService.savePlace(
             id: suggestion.id,
@@ -441,15 +441,30 @@ class SearchViewModel: ObservableObject {
             address: suggestion.address
         )
 
-        // Navigate immediately with minimal data - full details fetched in background
-        let minimalPlace = DetailPlace(
-            googlePlaceId: suggestion.id,
-            name: suggestion.name,
-            address: suggestion.address,
-            coordinate: suggestion.coordinate,
-            source: suggestion.source
-        )
-        onPlaceSelected?(minimalPlace)
+        // Check if this suggestion matches a city in our DB
+        Task {
+            if let cityMatch = await matchCity(name: suggestion.name) {
+                onCitySelected?(cityMatch)
+                return
+            }
+
+            // Not a city — proceed with normal place selection
+            let minimalPlace = DetailPlace(
+                googlePlaceId: suggestion.id,
+                name: suggestion.name,
+                address: suggestion.address,
+                coordinate: suggestion.coordinate,
+                source: suggestion.source
+            )
+            onPlaceSelected?(minimalPlace)
+        }
+    }
+
+    /// Checks if a name matches a city in the user's social graph.
+    private func matchCity(name: String) async -> CitySearchResult? {
+        guard let userId = SupabaseAuthService.shared.currentUserId else { return nil }
+        let results = (try? await placeService.searchCities(userId: userId, query: name)) ?? []
+        return results.first(where: { $0.cityName.lowercased() == name.lowercased() })
     }
     
     /// Save a user selection to recent history

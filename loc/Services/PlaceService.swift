@@ -477,4 +477,14 @@ class PlaceService: ObservableObject {
     func fetchCityTopPlaces(userId: String, cityName: String) async throws -> [CityTopPlace] {
         return try await supabase.fetchCityTopPlaces(userId: userId, cityName: cityName)
     }
+
+    /// Fetches users from the viewer's social graph who have saved places in this city.
+    func fetchCityActiveUsers(userId: String, cityName: String) async throws -> [CityActiveUser] {
+        return try await supabase.fetchCityActiveUsers(userId: userId, cityName: cityName)
+    }
+
+    /// Searches for cities matching a query within the user's social graph.
+    func searchCities(userId: String, query: String) async throws -> [CitySearchResult] {
+        return try await supabase.searchCities(userId: userId, query: query)
+    }
 }

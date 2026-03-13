@@ -1990,6 +1990,45 @@ class SupabasePlaceService: ObservableObject {
             throw error
         }
     }
+
+    /// Fetches users from the viewer's social graph who have saved places in this city.
+    func fetchCityActiveUsers(userId: String, cityName: String) async throws -> [CityActiveUser] {
+        do {
+            struct CityUsersParams: Encodable {
+                let p_user_id: String
+                let p_city_name: String
+            }
+
+            let params = CityUsersParams(p_user_id: userId, p_city_name: cityName)
+
+            let response: [CityActiveUser] = try await supabase.client
+                .rpc("get_city_active_users", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            print("❌ [Supabase] Error fetching city active users: \(error)")
+            throw error
+        }
+    }
+
+    /// Searches for cities matching a query within the user's social graph.
+    func searchCities(userId: String, query: String) async throws -> [CitySearchResult] {
+        struct Params: Encodable {
+            let p_user_id: String
+            let p_query: String
+        }
+
+        let params = Params(p_user_id: userId, p_query: query)
+
+        let results: [CitySearchResult] = try await supabase.client
+            .rpc("search_cities", params: params)
+            .execute()
+            .value
+
+        return results
+    }
 }
 
 // MARK: - Supabase Data Models
@@ -2108,5 +2147,8 @@ struct CityDetailListRecord: Codable {
     let city: String?
     let description: String?
     let average_location: String?
+    let user_id: String
+    let creator_name: String?
+    let creator_photo_url: String?
 }
 

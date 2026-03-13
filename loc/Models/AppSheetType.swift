@@ -6,6 +6,7 @@
 //  Used by PresentationService to manage single-sheet presentation.
 //
 
+import CoreLocation
 import Foundation
 
 /// Unified enum representing all possible sheet types in the app.
@@ -45,7 +46,7 @@ enum AppSheetType: Identifiable, Equatable {
 
     // MARK: - City Overview
 
-    case cityOverview(cityName: String)
+    case cityOverview(cityName: String, coordinate: CLLocationCoordinate2D, annotation: CityAnnotation?)
 
     // MARK: - Onboarding
 
@@ -83,7 +84,7 @@ enum AppSheetType: Identifiable, Equatable {
             return "keywordResults-\(keyword)"
         case .nearbyDiscovery:
             return "nearbyDiscovery"
-        case .cityOverview(let cityName):
+        case .cityOverview(let cityName, _, _):
             return "cityOverview-\(cityName)"
         case .suggestedProfiles:
             return "suggestedProfiles"
@@ -124,8 +125,8 @@ enum AppSheetType: Identifiable, Equatable {
             return true
         case (.suggestedProfiles, .suggestedProfiles):
             return true
-        case (.cityOverview(let lhsCity), .cityOverview(let rhsCity)):
-            return lhsCity == rhsCity
+        case (.cityOverview(let lhsName, _, _), .cityOverview(let rhsName, _, _)):
+            return lhsName == rhsName
         default:
             return false
         }

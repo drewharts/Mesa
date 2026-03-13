@@ -2,45 +2,153 @@
 //  CityDetailSheet.swift
 //  loc
 //
-//  Sheet displaying lists and top places for a specific city.
+//  Sheet displaying stats, lists, top places, and active users for a city.
 //
 
+import CoreLocation
 import SwiftUI
 
-/// City detail sheet showing lists and top places for a tapped city annotation.
+/// City detail sheet showing an overview of a city from map annotation tap or search.
 struct CityDetailSheet: View {
     let cityName: String
+    let coordinate: CLLocationCoordinate2D
     @StateObject private var viewModel: CityDetailViewModel
+    @ObservedObject private var presentationService = PresentationService.shared
     @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
-    init(cityName: String) {
+    init(cityName: String, coordinate: CLLocationCoordinate2D, annotation: CityAnnotation? = nil) {
         self.cityName = cityName
-        self._viewModel = StateObject(wrappedValue: CityDetailViewModel(cityName: cityName))
+        self.coordinate = coordinate
+        self._viewModel = StateObject(wrappedValue: CityDetailViewModel(
+            cityName: cityName,
+            coordinate: coordinate,
+            annotation: annotation
+        ))
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $viewModel.navigationPath) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 24) {
+                    Text(cityName)
+                        .font(.title)
+                        .fontWeight(.bold)
+
+                    statsBar
+
                     if viewModel.isLoading {
                         loadingView
                     } else {
                         listsSection
                         topPlacesSection
+                        peopleSection
+                        emptyStateView
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 16)
+                .padding(.bottom, 24)
             }
-            .navigationTitle(cityName)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: CityDetailDestination.self) { destination in
+                switch destination {
+                case .allLists:
+                    CityAllListsView(
+                        lists: viewModel.lists,
+                        listPlaces: viewModel.listPlaces,
+                        placeColors: $viewModel.placeColors,
+                        onListTap: { list in
+                            viewModel.handleListTap(list)
+                        }
+                    )
+                case .allPlaces:
+                    CityAllPlacesView(
+                        places: viewModel.topPlaces,
+                        onPlaceTap: { place in
+                            viewModel.handlePlaceTap(placeId: place.id)
+                        }
+                    )
+                case .listDetail(let listId, let listName, let creatorId, let creatorName, let creatorPhotoUrl):
+                    CityListDetailView(
+                        listId: listId,
+                        listName: listName,
+                        creatorId: creatorId,
+                        creatorName: creatorName,
+                        creatorPhotoUrl: creatorPhotoUrl,
+                        onPlaceTap: { placeId in
+                            viewModel.handlePlaceTap(placeId: placeId)
+                        },
+                        onCreatorTap: { userId in
+                            viewModel.handleUserTap(
+                                userId: userId,
+                                currentUserId: userSession.currentUserId
+                            )
+                        }
+                    )
+                case .placeDetail(let placeId):
+                    PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+                        .id(placeId)
+                case .userProfile(let userId):
+                    CityUserProfileView(userId: userId)
+                        .id(userId)
+                }
+            }
             .task {
                 if let userId = profileViewModel.user?.id {
                     await viewModel.loadContent(userId: userId)
                 }
             }
+            .onReceive(presentationService.$pendingPlaceNavigation.compactMap { $0 }) { placeId in
+                viewModel.navigationPath.append(CityDetailDestination.placeDetail(placeId: placeId))
+                presentationService.pendingPlaceNavigation = nil
+            }
         }
     }
+
+    // MARK: - Stats Bar
+
+    /// Horizontal stats bar showing spots, reviews, friends, and reviewed counts.
+    @ViewBuilder
+    private var statsBar: some View {
+        if viewModel.hasLoadedStats {
+            HStack(spacing: 0) {
+                statItem(icon: "mappin.circle.fill", count: viewModel.placeCount, label: "Spots", color: .blue)
+                Spacer()
+                statItem(icon: "star.bubble.fill", count: viewModel.reviewCount, label: "Reviews", color: .orange)
+                Spacer()
+                statItem(icon: "person.2.fill", count: viewModel.friendCount, label: "People", color: .green)
+                Spacer()
+                statItem(icon: "checkmark.seal.fill", count: viewModel.reviewedPlaceCount, label: "Reviewed", color: .purple)
+            }
+            .padding(14)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    /// Single stat item with icon, count, and label.
+    private func statItem(icon: String, count: Int, label: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(color)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(count)")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: - Loading
 
     /// Loading spinner shown while content is being fetched.
     private var loadingView: some View {
@@ -52,128 +160,138 @@ struct CityDetailSheet: View {
         }
     }
 
-    /// Section displaying lists that cover this city.
+    // MARK: - Lists Section
+
+    /// Horizontal scrolling row of list tiles with "See All" header.
     @ViewBuilder
     private var listsSection: some View {
         if !viewModel.lists.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Lists")
-                    .font(.title3)
-                    .fontWeight(.bold)
+                Button { viewModel.navigateToAllLists() } label: {
+                    HStack {
+                        Text("Lists")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("See All")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
 
-                ForEach(viewModel.lists, id: \.list_id) { list in
-                    listRow(list)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(viewModel.lists, id: \.list_id) { list in
+                            CityListTile(
+                                list: list,
+                                places: viewModel.listPlaces[list.list_id] ?? [],
+                                placeColors: $viewModel.placeColors,
+                                onTap: {
+                                    viewModel.handleListTap(list)
+                                }
+                            )
+                            .frame(width: 160)
+                        }
+                    }
                 }
             }
         }
     }
 
-    /// Single row for a list item.
-    private func listRow(_ list: CityDetailListRecord) -> some View {
-        Button {
-            PresentationService.shared.present(.list(listId: list.list_id))
-        } label: {
-            HStack(spacing: 12) {
-                listThumbnail(list)
+    // MARK: - Top Places Section
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(list.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Text("\(list.place_count) place\(list.place_count == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(12)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Thumbnail for a list row.
-    private func listThumbnail(_ list: CityDetailListRecord) -> some View {
-        Group {
-            if let imageUrl = list.image, let url = URL(string: imageUrl) {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    listPlaceholderIcon
-                }
-            } else {
-                listPlaceholderIcon
-            }
-        }
-        .frame(width: 44, height: 44)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    /// Placeholder icon for lists without an image.
-    private var listPlaceholderIcon: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(Color(.tertiarySystemBackground))
-            .overlay(
-                Image(systemName: "list.bullet")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
-            )
-    }
-
-    /// Section displaying top places in this city.
+    /// Horizontal scrolling row of place tiles with "See All" header.
     @ViewBuilder
     private var topPlacesSection: some View {
         if !viewModel.topPlaces.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Top Places")
-                    .font(.title3)
-                    .fontWeight(.bold)
+                Button { viewModel.navigateToAllPlaces() } label: {
+                    HStack {
+                        Text("Popular Places")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("See All")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
 
-                ForEach(viewModel.topPlaces) { place in
-                    topPlaceRow(place)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(viewModel.topPlaces) { place in
+                            CityPlaceTile(place: place, onTap: {
+                                viewModel.handlePlaceTap(placeId: place.id)
+                            })
+                            .frame(width: 160)
+                        }
+                    }
                 }
             }
         }
     }
 
-    /// Single row for a top place item.
-    private func topPlaceRow(_ place: CityTopPlace) -> some View {
-        HStack(spacing: 12) {
-            Text(place.emoji)
-                .font(.title3)
-                .frame(width: 36, height: 36)
-                .background(Color(.tertiarySystemBackground))
-                .clipShape(Circle())
+    // MARK: - People Section
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(place.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+    /// Horizontal scrolling row of user tiles with follow buttons.
+    @ViewBuilder
+    private var peopleSection: some View {
+        if !viewModel.activeUsers.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("People")
+                    .font(.title3)
+                    .fontWeight(.bold)
 
-                Text(place.placeType.replacingOccurrences(of: "_", with: " ").capitalized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            if place.tiktokCount > 0 {
-                Label("\(place.tiktokCount)", systemImage: "play.rectangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(viewModel.activeUsers) { user in
+                            CityUserTile(
+                                user: user,
+                                isFollowing: viewModel.followStates[user.id] ?? false,
+                                isCurrentUser: user.id == userSession.currentUserId,
+                                onTap: {
+                                    viewModel.handleUserTap(
+                                        userId: user.id,
+                                        currentUserId: userSession.currentUserId
+                                    )
+                                },
+                                onFollow: {
+                                    viewModel.toggleFollow(userId: user.id)
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
-        .padding(.vertical, 4)
+    }
+
+    // MARK: - Empty State
+
+    /// Shown when no lists, places, or users are found for the city.
+    @ViewBuilder
+    private var emptyStateView: some View {
+        if !viewModel.isLoading && viewModel.hasNoContent {
+            VStack(spacing: 8) {
+                Image(systemName: "mappin.slash")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.tertiary)
+                Text("No details yet")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 24)
+        }
     }
 }

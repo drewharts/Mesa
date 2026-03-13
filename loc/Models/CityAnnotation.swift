@@ -18,6 +18,9 @@ struct CityAnnotation: Identifiable, Codable, Equatable {
     let listCount: Int
     let tiktokCount: Int
     let topPlaceTypes: [String]
+    let reviewCount: Int
+    let friendCount: Int
+    let reviewedPlaceCount: Int
 
     /// Uses the city name as a stable identifier.
     var id: String { name }
@@ -25,21 +28,6 @@ struct CityAnnotation: Identifiable, Codable, Equatable {
     /// Computed coordinate from latitude/longitude.
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-    }
-
-    /// Returns emojis for the top place types.
-    var topEmojis: [String] {
-        topPlaceTypes.prefix(3).map { PlaceTypeEmoji.emoji(for: $0) }
-    }
-
-    /// Formatted summary string for the annotation marker.
-    var summary: String {
-        var parts: [String] = []
-        parts.append("\(placeCount) place\(placeCount == 1 ? "" : "s")")
-        if tiktokCount > 0 {
-            parts.append("\(tiktokCount) TikTok\(tiktokCount == 1 ? "" : "s")")
-        }
-        return parts.joined(separator: " · ")
     }
 
     enum CodingKeys: String, CodingKey {
@@ -50,6 +38,9 @@ struct CityAnnotation: Identifiable, Codable, Equatable {
         case listCount = "list_count"
         case tiktokCount = "tiktok_count"
         case topPlaceTypes = "top_place_types"
+        case reviewCount = "review_count"
+        case friendCount = "friend_count"
+        case reviewedPlaceCount = "reviewed_place_count"
     }
 }
 
@@ -59,6 +50,9 @@ struct CityTopPlace: Identifiable, Codable {
     let name: String
     let placeType: String
     let tiktokCount: Int
+    let imageUrl: String?
+    let latestReviewPhoto: String?
+    let contentUrl: String?
 
     /// Returns an emoji representing the place type.
     var emoji: String {
@@ -70,5 +64,47 @@ struct CityTopPlace: Identifiable, Codable {
         case name
         case placeType = "place_type"
         case tiktokCount = "tiktok_count"
+        case imageUrl = "image_url"
+        case latestReviewPhoto = "latest_review_photo"
+        case contentUrl = "tiktok_url"
+    }
+}
+
+/// Lightweight city result from the search_cities RPC.
+struct CitySearchResult: Identifiable, Codable {
+    let cityName: String
+    let latitude: Double
+    let longitude: Double
+    let placeCount: Int
+
+    var id: String { cityName }
+
+    /// Computed coordinate from latitude/longitude.
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case cityName = "city_name"
+        case latitude
+        case longitude
+        case placeCount = "place_count"
+    }
+}
+
+/// User with saved places in a city, returned from the get_city_active_users RPC.
+struct CityActiveUser: Identifiable, Codable, Hashable {
+    let id: String
+    let fullName: String
+    let profilePhotoUrl: String?
+    let placeCount: Int
+    let listCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case fullName = "full_name"
+        case profilePhotoUrl = "profile_photo_url"
+        case placeCount = "place_count"
+        case listCount = "list_count"
     }
 }

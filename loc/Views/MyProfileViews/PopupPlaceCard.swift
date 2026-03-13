@@ -23,6 +23,7 @@ struct PopupPlaceCard: View {
     /// Show "Added by [name]" indicator for collaborative lists
     var showAddedBy: Bool = false
 
+    @ObservedObject private var externalMetadataCache = ExternalMetadataCache.shared
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
@@ -103,7 +104,7 @@ struct PopupPlaceCard: View {
         if preferExternalThumbnail {
             // External video style: prioritize external video thumbnail
             if let contentUrl = place.content_url,
-               let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) {
+               let thumbnailURL = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) {
                 externalThumbnailView(thumbnailURL: thumbnailURL, contentUrl: contentUrl, size: size)
             } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
                 reviewPhotoView(url: url, size: size)
@@ -115,7 +116,7 @@ struct PopupPlaceCard: View {
             if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
                 reviewPhotoView(url: url, size: size)
             } else if let contentUrl = place.content_url,
-                      let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) {
+                      let thumbnailURL = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) {
                 externalThumbnailView(thumbnailURL: thumbnailURL, contentUrl: nil, size: size)
             } else {
                 placeholderView
@@ -154,7 +155,7 @@ struct PopupPlaceCard: View {
         Color.clear
             .onAppear {
                 // Prefetch external metadata if URL exists but no cached thumbnail
-                if preferExternalThumbnail, let contentUrl = place.content_url {
+                if let contentUrl = place.content_url {
                     Task {
                         _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                     }

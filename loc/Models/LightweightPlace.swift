@@ -10,6 +10,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
     let latest_review_photo: String?
     let external_place_id: String? // UUID from external_places table (row ID, unique per external video)
     let content_url: String? // External video URL from external_places table
+    let place_type: String? // Primary category (e.g. "restaurant", "cafe")
 
     // MARK: - Added By Info (for collaborative lists)
     // These fields are only populated when fetching places from a collaborative list
@@ -28,6 +29,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         case latest_review_photo
         case external_place_id
         case content_url = "tiktok_url"
+        case place_type
         case added_by_user_id
         case added_by_name
         case added_by_photo_url
@@ -43,6 +45,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         latest_review_photo: String?,
         external_place_id: String? = nil,
         content_url: String? = nil,
+        place_type: String? = nil,
         added_by_user_id: String? = nil,
         added_by_name: String? = nil,
         added_by_photo_url: String? = nil
@@ -54,6 +57,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         self.latest_review_photo = latest_review_photo
         self.external_place_id = external_place_id
         self.content_url = content_url
+        self.place_type = place_type
         self.added_by_user_id = added_by_user_id
         self.added_by_name = added_by_name
         self.added_by_photo_url = added_by_photo_url

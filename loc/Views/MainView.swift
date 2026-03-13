@@ -140,13 +140,16 @@ struct MainView: View {
                     if userProfileNavigationViewModel.navigatedFromPlaceDetail {
                         selectedPlaceVM.preserveStateForNavigation()
                     }
-                    presentationService.dismiss()
+                    presentationService.preserveAndDismiss()
                 }
 
-                // Restore state when returning from profile (if navigated from place detail)
-                if oldValue && !newValue && userProfileNavigationViewModel.navigatedFromPlaceDetail {
-                    selectedPlaceVM.restoreStateAfterNavigation()
-                    userProfileNavigationViewModel.navigatedFromPlaceDetail = false
+                // Restore state when returning from profile
+                if oldValue && !newValue {
+                    if userProfileNavigationViewModel.navigatedFromPlaceDetail {
+                        selectedPlaceVM.restoreStateAfterNavigation()
+                        userProfileNavigationViewModel.navigatedFromPlaceDetail = false
+                    }
+                    presentationService.restorePreservedSheet()
                 }
             }
             .fullScreenCover(isPresented: $shouldNavigateToProfile, onDismiss: {
@@ -290,8 +293,8 @@ struct MainView: View {
                 nearbyDiscoverySheet
 
             // City Overview
-            case .cityOverview(let cityName):
-                cityOverviewSheet(cityName: cityName)
+            case .cityOverview(let cityName, let coordinate, let annotation):
+                cityOverviewSheet(cityName: cityName, coordinate: coordinate, annotation: annotation)
 
             // Onboarding
             case .suggestedProfiles:
@@ -464,12 +467,20 @@ struct MainView: View {
             .applyMapPopupPresentation()
     }
 
-    /// City overview sheet showing lists and top places for a city.
-    private func cityOverviewSheet(cityName: String) -> some View {
-        CityDetailSheet(cityName: cityName)
+    /// City overview sheet showing lists, top places, and active users for a city.
+    private func cityOverviewSheet(cityName: String, coordinate: CLLocationCoordinate2D, annotation: CityAnnotation?) -> some View {
+        CityDetailSheet(cityName: cityName, coordinate: coordinate, annotation: annotation)
             .environmentObject(profileViewModel)
+            .environmentObject(userSession)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(locationManager)
+            .environmentObject(mapDisplayCoordinatorViewModel)
+            .environmentObject(dataManager)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .large))
     }
 
     /// Keyword results popup sheet content.

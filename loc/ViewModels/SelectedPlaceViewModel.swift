@@ -392,6 +392,7 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     /// Fetches fresh place details in background and loads posts once the real UUID is resolved.
+    /// If the resolved place is a city (locality), redirects to the city detail sheet.
     private func fetchFreshDetailsInBackground(for place: DetailPlace) {
         guard place.isCustom != true else { return }
         Task {
@@ -402,6 +403,18 @@ class SelectedPlaceViewModel: ObservableObject {
                     existingPlace: place
                 )
                 guard self.selectedPlace?.id == place.id else { return }
+
+                // Redirect to city sheet if the place is a city-level result
+                if Self.isCityPlace(enriched), let coordinate = enriched.coordinate {
+                    isDetailSheetPresented = false
+                    selectionState.selectedPlace = nil
+                    selectionState.markFetchComplete()
+                    PresentationService.shared.present(
+                        .cityOverview(cityName: enriched.name, coordinate: coordinate, annotation: nil)
+                    )
+                    return
+                }
+
                 selectionState.markFetchComplete()
                 selectionState.updatePlaceDetails(enriched)
                 loadPostsIfReady(for: enriched)
@@ -424,5 +437,12 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Returns true if the place's categories indicate it is a city-level locality.
+    static func isCityPlace(_ place: DetailPlace) -> Bool {
+        guard let categories = place.categories else { return false }
+        let cityTypes: Set<String> = ["locality", "postal_town"]
+        return categories.contains { cityTypes.contains($0) }
     }
 }
