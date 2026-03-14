@@ -123,6 +123,16 @@ private struct SearchPageViewContent: View {
                     }
                 }
 
+                viewModel.onCitySelected = { city in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        PresentationService.shared.present(.cityOverview(
+                            cityName: city.cityName,
+                            coordinate: city.coordinate,
+                            annotation: nil
+                        ))
+                    }
+                }
+
                 // Set map region for viewport-based searches
                 viewModel.setMapRegion(appCoordinator.currentMapRegion)
             }

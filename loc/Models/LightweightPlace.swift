@@ -10,6 +10,8 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
     let latest_review_photo: String?
     let external_place_id: String? // UUID from external_places table (row ID, unique per external video)
     let content_url: String? // External video URL from external_places table
+    let place_type: String? // Primary category (e.g. "restaurant", "cafe")
+    let thumbnail_url: String? // Google Places thumbnail — last-resort fallback for images
 
     // MARK: - Added By Info (for collaborative lists)
     // These fields are only populated when fetching places from a collaborative list
@@ -17,9 +19,9 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
     let added_by_user_id: String?
     let added_by_name: String?
     let added_by_photo_url: String?
-    
+
     var id: String { place_id }
-    
+
     enum CodingKeys: String, CodingKey {
         case place_id
         case name
@@ -28,13 +30,15 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         case latest_review_photo
         case external_place_id
         case content_url = "tiktok_url"
+        case place_type
+        case thumbnail_url
         case added_by_user_id
         case added_by_name
         case added_by_photo_url
     }
-    
+
     // MARK: - Convenience Initializer for Backward Compatibility
-    
+
     init(
         place_id: String,
         name: String,
@@ -43,6 +47,8 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         latest_review_photo: String?,
         external_place_id: String? = nil,
         content_url: String? = nil,
+        place_type: String? = nil,
+        thumbnail_url: String? = nil,
         added_by_user_id: String? = nil,
         added_by_name: String? = nil,
         added_by_photo_url: String? = nil
@@ -54,6 +60,8 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         self.latest_review_photo = latest_review_photo
         self.external_place_id = external_place_id
         self.content_url = content_url
+        self.place_type = place_type
+        self.thumbnail_url = thumbnail_url
         self.added_by_user_id = added_by_user_id
         self.added_by_name = added_by_name
         self.added_by_photo_url = added_by_photo_url

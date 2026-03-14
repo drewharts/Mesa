@@ -25,6 +25,7 @@ class SearchPageViewModel: ObservableObject {
     var onUserSelected: ((ProfileData) -> Void)?
     var onViewAllKeywords: ((String, [String]) -> Void)?
     var onCoordinateSelected: ((CLLocationCoordinate2D) -> Void)?
+    var onCitySelected: ((CitySearchResult) -> Void)?
 
     // MARK: - Dependencies
 
@@ -58,10 +59,13 @@ class SearchPageViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// Configure SearchViewModel callbacks for place selection
+    /// Configure SearchViewModel callbacks for place and city selection
     private func setupSearchViewModelCallbacks() {
         searchViewModel.onPlaceSelected = { [weak self] place in
             self?.handlePlaceSelection(place)
+        }
+        searchViewModel.onCitySelected = { [weak self] city in
+            self?.handleCitySelection(city)
         }
     }
 
@@ -104,6 +108,12 @@ class SearchPageViewModel: ObservableObject {
     /// Handle coordinate selection from search results
     func handleCoordinateSelection(_ coordinate: CLLocationCoordinate2D) {
         onCoordinateSelected?(coordinate)
+    }
+
+    /// Handle city selection from search results — dismisses search and presents city sheet.
+    func handleCitySelection(_ city: CitySearchResult) {
+        onDismiss?()
+        onCitySelected?(city)
     }
 
     /// Handle view all keywords action

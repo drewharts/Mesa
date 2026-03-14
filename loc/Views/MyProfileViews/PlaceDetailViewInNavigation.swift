@@ -11,6 +11,7 @@ import SwiftUI
 
 struct PlaceDetailViewInNavigation: View {
     let minSheetHeight: CGFloat
+    let shouldAnimateMap: Bool
 
     @StateObject private var viewModel: PlaceDetailNavigationViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -20,8 +21,9 @@ struct PlaceDetailViewInNavigation: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
-    init(placeId: String, minSheetHeight: CGFloat) {
+    init(placeId: String, minSheetHeight: CGFloat, shouldAnimateMap: Bool = false) {
         self.minSheetHeight = minSheetHeight
+        self.shouldAnimateMap = shouldAnimateMap
         self._viewModel = StateObject(wrappedValue: PlaceDetailNavigationViewModel(placeId: placeId))
     }
 
@@ -54,7 +56,7 @@ struct PlaceDetailViewInNavigation: View {
             await viewModel.loadPlace()
             await MainActor.run {
                 if let place = viewModel.loadedPlace {
-                    selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
+                    selectedPlaceVM.selectPlace(place, shouldAnimateMap: shouldAnimateMap)
                     selectedPlaceVM.isDetailSheetPresented = false
                 }
             }

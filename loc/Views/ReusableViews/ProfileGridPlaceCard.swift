@@ -17,6 +17,7 @@ struct ProfileGridPlaceCard: View {
     let photoUrl: String?
     let placeId: String
     var contentUrl: String? = nil
+    var placeThumbnailUrl: String? = nil
     var preferExternalThumbnail: Bool = false
     var height: CGFloat = 90
 
@@ -67,25 +68,29 @@ struct ProfileGridPlaceCard: View {
             )
     }
 
-    /// Displays external video thumbnail first, falling back to review photo.
+    /// Displays external video thumbnail first, falling back to review photo, then place thumbnail.
     @ViewBuilder
     private var externalFirstImageContent: some View {
         if let thumbnailURL = thumbnailURL {
             asyncImageView(url: thumbnailURL)
         } else if let photoURL = photoURL {
             asyncImageView(url: photoURL)
+        } else if let fallbackURL = placeThumbnailURL {
+            asyncImageView(url: fallbackURL)
         } else {
             coloredPlaceholder
         }
     }
 
-    /// Displays review photo first, falling back to external video thumbnail.
+    /// Displays review photo first, falling back to external video thumbnail, then place thumbnail.
     @ViewBuilder
     private var photoFirstImageContent: some View {
         if let photoURL = photoURL {
             asyncImageView(url: photoURL)
         } else if let thumbnailURL = thumbnailURL {
             asyncImageView(url: thumbnailURL)
+        } else if let fallbackURL = placeThumbnailURL {
+            asyncImageView(url: fallbackURL)
         } else {
             coloredPlaceholder
         }
@@ -147,6 +152,12 @@ struct ProfileGridPlaceCard: View {
         return URL(string: urlString)
     }
 
+    /// Google Places thumbnail URL — last-resort fallback when no other image is available.
+    private var placeThumbnailURL: URL? {
+        guard let urlString = placeThumbnailUrl else { return nil }
+        return URL(string: urlString)
+    }
+
     /// Prefetches external video thumbnail metadata if applicable.
     private func prefetchThumbnailIfNeeded() {
         guard let contentUrl = contentUrl else { return }
@@ -173,6 +184,7 @@ extension ProfileGridPlaceCard {
         self.photoUrl = place.latest_review_photo
         self.placeId = place.place_id
         self.contentUrl = place.content_url
+        self.placeThumbnailUrl = place.thumbnail_url
         self.preferExternalThumbnail = preferExternalThumbnail
         self.height = 90
     }
