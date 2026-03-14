@@ -450,6 +450,71 @@ class MyViewModel: ObservableObject {
 }
 ```
 
+### Data Loading Patterns (CRITICAL)
+
+**Progressive Loading by Default**
+- **NEVER gate all content behind a single loading spinner**. Each independent data section must load and render independently.
+- Use `withTaskGroup` with separate loader methods per section so content appears as each RPC returns.
+- The loading spinner should only appear as a fallback when nothing has loaded yet (`isLoading && hasNoContent`).
+- Empty state should only appear after all loading completes with no data.
+
+```swift
+// BAD: Single loading gate blocks everything until ALL fetches finish
+func loadContent() async {
+    isLoading = true
+    async let a = fetchLists()
+    async let b = fetchPlaces()
+    let (lists, places) = try await (a, b)
+    self.lists = lists
+    self.places = places
+    isLoading = false  // User stares at spinner until BOTH finish
+}
+
+// View
+if viewModel.isLoading { ProgressView() } else { content }
+
+// GOOD: Progressive loading — each section appears independently
+func loadContent() async {
+    isLoading = true
+    await withTaskGroup(of: Void.self) { group in
+        group.addTask { await self.loadLists() }
+        group.addTask { await self.loadPlaces() }
+    }
+    isLoading = false
+}
+
+private func loadLists() async {
+    self.lists = (try? await service.fetchLists()) ?? []
+}
+
+// View — sections appear as data arrives, spinner only when empty
+listsSection     // guards on !lists.isEmpty internally
+placesSection    // guards on !places.isEmpty internally
+if viewModel.isLoading && viewModel.hasNoContent { ProgressView() }
+```
+
+**Eliminate N+1 Queries**
+- **NEVER fetch a list of items and then loop to fetch child data** (e.g., fetching lists then N calls to get places per list).
+- Fold child data into the parent RPC using lateral joins, `json_agg`, or additional columns.
+- Follow state, counts, and preview data should be computed server-side, not cascaded client-side.
+
+```swift
+// BAD: N+1 cascade — fetches lists, then loops to fetch places for each
+let lists = try await fetchLists()
+for list in lists {
+    listPlaces[list.id] = try await fetchPlaces(listId: list.id)  // N additional RPCs!
+}
+
+// GOOD: Places inlined on each list from the RPC
+let lists = try await fetchLists()  // Each list already has .places from a lateral join
+```
+
+**Backend RPC Design Rules**
+- When a screen needs related data from multiple entities, prefer **fewer RPCs that return richer payloads** over many small RPCs stitched together client-side.
+- Boolean state checks (is_following, is_favorited, has_reviewed) should be computed as columns in the parent RPC, not as separate per-row client calls.
+- Preview/thumbnail data (top 3 photos, first 3 places) should be returned inline via JSONB columns using lateral joins + `json_agg`.
+- Pagination parameters (`limit`/`offset`) should always be supported for unbounded result sets.
+
 ### SwiftUI Views
 - **DECLARATIVE ONLY**: Views should be purely declarative UI descriptions
 - **NO SIDE EFFECTS**: No network calls, database operations, or complex logic in Views
@@ -485,6 +550,9 @@ class MyViewModel: ObservableObject {
 12. **God ViewModels**: ViewModels with 300+ lines or 10+ @Published properties handling multiple features - must be split into composed child ViewModels
 13. **Dependency Explosion**: Views with 4+ `@EnvironmentObject` dependencies - refactor to have ViewModels fetch their own dependencies from ServiceContainer
 14. **Manual Trigger Patterns**: Using `updateCounter`, `refreshFlag`, or similar properties to trigger updates - subscribe to actual data changes instead
+15. **Loading Gates**: Using `if isLoading { spinner } else { allContent }` that blocks all sections behind a single spinner - each section must load and render independently
+16. **N+1 Query Cascades**: Fetching a list then looping to fetch child data per item (e.g., places per list, follow state per user) - fold into the parent RPC using lateral joins, json_agg, or computed columns
+17. **Client-Side Boolean Checks**: Making per-row API calls for boolean state (is_following, is_favorited) instead of computing them as columns in the parent RPC
 
 ### Migration Strategy
 When finding violations:

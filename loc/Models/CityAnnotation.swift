@@ -92,6 +92,52 @@ struct CitySearchResult: Identifiable, Codable {
     }
 }
 
+/// TikTok video saved to a place in a city, returned from the get_city_tiktoks RPC.
+struct CityTikTok: Identifiable, Codable {
+    let url: String
+    let source: String
+    let placeId: String
+    let placeName: String
+    let savedByUserId: String
+    let savedByFirstName: String
+    let savedByProfilePhotoUrl: String?
+
+    var id: String { url }
+
+    enum CodingKeys: String, CodingKey {
+        case url
+        case source
+        case placeId = "place_id"
+        case placeName = "place_name"
+        case savedByUserId = "saved_by_user_id"
+        case savedByFirstName = "saved_by_first_name"
+        case savedByProfilePhotoUrl = "saved_by_profile_photo_url"
+    }
+}
+
+/// Review photo from a place in a city, returned from the get_city_review_photos RPC.
+struct CityReviewPhoto: Identifiable, Codable {
+    let imageUrl: String
+    let reviewId: String
+    let placeId: String
+    let placeName: String
+    let reviewerUserId: String
+    let reviewerFirstName: String
+    let reviewerProfilePhotoUrl: String?
+
+    var id: String { imageUrl }
+
+    enum CodingKeys: String, CodingKey {
+        case imageUrl = "image_url"
+        case reviewId = "review_id"
+        case placeId = "place_id"
+        case placeName = "place_name"
+        case reviewerUserId = "reviewer_user_id"
+        case reviewerFirstName = "reviewer_first_name"
+        case reviewerProfilePhotoUrl = "reviewer_profile_photo_url"
+    }
+}
+
 /// User with saved places in a city, returned from the get_city_active_users RPC.
 struct CityActiveUser: Identifiable, Codable, Hashable {
     let id: String
@@ -99,6 +145,7 @@ struct CityActiveUser: Identifiable, Codable, Hashable {
     let profilePhotoUrl: String?
     let placeCount: Int
     let listCount: Int
+    var isFollowing: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -106,5 +153,6 @@ struct CityActiveUser: Identifiable, Codable, Hashable {
         case profilePhotoUrl = "profile_photo_url"
         case placeCount = "place_count"
         case listCount = "list_count"
+        case isFollowing = "is_following"
     }
 }

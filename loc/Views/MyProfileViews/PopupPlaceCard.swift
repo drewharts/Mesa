@@ -108,6 +108,8 @@ struct PopupPlaceCard: View {
                 externalThumbnailView(thumbnailURL: thumbnailURL, contentUrl: contentUrl, size: size)
             } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
                 reviewPhotoView(url: url, size: size)
+            } else if let thumbUrl = place.thumbnail_url, let url = URL(string: thumbUrl) {
+                reviewPhotoView(url: url, size: size)
             } else {
                 placeholderView
             }
@@ -118,6 +120,8 @@ struct PopupPlaceCard: View {
             } else if let contentUrl = place.content_url,
                       let thumbnailURL = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) {
                 externalThumbnailView(thumbnailURL: thumbnailURL, contentUrl: nil, size: size)
+            } else if let thumbUrl = place.thumbnail_url, let url = URL(string: thumbUrl) {
+                reviewPhotoView(url: url, size: size)
             } else {
                 placeholderView
             }

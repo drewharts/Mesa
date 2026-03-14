@@ -193,6 +193,11 @@ struct CollagePhotoView: View {
                         }
                     }
                 }
+        } else if let thumbUrl = place.thumbnail_url, let url = URL(string: thumbUrl) {
+            CachedAsyncImage(url: url, targetSize: nil) {
+                Color.gray.opacity(0.3)
+            }
+            .aspectRatio(contentMode: .fill)
         }
     }
 }
@@ -318,6 +323,23 @@ struct LightweightPlacePreviewCard: View {
                         }
                     }
                 }
+        } else if let thumbUrl = place.thumbnail_url, let url = URL(string: thumbUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: height)
+                        .clipped()
+                case .failure:
+                    EmptyView()
+                case .empty:
+                    Color.gray.opacity(0.3)
+                @unknown default:
+                    EmptyView()
+                }
+            }
         }
     }
 }

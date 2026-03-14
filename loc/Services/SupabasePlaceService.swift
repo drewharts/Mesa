@@ -1993,6 +1993,31 @@ class SupabasePlaceService: ObservableObject {
         }
     }
 
+    /// Fetches TikTok videos saved to places near a city coordinate with pagination.
+    func fetchCityTiktoks(userId: String, latitude: Double, longitude: Double, limit: Int = 20, offset: Int = 0) async throws -> [CityTikTok] {
+        do {
+            struct Params: Encodable {
+                let p_user_id: String
+                let p_lat: Double
+                let p_lon: Double
+                let p_limit: Int
+                let p_offset: Int
+            }
+
+            let params = Params(p_user_id: userId, p_lat: latitude, p_lon: longitude, p_limit: limit, p_offset: offset)
+
+            let response: [CityTikTok] = try await supabase.client
+                .rpc("get_city_tiktoks", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            print("❌ [Supabase] Error fetching city tiktoks: \(error)")
+            throw error
+        }
+    }
+
     /// Fetches users who have saved places near a city coordinate.
     func fetchCityActiveUsers(userId: String, latitude: Double, longitude: Double) async throws -> [CityActiveUser] {
         do {
@@ -2012,6 +2037,31 @@ class SupabasePlaceService: ObservableObject {
             return response
         } catch {
             print("❌ [Supabase] Error fetching city active users: \(error)")
+            throw error
+        }
+    }
+
+    /// Fetches review photos from places near a city coordinate with pagination.
+    func fetchCityReviewPhotos(userId: String, latitude: Double, longitude: Double, limit: Int = 20, offset: Int = 0) async throws -> [CityReviewPhoto] {
+        do {
+            struct Params: Encodable {
+                let p_user_id: String
+                let p_lat: Double
+                let p_lon: Double
+                let p_limit: Int
+                let p_offset: Int
+            }
+
+            let params = Params(p_user_id: userId, p_lat: latitude, p_lon: longitude, p_limit: limit, p_offset: offset)
+
+            let response: [CityReviewPhoto] = try await supabase.client
+                .rpc("get_city_review_photos", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            print("❌ [Supabase] Error fetching city review photos: \(error)")
             throw error
         }
     }
@@ -2153,5 +2203,6 @@ struct CityDetailListRecord: Codable {
     let user_id: String
     let creator_name: String?
     let creator_photo_url: String?
+    let places: [LightweightPlace]
 }
 

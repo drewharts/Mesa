@@ -478,9 +478,19 @@ class PlaceService: ObservableObject {
         return try await supabase.fetchCityTopPlaces(userId: userId, latitude: latitude, longitude: longitude)
     }
 
+    /// Fetches TikTok videos saved to places near a city coordinate with pagination.
+    func fetchCityTiktoks(userId: String, latitude: Double, longitude: Double, limit: Int = 20, offset: Int = 0) async throws -> [CityTikTok] {
+        return try await supabase.fetchCityTiktoks(userId: userId, latitude: latitude, longitude: longitude, limit: limit, offset: offset)
+    }
+
     /// Fetches users who have saved places near a city coordinate.
     func fetchCityActiveUsers(userId: String, latitude: Double, longitude: Double) async throws -> [CityActiveUser] {
         return try await supabase.fetchCityActiveUsers(userId: userId, latitude: latitude, longitude: longitude)
+    }
+
+    /// Fetches review photos from places near a city coordinate with pagination.
+    func fetchCityReviewPhotos(userId: String, latitude: Double, longitude: Double, limit: Int = 20, offset: Int = 0) async throws -> [CityReviewPhoto] {
+        return try await supabase.fetchCityReviewPhotos(userId: userId, latitude: latitude, longitude: longitude, limit: limit, offset: offset)
     }
 
     /// Searches for cities matching a query within the user's social graph.

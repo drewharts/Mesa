@@ -39,7 +39,7 @@ class ProfilePhotoCache: ObservableObject {
                     await MainActor.run {
                         self.photos[userId] = image
                     }
-                    print("📸 [ProfilePhotoCache] Loaded photo for user: \(userId)")
+
                 } else {
                     print("⚠️ [ProfilePhotoCache] Failed to create image from data for user: \(userId)")
                 }

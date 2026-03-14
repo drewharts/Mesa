@@ -39,14 +39,15 @@ struct CityDetailSheet: View {
 
                     statsBar
 
-                    if viewModel.isLoading {
+                    listsSection
+                    topPlacesSection
+                    tiktoksSection
+                    peopleSection
+
+                    if viewModel.isLoading && viewModel.hasNoContent {
                         loadingView
-                    } else {
-                        listsSection
-                        topPlacesSection
-                        peopleSection
-                        emptyStateView
                     }
+                    emptyStateView
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -59,7 +60,6 @@ struct CityDetailSheet: View {
                 case .allLists:
                     CityAllListsView(
                         lists: viewModel.lists,
-                        listPlaces: viewModel.listPlaces,
                         placeColors: $viewModel.placeColors,
                         onListTap: { list in
                             viewModel.handleListTap(list)
@@ -70,6 +70,20 @@ struct CityDetailSheet: View {
                         places: viewModel.topPlaces,
                         onPlaceTap: { place in
                             viewModel.handlePlaceTap(placeId: place.id)
+                        }
+                    )
+                case .allPhotos:
+                    CityAllPhotosView(
+                        viewModel: viewModel,
+                        onPhotoTap: { photo in
+                            viewModel.handlePlaceTap(placeId: photo.placeId)
+                        }
+                    )
+                case .allVideos:
+                    CityAllVideosView(
+                        viewModel: viewModel,
+                        onVideoTap: { tiktok in
+                            viewModel.handlePlaceTap(placeId: tiktok.placeId)
                         }
                     )
                 case .listDetail(let listId, let listName, let creatorId, let creatorName, let creatorPhotoUrl):
@@ -90,8 +104,7 @@ struct CityDetailSheet: View {
                         }
                     )
                 case .placeDetail(let placeId):
-                    PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
-                        .id(placeId)
+                    PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 0, shouldAnimateMap: true)
                 case .userProfile(let userId):
                     CityUserProfileView(userId: userId)
                         .id(userId)
@@ -103,7 +116,7 @@ struct CityDetailSheet: View {
                 }
             }
             .onReceive(presentationService.$pendingPlaceNavigation.compactMap { $0 }) { placeId in
-                viewModel.navigationPath.append(CityDetailDestination.placeDetail(placeId: placeId))
+                viewModel.handlePlaceTap(placeId: placeId)
                 presentationService.pendingPlaceNavigation = nil
             }
         }
@@ -189,7 +202,7 @@ struct CityDetailSheet: View {
                         ForEach(viewModel.lists, id: \.list_id) { list in
                             CityListTile(
                                 list: list,
-                                places: viewModel.listPlaces[list.list_id] ?? [],
+                                places: list.places,
                                 placeColors: $viewModel.placeColors,
                                 onTap: {
                                     viewModel.handleListTap(list)
@@ -241,6 +254,44 @@ struct CityDetailSheet: View {
         }
     }
 
+    // MARK: - Videos Section
+
+    /// Horizontal scrolling row of TikTok video tiles with "See All" header.
+    @ViewBuilder
+    private var tiktoksSection: some View {
+        if !viewModel.tiktoks.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Button { viewModel.navigateToAllVideos() } label: {
+                    HStack {
+                        Text("Videos")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("See All")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(viewModel.tiktoks) { tiktok in
+                            CityTikTokTile(tiktok: tiktok, onTap: {
+                                viewModel.handlePlaceTap(placeId: tiktok.placeId)
+                            })
+                            .frame(width: 160)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - People Section
 
     /// Horizontal scrolling row of user tiles with follow buttons.
@@ -257,7 +308,7 @@ struct CityDetailSheet: View {
                         ForEach(viewModel.activeUsers) { user in
                             CityUserTile(
                                 user: user,
-                                isFollowing: viewModel.followStates[user.id] ?? false,
+                                isFollowing: user.isFollowing,
                                 isCurrentUser: user.id == userSession.currentUserId,
                                 onTap: {
                                     viewModel.handleUserTap(

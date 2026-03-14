@@ -10,7 +10,6 @@ import SwiftUI
 /// Full-screen vertical grid of all city lists, navigated from "See All" in city detail.
 struct CityAllListsView: View {
     let lists: [CityDetailListRecord]
-    let listPlaces: [String: [LightweightPlace]]
     @Binding var placeColors: [UUID: Color]
     let onListTap: (CityDetailListRecord) -> Void
 
@@ -25,7 +24,7 @@ struct CityAllListsView: View {
                 ForEach(lists, id: \.list_id) { list in
                     CityListTile(
                         list: list,
-                        places: listPlaces[list.list_id] ?? [],
+                        places: list.places,
                         placeColors: $placeColors,
                         onTap: { onListTap(list) }
                     )
