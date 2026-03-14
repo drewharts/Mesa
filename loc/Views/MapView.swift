@@ -76,32 +76,48 @@ struct MapView: View {
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
-            // Community places as small emoji markers (shown behind network places)
-            // Hidden in "My Places" mode since community markers are not user-specific
-            // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
-            if !mapViewModel.showMyPlacesOnly {
-                ForEach(mapViewModel.communityMarkers.filter { marker in
-                    selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
-                }) { marker in
+            if mapViewModel.showingCityAnnotations {
+                // City-level annotations (zoomed out)
+                ForEach(mapViewModel.cityAnnotations) { city in
                     Annotation(
                         "",
-                        coordinate: marker.coordinate,
+                        coordinate: city.coordinate,
                         anchor: .center
                     ) {
-                        communityMarkerView(for: marker)
+                        CityAnnotationMarkerView(city: city, isSelected: false)
+                            .onTapGesture {
+                                mapViewModel.handleCityAnnotationTap(city)
+                            }
                     }
                 }
-            }
+            } else {
+                // Community places as small emoji markers (shown behind network places)
+                // Hidden in "My Places" mode since community markers are not user-specific
+                // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
+                if !mapViewModel.showMyPlacesOnly {
+                    ForEach(mapViewModel.communityMarkers.filter { marker in
+                        selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
+                    }) { marker in
+                        Annotation(
+                            "",
+                            coordinate: marker.coordinate,
+                            anchor: .center
+                        ) {
+                            communityMarkerView(for: marker)
+                        }
+                    }
+                }
 
-            // Network places (user + followed users) as main annotations
-            // Use sortedAnnotations so selected annotation renders last (on top)
-            ForEach(sortedAnnotations) { annotation in
-                Annotation(
-                    annotation.name,
-                    coordinate: annotation.coordinate,
-                    anchor: .bottom
-                ) {
-                    annotationMarkerView(for: annotation)
+                // Network places (user + followed users) as main annotations
+                // Use sortedAnnotations so selected annotation renders last (on top)
+                ForEach(sortedAnnotations) { annotation in
+                    Annotation(
+                        annotation.name,
+                        coordinate: annotation.coordinate,
+                        anchor: .bottom
+                    ) {
+                        annotationMarkerView(for: annotation)
+                    }
                 }
             }
 

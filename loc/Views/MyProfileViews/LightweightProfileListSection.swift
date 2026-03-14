@@ -173,55 +173,31 @@ struct CollagePhotoView: View {
     @ViewBuilder
     private var photoOverlay: some View {
         if let contentUrl = place.content_url,
-           let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) {
-            AsyncImage(url: URL(string: thumbnailURL)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    EmptyView() // Falls back to placeColor
-                case .empty:
-                    Color.gray.opacity(0.3)
-                        .onAppear {
-                            // Only fetch if not already cached
-                            if ExternalMetadataCache.shared.getCachedMetadata(for: contentUrl) == nil {
-                                Task {
-                                    _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
-                                }
-                            }
-                        }
-                @unknown default:
-                    EmptyView()
-                }
+           let thumbnailURL = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) {
+            CachedAsyncImage(url: URL(string: thumbnailURL), targetSize: nil) {
+                Color.gray.opacity(0.3)
             }
+            .aspectRatio(contentMode: .fill)
         } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    EmptyView() // Falls back to placeColor
-                case .empty:
-                    Color.gray.opacity(0.3)
-                @unknown default:
-                    EmptyView()
-                }
+            CachedAsyncImage(url: url, targetSize: nil) {
+                Color.gray.opacity(0.3)
             }
+            .aspectRatio(contentMode: .fill)
         } else if let contentUrl = place.content_url {
             // No cached thumbnail yet - show placeholder while fetching
             Color.gray.opacity(0.3)
                 .onAppear {
-                    // Only fetch if not already cached
-                    if ExternalMetadataCache.shared.getCachedMetadata(for: contentUrl) == nil {
+                    if externalMetadataCache.getCachedMetadata(for: contentUrl) == nil {
                         Task {
                             _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                         }
                     }
                 }
+        } else if let thumbUrl = place.thumbnail_url, let url = URL(string: thumbUrl) {
+            CachedAsyncImage(url: url, targetSize: nil) {
+                Color.gray.opacity(0.3)
+            }
+            .aspectRatio(contentMode: .fill)
         }
     }
 }
@@ -347,6 +323,23 @@ struct LightweightPlacePreviewCard: View {
                         }
                     }
                 }
+        } else if let thumbUrl = place.thumbnail_url, let url = URL(string: thumbUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: height)
+                        .clipped()
+                case .failure:
+                    EmptyView()
+                case .empty:
+                    Color.gray.opacity(0.3)
+                @unknown default:
+                    EmptyView()
+                }
+            }
         }
     }
 }

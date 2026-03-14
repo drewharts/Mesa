@@ -93,4 +93,23 @@ class PresentationService: ObservableObject {
     var hasActiveSheet: Bool {
         activeSheet != nil
     }
+
+    // MARK: - Sheet Preservation (for profile navigation round-trips)
+
+    /// Saved sheet to restore after returning from profile navigation.
+    @Published var preservedSheet: AppSheetType? = nil
+
+    /// Saves the active sheet for later restoration (e.g., after profile navigation).
+    func preserveAndDismiss() {
+        preservedSheet = activeSheet
+        activeSheet = nil
+    }
+
+    /// Restores a previously preserved sheet, if any.
+    func restorePreservedSheet() {
+        if let sheet = preservedSheet {
+            activeSheet = sheet
+            preservedSheet = nil
+        }
+    }
 }

@@ -448,4 +448,53 @@ class PlaceService: ObservableObject {
     func fetchCustomPlaceCreator(placeId: String) async throws -> CustomPlaceCreator? {
         return try await supabase.fetchCustomPlaceCreator(placeId: placeId)
     }
+
+    // MARK: - City Annotations
+
+    /// Fetches city-level annotations aggregating places by city within the viewport.
+    func fetchCityAnnotationsInViewport(
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double,
+        userId: String
+    ) async throws -> [CityAnnotation] {
+        return try await supabase.fetchCityAnnotationsInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
+        )
+    }
+
+    /// Fetches lists with places near a city coordinate.
+    func fetchCityDetailLists(userId: String, latitude: Double, longitude: Double) async throws -> [CityDetailListRecord] {
+        return try await supabase.fetchCityDetailLists(userId: userId, latitude: latitude, longitude: longitude)
+    }
+
+    /// Fetches top places near a city coordinate.
+    func fetchCityTopPlaces(userId: String, latitude: Double, longitude: Double) async throws -> [CityTopPlace] {
+        return try await supabase.fetchCityTopPlaces(userId: userId, latitude: latitude, longitude: longitude)
+    }
+
+    /// Fetches TikTok videos saved to places near a city coordinate with pagination.
+    func fetchCityTiktoks(userId: String, latitude: Double, longitude: Double, limit: Int = 20, offset: Int = 0) async throws -> [CityTikTok] {
+        return try await supabase.fetchCityTiktoks(userId: userId, latitude: latitude, longitude: longitude, limit: limit, offset: offset)
+    }
+
+    /// Fetches users who have saved places near a city coordinate.
+    func fetchCityActiveUsers(userId: String, latitude: Double, longitude: Double) async throws -> [CityActiveUser] {
+        return try await supabase.fetchCityActiveUsers(userId: userId, latitude: latitude, longitude: longitude)
+    }
+
+    /// Fetches review photos from places near a city coordinate with pagination.
+    func fetchCityReviewPhotos(userId: String, latitude: Double, longitude: Double, limit: Int = 20, offset: Int = 0) async throws -> [CityReviewPhoto] {
+        return try await supabase.fetchCityReviewPhotos(userId: userId, latitude: latitude, longitude: longitude, limit: limit, offset: offset)
+    }
+
+    /// Searches for cities matching a query within the user's social graph.
+    func searchCities(userId: String, query: String) async throws -> [CitySearchResult] {
+        return try await supabase.searchCities(userId: userId, query: query)
+    }
 }
