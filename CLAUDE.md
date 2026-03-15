@@ -515,6 +515,14 @@ let lists = try await fetchLists()  // Each list already has .places from a late
 - Preview/thumbnail data (top 3 photos, first 3 places) should be returned inline via JSONB columns using lateral joins + `json_agg`.
 - Pagination parameters (`limit`/`offset`) should always be supported for unbounded result sets.
 
+**⚠️ Database Schema Change Safety (CRITICAL)**
+- **BEFORE any `ALTER TABLE ADD COLUMN`**: Audit ALL RPCs that reference the table for the unsafe pattern below. Fix them FIRST, then add the column.
+- **NEVER**: `RETURNS TABLE(col1, col2, ...) + SELECT u.*` — Adding a column to the table breaks the function because column count mismatches.
+- **SAFE**: `RETURNS SETOF tablename` + `SELECT u.*` — Auto-adapts to schema changes. Use this for RPCs that return full rows.
+- **SAFE**: `RETURNS TABLE(col1, col2)` + `SELECT u.col1, u.col2` — Explicit columns, decoupled from table schema. Use this for RPCs that compute/transform data.
+- **Audit query**: `SELECT proname, prosrc FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND prosrc LIKE '%tablename%';`
+- **Swift Codable safety**: New columns returned from RPCs must have `Optional` types in the corresponding Swift record struct so existing clients without the field still decode.
+
 ### SwiftUI Views
 - **DECLARATIVE ONLY**: Views should be purely declarative UI descriptions
 - **NO SIDE EFFECTS**: No network calls, database operations, or complex logic in Views

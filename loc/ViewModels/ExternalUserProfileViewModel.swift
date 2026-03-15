@@ -95,6 +95,13 @@ class ExternalUserProfileViewModel: ObservableObject {
     private let followersPerPage: Int = 20
     private let reviewsPerPage: Int = 8
 
+    // MARK: - Account Type
+
+    /// Whether this profile is a curated/brand profile (shows only lists and followers).
+    var isCuratedProfile: Bool {
+        user.accountType == .curated
+    }
+
     // MARK: - Favorites as LightweightPlace
     var lightweightFavorites: [LightweightPlace] {
         userFavorites.map { favorite in
@@ -164,17 +171,25 @@ class ExternalUserProfileViewModel: ObservableObject {
     // MARK: - Initial Data Loading
 
     /// Loads all initial data for the profile. Called once when view appears.
+    /// Refreshes user profile first to get account type, then loads remaining data.
+    /// Curated profiles skip favorites, following count, and total places count.
     func loadInitialData(currentUserId: String) async {
-        // Run all initial fetches in parallel
-        async let profileRefresh: () = refreshUserProfile()
+        // Refresh profile first so isCuratedProfile is accurate
+        await refreshUserProfile()
+
+        // Now load remaining data in parallel
         async let followingCheck: () = checkIfFollowing(currentUserId: currentUserId)
-        async let favoritesLoad: () = fetchProfileFavorites()
         async let listsLoad: () = fetchLists()
         async let followersLoad: () = fetchFollowers()
-        async let followingCountLoad: () = fetchFollowingCount()
-        async let placesCountLoad: () = fetchTotalPlacesCount()
 
-        _ = await (profileRefresh, followingCheck, favoritesLoad, listsLoad, followersLoad, followingCountLoad, placesCountLoad)
+        if isCuratedProfile {
+            _ = await (followingCheck, listsLoad, followersLoad)
+        } else {
+            async let favoritesLoad: () = fetchProfileFavorites()
+            async let followingCountLoad: () = fetchFollowingCount()
+            async let placesCountLoad: () = fetchTotalPlacesCount()
+            _ = await (followingCheck, listsLoad, followersLoad, favoritesLoad, followingCountLoad, placesCountLoad)
+        }
     }
 
     /// Refreshes the user profile data to ensure all fields (including social links) are current.

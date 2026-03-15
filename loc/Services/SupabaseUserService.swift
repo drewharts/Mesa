@@ -13,7 +13,7 @@ class SupabaseUserService: ObservableObject {
     static let shared = SupabaseUserService()
     private let supabase = SupabaseManager.shared
     
-    private init() {}
+    private nonisolated init() {}
     
     // MARK: - User Profile
 
@@ -35,7 +35,8 @@ class SupabaseUserService: ObservableObject {
                     lastName: response.last_name,
                     email: response.email,
                     profilePhotoURL: response.profile_photo_url.flatMap { URL(string: $0) },
-                    fullName: response.full_name
+                    fullName: response.full_name,
+                    accountType: AccountType(rawValue: response.account_type ?? "personal")
                 )
 
                 // Ensure completion is called on main thread
@@ -68,7 +69,8 @@ class SupabaseUserService: ObservableObject {
             lastName: response.last_name,
             email: response.email,
             profilePhotoURL: response.profile_photo_url.flatMap { URL(string: $0) },
-            fullName: response.full_name
+            fullName: response.full_name,
+            accountType: AccountType(rawValue: response.account_type ?? "personal")
         )
     }
 
@@ -90,7 +92,8 @@ class SupabaseUserService: ObservableObject {
                     lastName: response.last_name,
                     email: response.email,
                     profilePhotoURL: response.profile_photo_url.flatMap { URL(string: $0) },
-                    fullName: response.full_name
+                    fullName: response.full_name,
+                    accountType: AccountType(rawValue: response.account_type ?? "personal")
                 )
                 
                 // Ensure completion is called on main thread
@@ -156,7 +159,8 @@ class SupabaseUserService: ObservableObject {
                         lastName: record.last_name,
                         email: record.email,
                         profilePhotoURL: record.profile_photo_url.flatMap { URL(string: $0) },
-                        fullName: record.full_name
+                        fullName: record.full_name,
+                        accountType: AccountType(rawValue: record.account_type ?? "personal")
                     )
                 }
                 
@@ -310,7 +314,8 @@ class SupabaseUserService: ObservableObject {
                 lastName: record.last_name,
                 email: record.email,
                 profilePhotoURL: record.profile_photo_url.flatMap { URL(string: $0) },
-                fullName: record.full_name
+                fullName: record.full_name,
+                accountType: AccountType(rawValue: record.account_type ?? "personal")
             )
         }
     }
@@ -853,7 +858,8 @@ class SupabaseUserService: ObservableObject {
             fullName: fullName,
             fcmToken: record.fcm_token,
             instagramUsername: record.instagram_username,
-            tiktokUsername: record.tiktok_username
+            tiktokUsername: record.tiktok_username,
+            accountType: AccountType(rawValue: record.account_type ?? "personal")
         )
     }
 
@@ -871,7 +877,8 @@ class SupabaseUserService: ObservableObject {
             firebaseUid: nil,
             supabaseUid: record.supabase_uid,
             instagramUsername: record.instagram_username,
-            tiktokUsername: record.tiktok_username
+            tiktokUsername: record.tiktok_username,
+            accountType: AccountType(rawValue: record.account_type ?? "personal")
         )
     }
 
@@ -1077,6 +1084,7 @@ struct UserRecord: Codable {
     let email: String
     let profile_photo_url: String?
     let full_name: String
+    let account_type: String?
 }
 
 struct FollowingRecord: Codable {
@@ -1096,6 +1104,7 @@ struct ProfileDataRecord: Codable {
     let fcm_token: String?
     let instagram_username: String?
     let tiktok_username: String?
+    let account_type: String?
 }
 
 /// Response type for following/followers RPC calls - handles nullable database fields
@@ -1113,6 +1122,7 @@ private struct FollowingProfileRecord: Codable {
     let supabase_uid: String?
     let instagram_username: String?
     let tiktok_username: String?
+    let account_type: String?
 }
 
 /// Lightweight favorite place data for display
