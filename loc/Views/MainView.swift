@@ -45,6 +45,7 @@ struct MainView: View {
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var annotationDisplayMode: AnnotationDisplayMode = .everyone
     @State private var isSatelliteMap: Bool = false
+    @State private var showTripsSheet = false
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profileViewModel.externalContentViewModel }
@@ -185,6 +186,10 @@ struct MainView: View {
                         shouldNavigateToFeed = false
                     }
                 )
+            }
+            .fullScreenCover(isPresented: $showTripsSheet) {
+                TripsListView()
+                    .environmentObject(userSession)
             }
             .onChange(of: shouldNavigateToFeed) { _, newValue in
                 guard !newValue, let userId = pendingFeedProfileUserId else { return }
@@ -619,12 +624,16 @@ struct MainView: View {
     private var bottomNavigationBar: some View {
         Group {
             if shouldShowBottomNavigationBar {
-                MapBottomNavigationBar(
-                    showSearchPage: $showSearchPage,
-                    shouldNavigateToProfile: $shouldNavigateToProfile,
-                    shouldNavigateToFeed: $shouldNavigateToFeed
-                )
-                .environmentObject(profileViewModel)
+                VStack {
+                    Spacer()
+                    BottomNavigationBar(
+                        showSearchPage: $showSearchPage,
+                        shouldNavigateToProfile: $shouldNavigateToProfile,
+                        shouldNavigateToFeed: $shouldNavigateToFeed,
+                        showTripsSheet: $showTripsSheet
+                    )
+                    .environmentObject(profileViewModel)
+                }
             }
         }
     }
