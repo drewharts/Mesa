@@ -27,6 +27,9 @@ struct TripDayDetailView: View {
             },
             onDelete: { entryId in
                 Task { await viewModel.removePlaceFromDay(entryId: entryId) }
+            },
+            onPlaceTap: { placeId in
+                viewModel.selectedPlaceIdForDetail = placeId
             }
         )
         .navigationTitle(viewModel.dayLabel(for: dayIndex))

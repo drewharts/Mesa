@@ -10,9 +10,9 @@ import SwiftUI
 /// Displays a trip's full details with day-by-day itinerary.
 struct TripDetailView: View {
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @StateObject private var viewModel: TripDetailViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var showMapView = false
 
     init(tripId: String) {
         _viewModel = StateObject(wrappedValue: TripDetailViewModel(tripId: tripId))
@@ -43,22 +43,17 @@ struct TripDetailView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showMapView) {
-            if let trip = viewModel.trip {
-                TripMapView(
-                    trip: trip,
-                    dayPlaces: viewModel.dayPlaces,
-                    dayIndices: viewModel.dayIndices
-                )
-            }
-        }
         .navigationDestination(item: $viewModel.selectedDayForDetail) { dayIndex in
             TripDayDetailView(viewModel: viewModel, dayIndex: dayIndex)
         }
+        .navigationDestination(item: $viewModel.selectedPlaceIdForDetail) { placeId in
+            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+        }
+        .onChange(of: mapDisplayCoordinatorVM.tappedTripPlaceId) { _, placeId in
+            viewModel.handleMapPlaceTap(placeId)
+        }
         .onChange(of: viewModel.selectedDayForDetail) { old, new in
-            if old != nil && new == nil {
-                Task { await viewModel.loadTrip() }
-            }
+            Task { await viewModel.handleDayFilterChange(old: old, new: new) }
         }
         .sheet(isPresented: $viewModel.showCollaboratorsSheet) {
             if let userId = userSession.currentUserId {
@@ -69,15 +64,22 @@ struct TripDetailView: View {
             }
         }
         .task {
-            await viewModel.loadTrip()
+            viewModel.setMapCoordinator(mapDisplayCoordinatorVM)
+            await viewModel.loadTripAndShowAnnotations()
+        }
+        .onDisappear {
+            guard viewModel.selectedDayForDetail == nil else { return }
+            viewModel.clearMapAnnotations()
         }
     }
 
     // MARK: - Map Button
 
-    /// Opens the full-screen trip map view.
+    /// Re-fits the map camera to the currently visible trip annotations.
     private var mapButton: some View {
-        Button { showMapView = true } label: {
+        Button {
+            viewModel.fitMapToCurrentAnnotations()
+        } label: {
             Image(systemName: "map")
         }
     }

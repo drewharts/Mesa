@@ -22,6 +22,7 @@ class TripDetailViewModel: ObservableObject {
 
     // Navigation state
     @Published var selectedDayForDetail: Int?
+    @Published var selectedPlaceIdForDetail: String?
     @Published var showCollaboratorsSheet = false
 
     // MARK: - Dependencies
@@ -32,6 +33,17 @@ class TripDetailViewModel: ObservableObject {
     // MARK: - Properties
 
     let tripId: String
+    private var hasPerformedInitialLoad = false
+
+    // MARK: - Map Coordinator
+
+    /// Reference to the map display coordinator for annotation management.
+    private weak var mapCoordinator: MapDisplayCoordinatorViewModel?
+
+    /// Sets the map display coordinator reference for annotation management.
+    func setMapCoordinator(_ coordinator: MapDisplayCoordinatorViewModel) {
+        self.mapCoordinator = coordinator
+    }
 
     // MARK: - Computed
 
@@ -51,6 +63,15 @@ class TripDetailViewModel: ObservableObject {
         dayPlaces.contains { dayIndex, places in
             dayIndex >= 0 && places.contains { $0.placeLatitude != nil && $0.placeLongitude != nil }
         }
+    }
+
+    /// Builds trip map annotations, optionally filtered to a specific day.
+    func buildTripAnnotations(forDay dayFilter: Int? = nil) -> [TripMapAnnotation] {
+        TripMapViewModel.buildAnnotations(
+            dayPlaces: dayPlaces,
+            dayIndices: dayIndices,
+            selectedDayFilter: dayFilter
+        )
     }
 
     /// Places saved as unassigned Ideas (dayIndex = -1).
@@ -275,6 +296,49 @@ class TripDetailViewModel: ObservableObject {
     /// Deletes the entire trip.
     func deleteTrip() async throws {
         try await tripService.deleteTrip(tripId: tripId)
+    }
+
+    // MARK: - Map Annotation Coordination
+
+    /// Loads trip data and shows annotations on the map (runs only once per view lifecycle).
+    func loadTripAndShowAnnotations() async {
+        guard !hasPerformedInitialLoad else { return }
+        hasPerformedInitialLoad = true
+        await loadTrip()
+        if hasPlacesWithCoordinates {
+            let annotations = buildTripAnnotations()
+            mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
+        }
+    }
+
+    /// Handles day filter changes: filters annotations or restores all after reload.
+    func handleDayFilterChange(old: Int?, new: Int?) async {
+        if old != nil && new == nil {
+            await loadTrip()
+            let annotations = buildTripAnnotations()
+            mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
+        } else if let dayIndex = new {
+            let annotations = buildTripAnnotations(forDay: dayIndex)
+            mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
+        }
+    }
+
+    /// Re-fits the map camera to the currently visible annotations.
+    func fitMapToCurrentAnnotations() {
+        let annotations = buildTripAnnotations(forDay: selectedDayForDetail)
+        mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
+    }
+
+    /// Clears trip annotations from the map.
+    func clearMapAnnotations() {
+        mapCoordinator?.clearTripAnnotations()
+    }
+
+    /// Handles a trip place tap from the map by setting navigation state.
+    func handleMapPlaceTap(_ placeId: String?) {
+        guard let placeId else { return }
+        mapCoordinator?.tappedTripPlaceId = nil
+        selectedPlaceIdForDetail = placeId
     }
 
     // MARK: - Helpers

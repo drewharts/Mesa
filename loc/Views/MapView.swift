@@ -15,6 +15,7 @@ struct MapView: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var mapViewModel: MapViewModel
     @EnvironmentObject var appCoordinator: AppCoordinator
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
@@ -76,48 +77,68 @@ struct MapView: View {
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
-            if mapViewModel.showingCityAnnotations {
-                // City-level annotations (zoomed out)
-                ForEach(mapViewModel.cityAnnotations) { city in
-                    Annotation(
-                        "",
-                        coordinate: city.coordinate,
-                        anchor: .center
-                    ) {
-                        CityAnnotationMarkerView(city: city, isSelected: false)
-                            .onTapGesture {
-                                mapViewModel.handleCityAnnotationTap(city)
-                            }
-                    }
-                }
-            } else {
-                // Community places as small emoji markers (shown behind network places)
-                // Hidden in "My Places" mode since community markers are not user-specific
-                // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
-                if !mapViewModel.showMyPlacesOnly {
-                    ForEach(mapViewModel.communityMarkers.filter { marker in
-                        selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
-                    }) { marker in
+            // Suppress regular annotations when trip overlay is active
+            if !mapDisplayCoordinatorVM.hasTripOverlay {
+                if mapViewModel.showingCityAnnotations {
+                    // City-level annotations (zoomed out)
+                    ForEach(mapViewModel.cityAnnotations) { city in
                         Annotation(
                             "",
-                            coordinate: marker.coordinate,
+                            coordinate: city.coordinate,
                             anchor: .center
                         ) {
-                            communityMarkerView(for: marker)
+                            CityAnnotationMarkerView(city: city, isSelected: false)
+                                .onTapGesture {
+                                    mapViewModel.handleCityAnnotationTap(city)
+                                }
+                        }
+                    }
+                } else {
+                    // Community places as small emoji markers (shown behind network places)
+                    // Hidden in "My Places" mode since community markers are not user-specific
+                    // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
+                    if !mapViewModel.showMyPlacesOnly {
+                        ForEach(mapViewModel.communityMarkers.filter { marker in
+                            selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
+                        }) { marker in
+                            Annotation(
+                                "",
+                                coordinate: marker.coordinate,
+                                anchor: .center
+                            ) {
+                                communityMarkerView(for: marker)
+                            }
+                        }
+                    }
+
+                    // Network places (user + followed users) as main annotations
+                    // Use sortedAnnotations so selected annotation renders last (on top)
+                    ForEach(sortedAnnotations) { annotation in
+                        Annotation(
+                            annotation.name,
+                            coordinate: annotation.coordinate,
+                            anchor: .bottom
+                        ) {
+                            annotationMarkerView(for: annotation)
                         }
                     }
                 }
+            }
 
-                // Network places (user + followed users) as main annotations
-                // Use sortedAnnotations so selected annotation renders last (on top)
-                ForEach(sortedAnnotations) { annotation in
-                    Annotation(
-                        annotation.name,
-                        coordinate: annotation.coordinate,
-                        anchor: .bottom
-                    ) {
-                        annotationMarkerView(for: annotation)
-                    }
+            // Trip annotations (shown when viewing a specific trip)
+            ForEach(mapDisplayCoordinatorVM.activeTripAnnotations) { annotation in
+                Annotation(
+                    "",
+                    coordinate: annotation.coordinate,
+                    anchor: .center
+                ) {
+                    TripItineraryPinView(
+                        annotation: annotation,
+                        isSelected: false,
+                        onTap: {
+                            mapDisplayCoordinatorVM.tappedTripPlaceId = annotation.placeId
+                        }
+                    )
                 }
             }
 
@@ -255,6 +276,9 @@ struct MapView: View {
 
                     // Update global map region for viewport-based searches
                     appCoordinator.currentMapRegion = context.region
+
+                    // Skip viewport fetches when trip annotations are active
+                    guard !mapDisplayCoordinatorVM.hasTripOverlay else { return }
 
                     // Only load if user profile is available (View coordinates data flow)
                     if let userId = profile.user?.id {

@@ -45,7 +45,6 @@ struct MainView: View {
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var annotationDisplayMode: AnnotationDisplayMode = .everyone
     @State private var isSatelliteMap: Bool = false
-    @State private var showTripsSheet = false
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profileViewModel.externalContentViewModel }
@@ -187,15 +186,6 @@ struct MainView: View {
                     }
                 )
             }
-            .fullScreenCover(isPresented: $showTripsSheet) {
-                TripsListView()
-                    .environmentObject(userSession)
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(profileViewModel)
-                    .environmentObject(userProfileNavigationViewModel)
-                    .environmentObject(detailPlaceViewModel)
-                    .environmentObject(locationManager)
-            }
             .onChange(of: shouldNavigateToFeed) { _, newValue in
                 guard !newValue, let userId = pendingFeedProfileUserId else { return }
                 pendingFeedProfileUserId = nil
@@ -305,6 +295,10 @@ struct MainView: View {
             // City Overview
             case .cityOverview(let cityName, let coordinate, let annotation):
                 cityOverviewSheet(cityName: cityName, coordinate: coordinate, annotation: annotation)
+
+            // Trips
+            case .tripsList:
+                tripsListSheet
 
             // Onboarding
             case .suggestedProfiles:
@@ -521,6 +515,21 @@ struct MainView: View {
         .presentationDragIndicator(.visible)
     }
 
+    /// Trips list sheet content.
+    private var tripsListSheet: some View {
+        TripsListView()
+            .environmentObject(userSession)
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(profileViewModel)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(locationManager)
+            .environmentObject(mapDisplayCoordinatorViewModel)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .large))
+    }
+
     /// Loading view for lists.
     private var loadingListView: some View {
         VStack {
@@ -634,8 +643,7 @@ struct MainView: View {
                     BottomNavigationBar(
                         showSearchPage: $showSearchPage,
                         shouldNavigateToProfile: $shouldNavigateToProfile,
-                        shouldNavigateToFeed: $shouldNavigateToFeed,
-                        showTripsSheet: $showTripsSheet
+                        shouldNavigateToFeed: $shouldNavigateToFeed
                     )
                     .environmentObject(profileViewModel)
                 }

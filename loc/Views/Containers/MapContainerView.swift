@@ -148,6 +148,7 @@ struct MapContainerView: View {
             .environmentObject(selectedPlaceViewModel)
             .environmentObject(detailPlaceViewModel)
             .environmentObject(profileViewModel)
+            .environmentObject(mapDisplayCoordinatorViewModel)
             .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
                 handleListSelectionChange(newValue)
             }
@@ -164,6 +165,11 @@ struct MapContainerView: View {
                 handleMyPlacesOnMap(newValue)
             }
             .onChange(of: presentationService.activeSheet) { oldSheet, newSheet in
+                // Clear trip annotations when the trips sheet is dismissed
+                if newSheet == nil, oldSheet == .tripsList {
+                    mapDisplayCoordinatorViewModel.clearTripAnnotations()
+                }
+
                 // Clear filters when a filter-related sheet is dismissed
                 guard newSheet == nil,
                       let oldSheet = oldSheet,
@@ -176,6 +182,34 @@ struct MapContainerView: View {
                     Task {
                         await mapViewModel.onMapCameraSettled(region, userId: userId)
                     }
+                }
+            }
+            .onChange(of: mapDisplayCoordinatorViewModel.activeTripAnnotations) { _, annotations in
+                guard !annotations.isEmpty else { return }
+                let coords = annotations.map(\.coordinate)
+
+                if coords.count == 1 {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        mapPosition = .region(MKCoordinateRegion(
+                            center: coords[0],
+                            span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                        ))
+                    }
+                    return
+                }
+
+                let lats = coords.map(\.latitude)
+                let lons = coords.map(\.longitude)
+                let center = CLLocationCoordinate2D(
+                    latitude: (lats.min()! + lats.max()!) / 2,
+                    longitude: (lons.min()! + lons.max()!) / 2
+                )
+                let span = MKCoordinateSpan(
+                    latitudeDelta: (lats.max()! - lats.min()!) * 1.4 + 0.005,
+                    longitudeDelta: (lons.max()! - lons.min()!) * 1.4 + 0.005
+                )
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    mapPosition = .region(MKCoordinateRegion(center: center, span: span))
                 }
             }
         }

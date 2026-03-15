@@ -13,6 +13,7 @@ struct TripTimelinePlaceCard: View {
     let number: Int
     let isFirst: Bool
     let isLast: Bool
+    let onTap: () -> Void
 
     private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
     private let connectorWidth: CGFloat = 2
@@ -25,6 +26,8 @@ struct TripTimelinePlaceCard: View {
             timelineColumn
             placeCard
         }
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
     }
 
     // MARK: - Timeline Column

@@ -44,9 +44,9 @@ struct TripMapView: View {
         Map(position: $viewModel.mapPosition) {
             ForEach(viewModel.annotations) { annotation in
                 Annotation(
-                    annotation.placeName,
+                    "",
                     coordinate: annotation.coordinate,
-                    anchor: .bottom
+                    anchor: .center
                 ) {
                     TripItineraryPinView(
                         annotation: annotation,

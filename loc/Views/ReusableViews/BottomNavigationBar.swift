@@ -19,7 +19,6 @@ struct BottomNavigationBar: View {
     @Binding var showSearchPage: Bool
     @Binding var shouldNavigateToProfile: Bool
     @Binding var shouldNavigateToFeed: Bool
-    @Binding var showTripsSheet: Bool
 
     // MARK: - Body
 
@@ -106,7 +105,7 @@ struct BottomNavigationBar: View {
 
     private var tripsButton: some View {
         Button {
-            showTripsSheet = true
+            PresentationService.shared.present(.tripsList)
         } label: {
             Image(systemName: "airplane")
                 .font(.system(size: 16, weight: .medium))

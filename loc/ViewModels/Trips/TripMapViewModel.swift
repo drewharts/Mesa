@@ -71,6 +71,19 @@ class TripMapViewModel: ObservableObject {
 
     /// Builds display-ready annotations filtered by the current day filter.
     var annotations: [TripMapAnnotation] {
+        Self.buildAnnotations(
+            dayPlaces: dayPlaces,
+            dayIndices: dayIndices,
+            selectedDayFilter: selectedDayFilter
+        )
+    }
+
+    /// Builds display-ready annotations from day places data.
+    nonisolated static func buildAnnotations(
+        dayPlaces: [Int: [TripDayPlace]],
+        dayIndices: [Int],
+        selectedDayFilter: Int? = nil
+    ) -> [TripMapAnnotation] {
         var result: [TripMapAnnotation] = []
 
         let indicesToShow: [Int]
@@ -87,7 +100,7 @@ class TripMapViewModel: ObservableObject {
 
             for (stopIndex, place) in placesWithCoords.enumerated() {
                 guard let lat = place.placeLatitude, let lon = place.placeLongitude else { continue }
-                let color = Self.colorForStop(dayIndex: dayIndex, stopIndex: stopIndex, totalStops: totalStops)
+                let color = colorForStop(dayIndex: dayIndex, stopIndex: stopIndex, totalStops: totalStops)
                 let annotation = TripMapAnnotation(
                     id: place.id,
                     coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),

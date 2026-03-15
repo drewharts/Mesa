@@ -13,6 +13,7 @@ struct TripDayItineraryView: View {
     let canEdit: Bool
     let onMove: (IndexSet, Int) -> Void
     let onDelete: (String) -> Void
+    let onPlaceTap: (String) -> Void
 
     var body: some View {
         if places.isEmpty {
@@ -51,7 +52,8 @@ struct TripDayItineraryView: View {
                     place: place,
                     number: index + 1,
                     isFirst: index == 0,
-                    isLast: index == places.count - 1
+                    isLast: index == places.count - 1,
+                    onTap: { onPlaceTap(place.placeId) }
                 )
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)

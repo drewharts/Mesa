@@ -11,6 +11,7 @@ import SwiftUI
 struct TripsListView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @StateObject private var viewModel = TripsListViewModel()
     @Environment(\.dismiss) private var dismiss
 
@@ -47,6 +48,7 @@ struct TripsListView: View {
                 TripDetailView(tripId: tripId)
                     .environmentObject(userSession)
                     .environmentObject(selectedPlaceVM)
+                    .environmentObject(mapDisplayCoordinatorVM)
             }
             .fullScreenCover(isPresented: $viewModel.showCreateTrip) {
                 CreateTripView { tripId in

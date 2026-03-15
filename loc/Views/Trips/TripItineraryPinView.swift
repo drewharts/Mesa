@@ -2,12 +2,12 @@
 //  TripItineraryPinView.swift
 //  loc
 //
-//  Map annotation pin with numbered circle colored by day/stop
+//  Map annotation pin styled like regular annotations with day-colored border and stop badge
 //
 
 import SwiftUI
 
-/// A numbered circle pin for trip map annotations with day-colored gradient.
+/// A place-type emoji pin for trip map annotations with a day-colored border and stop number badge.
 struct TripItineraryPinView: View {
     let annotation: TripMapAnnotation
     let isSelected: Bool
@@ -15,57 +15,45 @@ struct TripItineraryPinView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 0) {
-                numberCircle
-                trianglePointer
-                placeNameLabel
+            ZStack(alignment: .topTrailing) {
+                emojiCircle
+                stopBadge
             }
         }
         .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.2 : 1.0)
-        .shadow(color: isSelected ? annotation.color.opacity(0.5) : .clear, radius: 6)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .scaleEffect(isSelected ? 1.15 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
     }
 
-    /// Numbered circle filled with the stop's gradient-adjusted color.
-    private var numberCircle: some View {
+    /// White circle with place-type emoji and a colored border indicating the day.
+    private var emojiCircle: some View {
+        ZStack {
+            Circle()
+                .fill(.white)
+                .frame(width: isSelected ? 46 : 38, height: isSelected ? 46 : 38)
+                .overlay(
+                    Circle()
+                        .strokeBorder(annotation.color, lineWidth: 3)
+                )
+                .shadow(
+                    color: Color.black.opacity(0.25),
+                    radius: isSelected ? 6 : 4,
+                    x: 0,
+                    y: 2
+                )
+
+            Text(PlaceTypeEmoji.emoji(for: annotation.placeType ?? ""))
+                .font(.system(size: isSelected ? 24 : 19))
+        }
+    }
+
+    /// Small numbered badge in the corner showing the stop order.
+    private var stopBadge: some View {
         Text("\(annotation.stopNumber)")
-            .font(.system(size: 14, weight: .bold))
+            .font(.system(size: 10, weight: .bold))
             .foregroundStyle(.white)
-            .frame(width: 30, height: 30)
+            .frame(width: 18, height: 18)
             .background(Circle().fill(annotation.color))
-    }
-
-    /// Small triangle pointer below the circle.
-    private var trianglePointer: some View {
-        Triangle()
-            .fill(annotation.color)
-            .frame(width: 10, height: 6)
-    }
-
-    /// Place name label on a material background.
-    private var placeNameLabel: some View {
-        Text(annotation.placeName)
-            .font(.caption2)
-            .fontWeight(.medium)
-            .lineLimit(1)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-}
-
-// MARK: - Triangle Shape
-
-/// A downward-pointing triangle for the pin pointer.
-private struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.closeSubpath()
-        return path
+            .offset(x: 4, y: -4)
     }
 }
