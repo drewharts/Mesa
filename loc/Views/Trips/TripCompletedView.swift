@@ -12,6 +12,8 @@ struct TripCompletedView: View {
     let tripId: String
     let onDone: () -> Void
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -36,12 +38,11 @@ struct TripCompletedView: View {
                 onDone()
             } label: {
                 Text("Start Planning")
-                    .fontWeight(.semibold)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(height: 56)
+                    .background(Capsule().fill(mesaCharcoal))
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 24)

@@ -12,6 +12,8 @@ struct TripPlaceRowView: View {
     let place: TripDayPlace
     let number: Int
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         HStack(spacing: 12) {
             // Number badge
@@ -20,7 +22,7 @@ struct TripPlaceRowView: View {
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
-                .background(Color.accentColor)
+                .background(mesaCharcoal)
                 .clipShape(Circle())
 
             // Place photo

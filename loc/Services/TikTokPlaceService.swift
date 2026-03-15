@@ -8,7 +8,7 @@
 import Foundation
 
 class ExternalPlaceService {
-    static let shared = ExternalPlaceService()
+    nonisolated(unsafe) static let shared = ExternalPlaceService()
     private let supabase = SupabaseManager.shared
 
     private init() {}

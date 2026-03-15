@@ -39,7 +39,6 @@ struct ProfilePhotoOnboardingView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear {
-            viewModel.loadExistingGooglePhoto()
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3)) {
                 showSheet = true
             }
@@ -118,7 +117,7 @@ struct ProfilePhotoOnboardingView: View {
 
     @ViewBuilder
     private var photoPreview: some View {
-        if let image = viewModel.displayImage {
+        if let image = viewModel.selectedImage {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -151,7 +150,7 @@ struct ProfilePhotoOnboardingView: View {
         Button {
             viewModel.showImagePicker = true
         } label: {
-            Text(viewModel.displayImage != nil ? "Change Photo" : "Choose Photo")
+            Text(viewModel.selectedImage != nil ? "Change Photo" : "Choose Photo")
                 .font(.system(size: 19, weight: .medium))
                 .foregroundColor(mesaCharcoal)
                 .frame(maxWidth: .infinity)

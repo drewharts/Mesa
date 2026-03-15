@@ -12,6 +12,8 @@ struct TripDayDetailView: View {
     @ObservedObject var viewModel: TripDetailViewModel
     let dayIndex: Int
 
+    @State private var showAddPlaceSheet = false
+
     private var places: [TripDayPlace] {
         viewModel.dayPlaces[dayIndex] ?? []
     }
@@ -29,5 +31,29 @@ struct TripDayDetailView: View {
         )
         .navigationTitle(viewModel.dayLabel(for: dayIndex))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if viewModel.canEdit {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAddPlaceSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showAddPlaceSheet) {
+            if let userId = ServiceContainer.shared.authService.currentUserId {
+                AddPlaceToTripSheet(
+                    tripId: viewModel.tripId,
+                    targetDayIndex: dayIndex,
+                    existingPlaceIds: viewModel.allPlaceIdsInTrip,
+                    userId: userId,
+                    onDismiss: {
+                        Task { await viewModel.loadTrip() }
+                    }
+                )
+            }
+        }
     }
 }

@@ -13,7 +13,7 @@ class SupabasePostService: ObservableObject {
     static let shared = SupabasePostService()
     private let supabase = SupabaseManager.shared
     
-    private init() {}
+    private nonisolated init() {}
     
     // MARK: - Save Post
     

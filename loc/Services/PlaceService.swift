@@ -4,7 +4,7 @@ import CoreLocation
 /// Legacy PlaceService - now delegates all calls to SupabasePlaceService
 /// This wrapper exists for backward compatibility with existing ViewModels
 class PlaceService: ObservableObject {
-    static let shared = PlaceService()
+    nonisolated(unsafe) static let shared = PlaceService()
     private let supabase = SupabasePlaceService.shared // All data comes from Supabase
     
     private init() {

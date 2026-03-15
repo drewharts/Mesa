@@ -13,12 +13,14 @@ struct TripMapPlacePin: View {
     let isAlreadyAdded: Bool
     let onTap: () -> Void
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 2) {
                 Image(systemName: isAlreadyAdded ? "checkmark.circle.fill" : "mappin.circle.fill")
                     .font(.title2)
-                    .foregroundColor(isAlreadyAdded ? .green : .accentColor)
+                    .foregroundColor(isAlreadyAdded ? .green : mesaCharcoal)
                     .background(
                         Circle()
                             .fill(.white)

@@ -83,7 +83,7 @@ struct ExternalPlaceDirectResponse: Codable {
 /// Legacy UserService - now delegates all calls to SupabaseUserService
 /// This wrapper exists for backward compatibility with existing ViewModels
 class UserService: ObservableObject {
-    static let shared = UserService()
+    nonisolated(unsafe) static let shared = UserService()
     private let supabase = SupabaseUserService.shared // All data comes from Supabase
     
     private init() {

@@ -27,9 +27,10 @@ struct TripCalendarGridView: View {
 
     // MARK: - Weekday Headers
 
+    /// Row of abbreviated weekday labels (S, M, T, ...).
     private var weekdayHeaderRow: some View {
         HStack(spacing: 4) {
-            ForEach(CalendarGridData.weekdayHeaders, id: \.self) { header in
+            ForEach(Array(CalendarGridData.weekdayHeaders.enumerated()), id: \.offset) { _, header in
                 Text(header)
                     .font(.caption2)
                     .fontWeight(.semibold)
@@ -41,12 +42,13 @@ struct TripCalendarGridView: View {
 
     // MARK: - Calendar Grid
 
+    /// Grid of day cells with colored dots and drop targets.
     private var calendarGrid: some View {
         LazyVGrid(columns: columns, spacing: 4) {
             ForEach(calendarData.cells) { cell in
                 TripCalendarDayCellView(
                     cell: cell,
-                    placeCount: cell.dayIndex.flatMap { dayPlaces[$0]?.count } ?? 0,
+                    dotColors: buildDotColors(dayIndex: cell.dayIndex, dayPlaces: dayPlaces),
                     onTap: {
                         if let dayIndex = cell.dayIndex {
                             onDayTap(dayIndex)
@@ -62,5 +64,23 @@ struct TripCalendarGridView: View {
                 )
             }
         }
+    }
+}
+
+// MARK: - Helpers
+
+/// Builds gradient-shaded dot colors for a calendar cell's assigned places.
+private func buildDotColors(dayIndex: Int?, dayPlaces: [Int: [TripDayPlace]]) -> [Color] {
+    guard let dayIndex = dayIndex else { return [] }
+    let count = dayPlaces[dayIndex]?.count ?? 0
+    guard count > 0 else { return [] }
+
+    let dotCount = min(count, 3)
+    return (0..<dotCount).map { stopIndex in
+        TripMapViewModel.colorForStop(
+            dayIndex: dayIndex,
+            stopIndex: stopIndex,
+            totalStops: dotCount
+        )
     }
 }

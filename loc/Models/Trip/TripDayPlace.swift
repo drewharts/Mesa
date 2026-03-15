@@ -9,6 +9,9 @@ import Foundation
 
 /// Represents a place on a specific day of a trip, with joined place and user info.
 struct TripDayPlace: Codable, Identifiable, Equatable {
+    /// Sentinel day index for unassigned "Ideas" places.
+    static let ideasDayIndex = -1
+
     let id: String
     let tripId: String
     let placeId: String
@@ -28,6 +31,24 @@ struct TripDayPlace: Codable, Identifiable, Equatable {
     let addedByName: String?
     let addedByPhotoUrl: String?
 
+    // Joined external place fields
+    let contentUrl: String?
+
+    // Joined place category
+    let placeType: String?
+
+    /// Converts to a LightweightPlace for use with PopupPlaceCard.
+    var asLightweightPlace: LightweightPlace {
+        LightweightPlace(
+            place_id: placeId,
+            name: placeName ?? "Unknown Place",
+            latitude: placeLatitude,
+            longitude: placeLongitude,
+            latest_review_photo: placePhoto,
+            content_url: contentUrl
+        )
+    }
+
     enum CodingKeys: String, CodingKey {
         case id = "day_place_id"
         case tripId = "trip_id"
@@ -43,5 +64,7 @@ struct TripDayPlace: Codable, Identifiable, Equatable {
         case placePhoto = "place_photo"
         case addedByName = "added_by_name"
         case addedByPhotoUrl = "added_by_photo_url"
+        case contentUrl = "tiktok_url"
+        case placeType = "place_type"
     }
 }

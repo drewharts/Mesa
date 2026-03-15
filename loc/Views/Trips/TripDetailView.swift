@@ -12,6 +12,7 @@ struct TripDetailView: View {
     @EnvironmentObject var userSession: UserSession
     @StateObject private var viewModel: TripDetailViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showMapView = false
 
     init(tripId: String) {
         _viewModel = StateObject(wrappedValue: TripDetailViewModel(tripId: tripId))
@@ -31,10 +32,24 @@ struct TripDetailView: View {
         .navigationTitle(viewModel.trip?.name ?? "Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if viewModel.canEdit {
-                ToolbarItem(placement: .topBarTrailing) {
-                    tripMenu
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 12) {
+                    if viewModel.hasPlacesWithCoordinates {
+                        mapButton
+                    }
+                    if viewModel.canEdit {
+                        tripMenu
+                    }
                 }
+            }
+        }
+        .fullScreenCover(isPresented: $showMapView) {
+            if let trip = viewModel.trip {
+                TripMapView(
+                    trip: trip,
+                    dayPlaces: viewModel.dayPlaces,
+                    dayIndices: viewModel.dayIndices
+                )
             }
         }
         .navigationDestination(item: $viewModel.selectedDayForDetail) { dayIndex in
@@ -55,6 +70,15 @@ struct TripDetailView: View {
         }
         .task {
             await viewModel.loadTrip()
+        }
+    }
+
+    // MARK: - Map Button
+
+    /// Opens the full-screen trip map view.
+    private var mapButton: some View {
+        Button { showMapView = true } label: {
+            Image(systemName: "map")
         }
     }
 

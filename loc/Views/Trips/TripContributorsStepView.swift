@@ -12,6 +12,8 @@ struct TripContributorsStepView: View {
     @EnvironmentObject var userSession: UserSession
     @ObservedObject var viewModel: CreateTripViewModel
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         VStack(spacing: 16) {
             Text("Who's coming?")
@@ -62,13 +64,12 @@ struct TripContributorsStepView: View {
                     }
                 }
             } label: {
-                Text(viewModel.selectedContributors.isEmpty ? "Create Trip" : "Create Trip")
-                    .fontWeight(.semibold)
+                Text("Create Trip")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(height: 56)
+                    .background(Capsule().fill(mesaCharcoal))
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
@@ -145,7 +146,7 @@ struct TripContributorsStepView: View {
                             Spacer()
 
                             Image(systemName: "plus.circle")
-                                .foregroundColor(.accentColor)
+                                .foregroundColor(mesaCharcoal)
                         }
                         .padding(.horizontal)
                         .padding(.vertical, 8)

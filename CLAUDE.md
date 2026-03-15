@@ -195,6 +195,34 @@ Run tests from **Xcode** (Cmd+U or Product → Test). Do not run xcodebuild test
 - **FILE NAMING**: View files should be named exactly the same as the View struct they contain
 - **LOCATION**: Place views in appropriate subdirectories under `/Views/`
 
+### Reusable UI Components
+- **EXTRACT COMMON PATTERNS**: When the same visual pattern (buttons, cards, pills, rows, badges, empty states, etc.) appears in more than one place, extract it into a reusable View struct
+- **CONSISTENT STYLING**: Reusable components are the single source of truth for styling — colors, fonts, spacing, corner radii, shadows. Changing the component updates every usage
+- **LOCATION**: Place shared components in `loc/Views/SharedComponents/`. Feature-specific components stay in their feature folder but must still be their own file
+- **PARAMETERIZE BEHAVIOR, NOT STYLE**: Reusable components accept data and action closures as parameters. Style decisions (font, padding, colors) live inside the component, not at the call site
+- **PREFER REUSE OVER DUPLICATION**: Before creating a new view, check if an existing shared component can be used or extended. Duplicated UI code is a violation
+
+```swift
+// BAD: Duplicated pill styling in multiple views
+Text(label)
+    .font(.subheadline)
+    .fontWeight(isSelected ? .semibold : .regular)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(isSelected ? activeColor : Color(.systemGray6))
+    .foregroundStyle(isSelected ? .white : .primary)
+    .clipShape(Capsule())
+
+// GOOD: Shared component owns the styling
+struct FilterPill: View {
+    let label: String
+    let isSelected: Bool
+    let activeColor: Color
+    let onTap: () -> Void
+    // All styling lives here — one place to update
+}
+```
+
 ### Function Organization
 - **NO FUNCTIONS IN VIEWS**: Never define functions inside SwiftUI View structs
 - **MOVE TO VIEWMODEL**: All business logic and functions should be moved to ViewModels
@@ -561,6 +589,7 @@ let lists = try await fetchLists()  // Each list already has .places from a late
 15. **Loading Gates**: Using `if isLoading { spinner } else { allContent }` that blocks all sections behind a single spinner - each section must load and render independently
 16. **N+1 Query Cascades**: Fetching a list then looping to fetch child data per item (e.g., places per list, follow state per user) - fold into the parent RPC using lateral joins, json_agg, or computed columns
 17. **Client-Side Boolean Checks**: Making per-row API calls for boolean state (is_following, is_favorited) instead of computing them as columns in the parent RPC
+18. **Duplicated UI Patterns**: Copy-pasted styling (pills, cards, rows, badges, etc.) across multiple views instead of extracting a reusable shared component
 
 ### Migration Strategy
 When finding violations:
@@ -570,6 +599,7 @@ When finding violations:
 4. **Update Dependencies**: Ensure proper `@EnvironmentObject` setup
 5. **Refactor Long Functions**: Break functions longer than 30 lines into smaller, focused functions
 6. **Split God ViewModels**: Decompose large ViewModels into parent/child composition by feature domain
+7. **Extract Reusable Components**: When duplicated UI patterns are found, extract them into shared View structs in `loc/Views/SharedComponents/`
 
 ## Enforcement
 

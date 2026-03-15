@@ -190,6 +190,11 @@ struct MainView: View {
             .fullScreenCover(isPresented: $showTripsSheet) {
                 TripsListView()
                     .environmentObject(userSession)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(userProfileNavigationViewModel)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(locationManager)
             }
             .onChange(of: shouldNavigateToFeed) { _, newValue in
                 guard !newValue, let userId = pendingFeedProfileUserId else { return }

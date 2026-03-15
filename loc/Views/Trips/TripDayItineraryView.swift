@@ -47,10 +47,15 @@ struct TripDayItineraryView: View {
     private var placesList: some View {
         List {
             ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                TripPlaceRowView(
+                TripTimelinePlaceCard(
                     place: place,
-                    number: index + 1
+                    number: index + 1,
+                    isFirst: index == 0,
+                    isLast: index == places.count - 1
                 )
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
                 .draggable(place.id) {
                     TripPlaceDragPreview(placeName: place.placeName ?? "Place")
                 }
@@ -63,6 +68,7 @@ struct TripDayItineraryView: View {
             } : nil)
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .environment(\.editMode, canEdit ? .constant(.active) : .constant(.inactive))
     }
 }

@@ -28,12 +28,9 @@ class PushNotificationService {
     
     // MARK: - Initialization
     
-    private init(
-        authService: SupabaseAuthService = SupabaseAuthService.shared,
-        userService: UserService = UserService.shared
-    ) {
-        self.authService = authService
-        self.userService = userService
+    private nonisolated init() {
+        self.authService = SupabaseAuthService.shared
+        self.userService = UserService.shared
     }
     
     // MARK: - Device Token Management

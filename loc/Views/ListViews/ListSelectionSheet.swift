@@ -8,6 +8,12 @@
 import SwiftUI
 import CoreLocation
 
+/// Tab options for the save-to selection sheet.
+enum SaveDestination: String, CaseIterable {
+    case lists = "Lists"
+    case trips = "Trips"
+}
+
 // ListDescription - OLD (for PlaceList)
 struct ListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
@@ -351,6 +357,8 @@ struct ListSelectionSheet: View {
     let place: DetailPlace
     @ObservedObject var listsVM: ProfileListsViewModel
     @Binding var isPresented: Bool
+    var tripSelectionViewModel: PlaceTripSelectionViewModel?
+    @State private var selectedTab: SaveDestination = .lists
     @State private var showNewListSheet = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -360,12 +368,21 @@ struct ListSelectionSheet: View {
             // Header with integrated filter
             sheetHeader
 
+            // Tab picker (only show if trips VM is available)
+            if tripSelectionViewModel != nil {
+                tabPicker
+            }
+
             // Breathing room
-                Spacer()
+            Spacer()
                 .frame(height: 16)
 
-            // List content
-            ListsInSelectionSheet(viewModel: viewModel, place: place, listsVM: listsVM)
+            // Content based on selected tab
+            if selectedTab == .trips, let tripVM = tripSelectionViewModel {
+                TripsInSelectionSheet(viewModel: tripVM, place: place)
+            } else {
+                ListsInSelectionSheet(viewModel: viewModel, place: place, listsVM: listsVM)
+            }
         }
         .overlay(alignment: .bottom) {
             confirmationToast
@@ -373,6 +390,11 @@ struct ListSelectionSheet: View {
         .animation(.easeInOut(duration: 0.25), value: viewModel.confirmation)
         .task {
             await viewModel.loadInitialLists(for: place)
+        }
+        .task(id: selectedTab) {
+            if selectedTab == .trips {
+                await tripSelectionViewModel?.loadTrips(for: place)
+            }
         }
         .alert("Error Creating List", isPresented: $showError) {
             Button("OK", role: .cancel) { }
@@ -395,58 +417,77 @@ struct ListSelectionSheet: View {
             // Title and buttons row - ZStack for true centering
             ZStack {
                 // Centered title
-                Text("Save to list")
+                Text("Save to...")
                     .font(.headline)
-                
-                // Buttons on sides
+
+                // Buttons on sides (only show on Lists tab)
                 HStack {
-                    // Shared filter on left (only if there are shared lists)
-                    if viewModel.hasSharedLists {
-                        sharedFilterButton
+                    if selectedTab == .lists {
+                        // Shared filter on left (only if there are shared lists)
+                        if viewModel.hasSharedLists {
+                            sharedFilterButton
+                        }
                     }
 
-                Spacer()
+                    Spacer()
 
-                Button(action: {
-                    showNewListSheet = true
-                }) {
-                    Image(systemName: "plus")
-                            .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.gray)
-                            .frame(width: 32, height: 32)
-                            .background(Circle().fill(Color(.systemGray5)))
-                }
-                .sheet(isPresented: $showNewListSheet) {
-                    NewListSheetView(onSave: { listName in
-                        let result = await viewModel.addNewListToSelection(
-                            named: listName, 
-                            city: "", 
-                            emoji: "", 
-                            image: ""
-                        )
-                        
-                        switch result {
-                        case .success:
-                            break
-                        case .failure(let error):
-                            errorMessage = error.localizedDescription
-                            showError = true
+                    if selectedTab == .lists {
+                        Button(action: {
+                            showNewListSheet = true
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.gray)
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(Color(.systemGray5)))
                         }
-                    })
-                    .presentationDetents([.height(200)])
-                    .presentationDragIndicator(.visible)
-                }
+                        .sheet(isPresented: $showNewListSheet) {
+                            NewListSheetView(onSave: { listName in
+                                let result = await viewModel.addNewListToSelection(
+                                    named: listName,
+                                    city: "",
+                                    emoji: "",
+                                    image: ""
+                                )
+
+                                switch result {
+                                case .success:
+                                    break
+                                case .failure(let error):
+                                    errorMessage = error.localizedDescription
+                                    showError = true
+                                }
+                            })
+                            .presentationDetents([.height(200)])
+                            .presentationDragIndicator(.visible)
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 20)
-            
-            // Search bar
-            searchBar
+
+            // Search bar (only show on Lists tab)
+            if selectedTab == .lists {
+                searchBar
+            }
         }
     }
     
+    // MARK: - Tab Picker
+
+    private var tabPicker: some View {
+        Picker("Save to", selection: $selectedTab) {
+            ForEach(SaveDestination.allCases, id: \.self) { tab in
+                Text(tab.rawValue).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+    }
+
     // MARK: - Search Bar
-    
+
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")

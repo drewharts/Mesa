@@ -9,6 +9,7 @@ struct ExternalPlaceSelectionView: View {
     @State private var selectedPlaceForList: DetailPlace?
     @State private var showingListSelection = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
+    @State private var tripSelectionViewModel: PlaceTripSelectionViewModel?
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profile.externalContentViewModel }
@@ -125,21 +126,24 @@ struct ExternalPlaceSelectionView: View {
                     viewModel: viewModel,
                     place: place,
                     listsVM: profile.listsViewModel,
-                    isPresented: $showingListSelection
+                    isPresented: $showingListSelection,
+                    tripSelectionViewModel: tripSelectionViewModel
                 )
                 .onDisappear {
-                    // Clean up ViewModel when sheet is dismissed
+                    // Clean up ViewModels when sheet is dismissed
                     listSelectionViewModel = nil
+                    tripSelectionViewModel = nil
                 }
             }
         }
         .onChange(of: showingListSelection) { newValue in
-            // Create ViewModel when sheet is about to be shown
+            // Create ViewModels when sheet is about to be shown
             if newValue && listSelectionViewModel == nil {
                 listSelectionViewModel = PlaceListSelectionViewModel(
                     profile: profile,
                     userSession: userSession
                 )
+                tripSelectionViewModel = PlaceTripSelectionViewModel()
             }
         }
     }

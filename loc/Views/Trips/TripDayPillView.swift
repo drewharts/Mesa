@@ -15,6 +15,8 @@ struct TripDayPillView: View {
     let onSelect: () -> Void
     let onDropPlace: ((String, Int) -> Void)?
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     @State private var isTargeted = false
 
     var body: some View {
@@ -31,7 +33,7 @@ struct TripDayPillView: View {
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(Color.accentColor, lineWidth: isTargeted ? 2 : 0)
+                        .stroke(mesaCharcoal, lineWidth: isTargeted ? 2 : 0)
                 )
         }
         .buttonStyle(.plain)
@@ -49,8 +51,8 @@ struct TripDayPillView: View {
     /// Returns the background color based on selection and drag-target state.
     private var pillBackground: Color {
         if isTargeted {
-            return Color.accentColor.opacity(0.2)
+            return mesaCharcoal.opacity(0.15)
         }
-        return isSelected ? Color.accentColor : Color(.systemGray6)
+        return isSelected ? mesaCharcoal : Color(.systemGray6)
     }
 }

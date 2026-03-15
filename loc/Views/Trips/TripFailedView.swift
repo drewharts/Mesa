@@ -12,6 +12,8 @@ struct TripFailedView: View {
     let message: String
     let onRetry: () -> Void
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -36,12 +38,11 @@ struct TripFailedView: View {
                 onRetry()
             } label: {
                 Text("Try Again")
-                    .fontWeight(.semibold)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.orange)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(height: 56)
+                    .background(Capsule().fill(mesaCharcoal))
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 24)

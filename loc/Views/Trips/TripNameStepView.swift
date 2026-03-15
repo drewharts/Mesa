@@ -12,13 +12,15 @@ struct TripNameStepView: View {
     @ObservedObject var viewModel: CreateTripViewModel
     @FocusState private var isNameFocused: Bool
 
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
 
             Image(systemName: "airplane.departure")
                 .font(.system(size: 48))
-                .foregroundColor(.accentColor)
+                .foregroundColor(mesaCharcoal)
 
             Text("What's your trip called?")
                 .font(.title2)
@@ -46,12 +48,13 @@ struct TripNameStepView: View {
                 viewModel.nextStep()
             } label: {
                 Text("Next")
-                    .fontWeight(.semibold)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(viewModel.canProceed ? Color.accentColor : Color.gray.opacity(0.3))
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(height: 56)
+                    .background(
+                        Capsule().fill(viewModel.canProceed ? mesaCharcoal : mesaCharcoal.opacity(0.4))
+                    )
             }
             .disabled(!viewModel.canProceed)
             .padding(.horizontal, 24)

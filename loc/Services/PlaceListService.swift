@@ -115,8 +115,12 @@ class PlaceListService {
                 .rpc("get_paginated_place_list_places", params: params)
                 .execute()
                 .value
-            
-            return places
+
+            // Deduplicate by place_id — the SQL LEFT JOIN with external_places
+            // can return multiple rows per place when a user has multiple external entries.
+            // Duplicate IDs cause invisible cells in SwiftUI ForEach/LazyVGrid.
+            var seen = Set<String>()
+            return places.filter { seen.insert($0.place_id).inserted }
         } catch {
             print("❌ [PlaceListService] Error fetching places for list \(listId): \(error)")
             throw error

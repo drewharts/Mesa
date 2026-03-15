@@ -78,6 +78,7 @@ struct PlaceDetailViewContent: View {
     @State private var showListSelection = false
     @State private var showCreatePost = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
+    @State private var tripSelectionViewModel: PlaceTripSelectionViewModel?
 
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -130,6 +131,7 @@ struct PlaceDetailViewContent: View {
                 // Refresh list membership state after sheet closes
                 tabsViewModel?.refreshPlaceListMembership()
                 listSelectionViewModel = nil
+                tripSelectionViewModel = nil
             }) {
                 if let selectedPlace = selectedPlaceVM.selectedPlace,
                    let viewModel = listSelectionViewModel {
@@ -137,7 +139,8 @@ struct PlaceDetailViewContent: View {
                         viewModel: viewModel,
                         place: selectedPlace,
                         listsVM: profile.listsViewModel,
-                        isPresented: $showListSelection
+                        isPresented: $showListSelection,
+                        tripSelectionViewModel: tripSelectionViewModel
                     )
                 } else {
                     Text("No place selected")
@@ -149,6 +152,7 @@ struct PlaceDetailViewContent: View {
                         profile: profile,
                         userSession: userSession
                     )
+                    tripSelectionViewModel = PlaceTripSelectionViewModel()
                 }
             }
             .sheet(isPresented: $showCreatePost) {

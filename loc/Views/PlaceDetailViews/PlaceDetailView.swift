@@ -21,6 +21,7 @@ struct PlaceDetailView: View {
     @State private var showCreatePost = false
     @State private var showCreatePlace = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
+    @State private var tripSelectionViewModel: PlaceTripSelectionViewModel?
     @State private var tabsViewModel: PlaceDetailTabsViewModel?
 
     @EnvironmentObject var profile: ProfileViewModel
@@ -221,7 +222,8 @@ struct PlaceDetailView: View {
                 viewModel: viewModel,
                 place: selectedPlace,
                 listsVM: profile.listsViewModel,
-                isPresented: $showListSelection
+                isPresented: $showListSelection,
+                tripSelectionViewModel: tripSelectionViewModel
             )
         } else {
             Text("No place selected")
@@ -319,6 +321,7 @@ struct PlaceDetailView: View {
     private func handleListSelectionDismiss() {
         tabsViewModel?.refreshPlaceListMembership()
         listSelectionViewModel = nil
+        tripSelectionViewModel = nil
     }
 
     /// Handles list selection sheet state changes.
@@ -328,6 +331,7 @@ struct PlaceDetailView: View {
             profile: profile,
             userSession: userSession
         )
+        tripSelectionViewModel = PlaceTripSelectionViewModel()
     }
 
     // MARK: - ViewModel Initialization

@@ -2,15 +2,15 @@
 //  TripCalendarDayCellView.swift
 //  loc
 //
-//  Single calendar cell showing day number, place dots, and acting as a drop target
+//  Single calendar cell showing day number, colored event dots, and acting as a drop target
 //
 
 import SwiftUI
 
-/// Renders a single day cell in the trip calendar grid.
+/// Renders a single day cell in the trip calendar grid (Apple Calendar style).
 struct TripCalendarDayCellView: View {
     let cell: CalendarGridData.Cell
-    let placeCount: Int
+    let dotColors: [Color]
     let onTap: () -> Void
     let onDropPlace: ((String) -> Void)?
 
@@ -27,12 +27,13 @@ struct TripCalendarDayCellView: View {
 
     // MARK: - Day Content
 
+    /// Tappable day cell with date number and colored event dots.
     private var dayContent: some View {
         Button(action: onTap) {
             VStack(spacing: 4) {
                 Text("\(cell.dayOfMonth ?? 0)")
                     .font(.subheadline)
-                    .fontWeight(.medium)
+                    .fontWeight(.semibold)
                     .foregroundStyle(.primary)
 
                 placeDotsIndicator
@@ -41,7 +42,7 @@ struct TripCalendarDayCellView: View {
             .aspectRatio(1, contentMode: .fill)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isTargeted ? Color.accentColor.opacity(0.15) : Color(.systemGray6))
+                    .fill(isTargeted ? Color.accentColor.opacity(0.12) : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -54,20 +55,13 @@ struct TripCalendarDayCellView: View {
 
     // MARK: - Place Dots
 
+    /// Up to 3 colored dots indicating places assigned to this day.
     private var placeDotsIndicator: some View {
         HStack(spacing: 3) {
-            if placeCount > 0 {
-                let dotCount = min(placeCount, 3)
-                ForEach(0..<dotCount, id: \.self) { _ in
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 5, height: 5)
-                }
-                if placeCount > 3 {
-                    Text("+")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.secondary)
-                }
+            ForEach(Array(dotColors.prefix(3).enumerated()), id: \.offset) { _, color in
+                Circle()
+                    .fill(color)
+                    .frame(width: 5, height: 5)
             }
         }
         .frame(height: 8)

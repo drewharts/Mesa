@@ -14,7 +14,7 @@ class SupabaseManager {
     
     let client: SupabaseClient
     
-    private init() {
+    private nonisolated init() {
         self.client = SupabaseClient(
             supabaseURL: SupabaseConfig.supabaseURL,
             supabaseKey: SupabaseConfig.supabaseAnonKey,
