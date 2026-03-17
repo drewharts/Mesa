@@ -12,6 +12,7 @@ struct TripIdeasSectionView: View {
     let ideaPlaces: [TripDayPlace]
     let onRemove: (String) -> Void
     var onAddPlace: (() -> Void)?
+    var onPlaceTap: ((String) -> Void)?
 
     private let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -83,7 +84,7 @@ struct TripIdeasSectionView: View {
                         PopupPlaceCard(
                             place: place.asLightweightPlace,
                             preferExternalThumbnail: false,
-                            onNavigate: nil
+                            onNavigate: onPlaceTap
                         )
 
                         Button(action: { onRemove(place.id) }) {

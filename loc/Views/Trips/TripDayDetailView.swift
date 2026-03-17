@@ -13,6 +13,8 @@ struct TripDayDetailView: View {
     let dayIndex: Int
 
     @State private var showAddPlaceSheet = false
+    @State private var isEditing = false
+    @State private var selectedPlaceId: String?
 
     private var places: [TripDayPlace] {
         viewModel.dayPlaces[dayIndex] ?? []
@@ -22,6 +24,7 @@ struct TripDayDetailView: View {
         TripDayItineraryView(
             places: places,
             canEdit: viewModel.canEdit,
+            isEditing: isEditing,
             onMove: { fromOffsets, toOffset in
                 viewModel.reorderPlaces(dayIndex: dayIndex, fromOffsets: fromOffsets, toOffset: toOffset)
             },
@@ -29,13 +32,19 @@ struct TripDayDetailView: View {
                 Task { await viewModel.removePlaceFromDay(entryId: entryId) }
             },
             onPlaceTap: { placeId in
-                viewModel.selectedPlaceIdForDetail = placeId
+                viewModel.highlightTripAnnotation(placeId: placeId)
+                selectedPlaceId = placeId
             }
         )
         .navigationTitle(viewModel.dayLabel(for: dayIndex))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if viewModel.canEdit {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(isEditing ? "Done" : "Reorder") {
+                        withAnimation { isEditing.toggle() }
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showAddPlaceSheet = true
@@ -44,6 +53,9 @@ struct TripDayDetailView: View {
                     }
                 }
             }
+        }
+        .navigationDestination(item: $selectedPlaceId) { placeId in
+            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
         }
         .sheet(isPresented: $showAddPlaceSheet) {
             if let userId = ServiceContainer.shared.authService.currentUserId {

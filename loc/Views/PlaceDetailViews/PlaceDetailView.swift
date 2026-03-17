@@ -298,7 +298,6 @@ struct PlaceDetailView: View {
             await MainActor.run {
                 guard let place = selectedPlaceVM.selectedPlace else { return }
                 let userVideos = profile.externalContentViewModel.getExternalVideosSync(for: place.id.uuidString)
-                print("🎬 [PlaceDetailView] handleAppear - after fetchUserExternalPlaces, userVideos: \(userVideos.count)")
                 tabsViewModel?.setExternalVideos(placeVideos: selectedPlaceVM.externalVideos, userVideos: userVideos)
             }
         }

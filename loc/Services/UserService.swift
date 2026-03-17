@@ -697,7 +697,6 @@ class UserService: ObservableObject {
             .execute()
             .value
         
-        print("✅ [UserService] Fetched \(response.count) savers for place \(placeId.prefix(8))...")
         return response
     }
 }

@@ -171,12 +171,6 @@ class MapViewportViewModel: ObservableObject {
                 let friendsPlaceIds = Set(annotations.map { $0.id })
                 let filteredCommunity = community.filter { !friendsPlaceIds.contains($0.id) }
 
-                let duplicateCount = community.count - filteredCommunity.count
-                if duplicateCount > 0 {
-                    let duplicateIds = community.filter { friendsPlaceIds.contains($0.id) }.map { $0.id }
-                    print("🔍 [MapViewportViewModel] Filtered \(duplicateCount) duplicate community markers: \(duplicateIds)")
-                }
-
                 self.communityMarkers = filteredCommunity
                 self.lastLoadedRegion = region
 

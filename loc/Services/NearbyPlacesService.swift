@@ -24,22 +24,10 @@ class NearbyPlacesService {
         }
         
         do {
-            // Print raw response for debugging
-            if let rawString = String(data: data, encoding: .utf8) {
-                print("🔍 Raw API Response:")
-                print(rawString)
-            }
-            
             let nearbyPlacesResponse = try JSONDecoder().decode(NearbyPlacesResponse.self, from: data)
             return nearbyPlacesResponse
         } catch {
             print("❌ Decoding error: \(error)")
-            
-            // Additional debugging - try to parse as generic JSON to see structure
-            if let json = try? JSONSerialization.jsonObject(with: data) {
-                print("🔍 JSON structure that failed to decode:")
-                print(json)
-            }
             
             throw NearbyPlacesError.decodingError(error)
         }

@@ -30,6 +30,9 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
     /// Place ID tapped on a trip map annotation, observed by TripDetailView for navigation.
     @Published var tappedTripPlaceId: String?
 
+    /// Place ID of the currently highlighted trip annotation (drives pin selection + camera).
+    @Published var selectedTripAnnotationPlaceId: String?
+
     // MARK: - Map Display Triggers
 
     /// Triggers map sheet to show external user's reviews
@@ -185,6 +188,7 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
     func clearTripAnnotations() {
         activeTripAnnotations = []
         activeTripId = nil
+        selectedTripAnnotationPlaceId = nil
     }
 
     /// Clears all map display state.

@@ -184,6 +184,16 @@ struct MapContainerView: View {
                     }
                 }
             }
+            .onChange(of: mapDisplayCoordinatorViewModel.selectedTripAnnotationPlaceId) { _, placeId in
+                guard let placeId,
+                      let annotation = mapDisplayCoordinatorViewModel.activeTripAnnotations.first(where: { $0.placeId == placeId }) else { return }
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    mapPosition = .region(MKCoordinateRegion(
+                        center: annotation.coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
+                    ))
+                }
+            }
             .onChange(of: mapDisplayCoordinatorViewModel.activeTripAnnotations) { _, annotations in
                 guard !annotations.isEmpty else { return }
                 let coords = annotations.map(\.coordinate)

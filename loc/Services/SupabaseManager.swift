@@ -45,10 +45,7 @@ class SupabaseManager {
     /// Debug: Check current authentication status
     func debugAuthStatus() async {
         do {
-            let user = try await client.auth.user()
-            print("🔍 [SupabaseManager] Current authenticated user: \(user.id)")
-            print("🔍 [SupabaseManager] User email: \(user.email ?? "no email")")
-            print("🔍 [SupabaseManager] User created at: \(user.createdAt)")
+            _ = try await client.auth.user()
         } catch {
             print("❌ [SupabaseManager] No authenticated user: \(error)")
         }

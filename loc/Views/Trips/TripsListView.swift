@@ -66,6 +66,12 @@ struct TripsListView: View {
                 if let userId = userSession.currentUserId {
                     await viewModel.loadTrips(userId: userId)
                 }
+                // Auto-navigate to trip from push notification (after data loads)
+                if let tripId = NotificationManager.shared.pendingTripId {
+                    NotificationManager.shared.pendingTripId = nil
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    navigationPath.append(tripId)
+                }
             }
         }
     }

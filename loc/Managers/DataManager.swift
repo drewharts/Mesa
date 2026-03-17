@@ -164,7 +164,6 @@ class DataManager: ObservableObject {
     /// PHASE 0: Load ALL user places in a single optimized query
     /// This is the fastest way to get all places on the map
     private func loadAllUserPlacesOptimized(userId: String) async {
-        let startTime = Date()
         do {
             let allPlaces = try await placeService.fetchAllUserPlaces(userId: userId)
             
@@ -183,21 +182,6 @@ class DataManager: ObservableObject {
                     }
                 }
                 
-                let duration = Date().timeIntervalSince(startTime)
-                print("⚡ [DataManager] Loaded \(allPlaces.count) total places in \(String(format: "%.2f", duration))s")
-                
-                // Debug: Verify places were stored
-                print("🔍 [DataManager] Verification:")
-                print("   - Places in detailPlaceVM.places: \(self.detailPlaceViewModel.places.count)")
-                print("   - Places in placeSavers: \(self.detailPlaceViewModel.placeSavers.count)")
-                print("   - SavedDetailPlaces count: \(self.detailPlaceViewModel.savedDetailPlaces.count)")
-                if !allPlaces.isEmpty {
-                    let firstPlace = allPlaces[0]
-                    print("   - First place: \(firstPlace.name) at \(firstPlace.coordinate?.latitude ?? 0), \(firstPlace.coordinate?.longitude ?? 0)")
-                    print("   - Place ID: \(firstPlace.id.uuidString)")
-                    print("   - In places dict: \(self.detailPlaceViewModel.places[firstPlace.id.uuidString] != nil)")
-                    print("   - In placeSavers: \(self.detailPlaceViewModel.placeSavers[firstPlace.id.uuidString] != nil)")
-                }
             }
             
             // Trigger map annotation calculation
@@ -333,7 +317,6 @@ class DataManager: ObservableObject {
             if !contentUrls.isEmpty {
                 Task {
                     await ExternalMetadataCache.shared.prefetchMetadata(for: contentUrls)
-                    print("✅ [DataManager] Prefetched external metadata for \(contentUrls.count) URLs")
                 }
             }
 
@@ -354,7 +337,6 @@ class DataManager: ObservableObject {
                 self.profileViewModel.externalContentViewModel.hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
             }
 
-            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.externalContentViewModel.hasMoreExternalPlaces))")
         } catch {
             print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
@@ -471,10 +453,8 @@ class DataManager: ObservableObject {
             let lists: [PlaceList]
             
             if let userLocation = userLocation {
-                print("📍 [DataManager] Loading place lists with proximity sorting")
                 lists = try await placeService.fetchListsByProximity(userId: userId, userLocation: userLocation)
             } else {
-                print("📍 [DataManager] Loading place lists with regular sorting (no location)")
                 lists = try await placeService.fetchLists(userId: userId)
             }
             
@@ -493,7 +473,6 @@ class DataManager: ObservableObject {
                 }
 
                 // Use the optimized loading method instead of the old preloading
-                print("📍 [DataManager] Triggering optimized list loading...")
                 self.profileViewModel.listsViewModel.ensureListsLoaded()
             }
         } catch {
@@ -506,9 +485,7 @@ class DataManager: ObservableObject {
     private func preloadPlacesForTopLists(lists: [PlaceList], userId: String, topN: Int) async {
         // Sort lists by distance (if they have averageCoordinate) or use first N
         let sortedLists = lists.prefix(topN)
-        
-        print("📍 [DataManager] Preloading places for \(sortedLists.count) lists...")
-        
+
         // Load places for each of the top lists in parallel
         await withTaskGroup(of: Void.self) { group in
             for list in sortedLists {

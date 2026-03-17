@@ -79,7 +79,6 @@ class PlacePhotosViewModel: ObservableObject {
 
         guard let place = place, !place.hasPlaceholderID else { return }
 
-        print("📸 [PlacePhotosVM] setPlace called for: \(place.id.uuidString)")
         postsLoadingFinished = false
         resetPlaceGallery()
         externalReviewPhotosVM.setPlace(place)

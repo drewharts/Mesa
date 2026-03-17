@@ -42,7 +42,10 @@ struct TripDetailContentView: View {
                         onRemove: { entryId in
                             Task { await viewModel.removeIdea(entryId: entryId) }
                         },
-                        onAddPlace: { showAddPlaceSheet = true }
+                        onAddPlace: { showAddPlaceSheet = true },
+                        onPlaceTap: { placeId in
+                            viewModel.selectedPlaceIdForDetail = placeId
+                        }
                     )
                 }
             }

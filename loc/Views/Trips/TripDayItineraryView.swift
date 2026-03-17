@@ -11,6 +11,7 @@ import SwiftUI
 struct TripDayItineraryView: View {
     let places: [TripDayPlace]
     let canEdit: Bool
+    let isEditing: Bool
     let onMove: (IndexSet, Int) -> Void
     let onDelete: (String) -> Void
     let onPlaceTap: (String) -> Void
@@ -48,29 +49,31 @@ struct TripDayItineraryView: View {
     private var placesList: some View {
         List {
             ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                TripTimelinePlaceCard(
+                TripDayPlaceCard(
                     place: place,
                     number: index + 1,
-                    isFirst: index == 0,
-                    isLast: index == places.count - 1,
                     onTap: { onPlaceTap(place.placeId) }
                 )
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .draggable(place.id) {
                     TripPlaceDragPreview(placeName: place.placeName ?? "Place")
                 }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    if canEdit {
+                        Button(role: .destructive) {
+                            onDelete(place.id)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
             }
             .onMove(perform: canEdit ? onMove : nil)
-            .onDelete(perform: canEdit ? { indexSet in
-                for index in indexSet {
-                    onDelete(places[index].id)
-                }
-            } : nil)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .environment(\.editMode, canEdit ? .constant(.active) : .constant(.inactive))
+        .environment(\.editMode, isEditing ? .constant(.active) : .constant(.inactive))
     }
 }

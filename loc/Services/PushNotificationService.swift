@@ -45,8 +45,7 @@ class PushNotificationService {
     /// - Parameter deviceToken: The raw device token Data from APNs
     func handleDeviceTokenReceived(_ deviceToken: Data) {
         let tokenString = convertDeviceToken(deviceToken)
-        print("📱 [PushNotification] Device token received: \(tokenString)")
-        
+
         Task { @MainActor in
             await storeDeviceToken(tokenString)
         }
@@ -83,7 +82,6 @@ class PushNotificationService {
             return
         }
         
-        print("📱 [PushNotification] Processing pending token for user: \(userId)")
         await saveTokenForUser(userId: userId, token: pendingToken)
         clearPendingToken()
     }
@@ -116,8 +114,6 @@ class PushNotificationService {
             userService.updateFCMToken(userId: userId, token: token) { error in
                 if let error = error {
                     print("❌ [PushNotification] Failed to store device token: \(error.localizedDescription)")
-                } else {
-                    print("✅ [PushNotification] Device token stored successfully for user \(userId)")
                 }
                 continuation.resume()
             }

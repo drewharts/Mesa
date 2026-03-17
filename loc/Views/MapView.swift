@@ -134,7 +134,7 @@ struct MapView: View {
                 ) {
                     TripItineraryPinView(
                         annotation: annotation,
-                        isSelected: false,
+                        isSelected: mapDisplayCoordinatorVM.selectedTripAnnotationPlaceId == annotation.placeId,
                         onTap: {
                             mapDisplayCoordinatorVM.tappedTripPlaceId = annotation.placeId
                         }

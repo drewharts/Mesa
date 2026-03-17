@@ -161,7 +161,6 @@ class ExternalReviewPhotosViewModel: ObservableObject {
 
         do {
             try await postService.deleteExternalReviewImage(placeId: placeId, imageUrl: url)
-            print("📸 [ExternalReviewPhotosVM] Deleted external review image: \(url.prefix(60))...")
         } catch {
             print("📸 [ExternalReviewPhotosVM] Failed to delete image, restoring: \(error)")
             // Re-insert at original position on failure
@@ -251,11 +250,8 @@ class ExternalReviewPhotosViewModel: ObservableObject {
         let placeId = place.id.uuidString
 
         if externalReviewPhotoLoadingStates[placeId] == .loading {
-            print("📸 [ExternalReviewPhotosVM] Skipping - already loading for \(placeId)")
             return
         }
-
-        print("📸 [ExternalReviewPhotosVM] Starting load for \(placeId), reset=\(reset)")
         externalReviewPhotoLoadingStates[placeId] = .loading
 
         Task {
@@ -415,7 +411,6 @@ class ExternalReviewPhotosViewModel: ObservableObject {
             let expiredSet = Set(expired)
             self?.externalReviewPhotoItems[placeId]?.removeAll { expiredSet.contains($0.url) }
 
-            print("📸 [ExternalReviewPhotosVM] Background validation found \(expired.count) expired URLs for \(placeId), removed from display")
             self?.failedImageURLs[placeId] = expiredSet
             await self?.executePerImageRefresh(for: placeId)
         }
@@ -457,7 +452,6 @@ class ExternalReviewPhotosViewModel: ObservableObject {
         perImageRefreshAttempted.insert(placeId)
         googleCDNCheckedForPlace.remove(placeId)
 
-        print("📸 [ExternalReviewPhotosVM] Per-image refresh for \(failedURLs.count) failed URLs in \(placeId)")
         await triggerRefreshAndReload(for: placeId, expiredURLs: Array(failedURLs))
     }
 
@@ -485,7 +479,6 @@ class ExternalReviewPhotosViewModel: ObservableObject {
             let (_, response) = try await URLSession.shared.data(for: request)
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 200
             if statusCode == 403 {
-                print("📸 [ExternalReviewPhotosVM] Google CDN URL expired (403): \(sampleURL.prefix(80))...")
                 return false
             }
             return true
@@ -508,12 +501,10 @@ class ExternalReviewPhotosViewModel: ObservableObject {
             )
 
             if refreshInitiated {
-                print("📸 [ExternalReviewPhotosVM] Backend refresh initiated for \(placeId), waiting for processing...")
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 isRefreshingImagesByPlace[placeId] = false
                 await retryAfterRefresh(for: placeId)
             } else {
-                print("📸 [ExternalReviewPhotosVM] Backend refresh rate-limited for \(placeId), skipping retry")
                 isRefreshingImagesByPlace[placeId] = false
             }
         } catch {
@@ -525,8 +516,6 @@ class ExternalReviewPhotosViewModel: ObservableObject {
     /// Retries loading external photos after backend has refreshed the image URLs.
     private func retryAfterRefresh(for placeId: String) async {
         guard let place = place, place.id.uuidString == placeId else { return }
-
-        print("📸 [ExternalReviewPhotosVM] Retrying after refresh for \(placeId)")
 
         externalReviewPhotoItems[placeId] = []
         externalReviewImageURLCache[placeId] = []

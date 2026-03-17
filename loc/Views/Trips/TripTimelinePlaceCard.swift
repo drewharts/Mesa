@@ -2,131 +2,123 @@
 //  TripTimelinePlaceCard.swift
 //  loc
 //
-//  Timeline-style card for a place in the day itinerary
+//  Photo-forward card for a place in the day itinerary
 //
 
 import SwiftUI
 
-/// Displays a place as a timeline card with numbered stop, connector lines, and place details.
-struct TripTimelinePlaceCard: View {
+/// Displays a place as a photo-forward card with gradient overlay, stop badge, and metadata below.
+struct TripDayPlaceCard: View {
     let place: TripDayPlace
     let number: Int
-    let isFirst: Bool
-    let isLast: Bool
     let onTap: () -> Void
 
-    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
-    private let connectorWidth: CGFloat = 2
-    private let timelineColumnWidth: CGFloat = 40
-    private let circleSize: CGFloat = 28
-    private let photoSize: CGFloat = 80
+    private let cardHeight: CGFloat = 150
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            timelineColumn
-            placeCard
+        VStack(alignment: .leading, spacing: 6) {
+            photoCard
+            metadataSection
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
     }
 
-    // MARK: - Timeline Column
+    // MARK: - Photo Card
 
-    private var timelineColumn: some View {
-        VStack(spacing: 0) {
-            topConnector
-            numberCircle
-            bottomConnector
+    private var photoCard: some View {
+        ZStack(alignment: .bottomLeading) {
+            photoBackground
+            gradientOverlay
+            placeInfoOverlay
+            stopBadge
         }
-        .frame(width: timelineColumnWidth)
-    }
-
-    /// Top connector line, hidden for the first stop.
-    private var topConnector: some View {
-        Rectangle()
-            .fill(mesaCharcoal.opacity(0.3))
-            .frame(width: connectorWidth, height: 16)
-            .opacity(isFirst ? 0 : 1)
-    }
-
-    /// Numbered circle badge for this stop.
-    private var numberCircle: some View {
-        Text("\(number)")
-            .font(.caption)
-            .fontWeight(.bold)
-            .foregroundStyle(.white)
-            .frame(width: circleSize, height: circleSize)
-            .background(mesaCharcoal)
-            .clipShape(Circle())
-    }
-
-    /// Bottom connector line, hidden for the last stop.
-    private var bottomConnector: some View {
-        Rectangle()
-            .fill(mesaCharcoal.opacity(0.3))
-            .frame(width: connectorWidth)
-            .frame(maxHeight: .infinity)
-            .opacity(isLast ? 0 : 1)
-    }
-
-    // MARK: - Place Card
-
-    private var placeCard: some View {
-        HStack(spacing: 12) {
-            placePhoto
-            placeInfo
-            Spacer(minLength: 0)
-        }
-        .padding(10)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .frame(height: cardHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+        )
         .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
     }
 
-    /// Place photo thumbnail or hash-based fallback color.
+    /// Place photo or hash-based fallback color.
     @ViewBuilder
-    private var placePhoto: some View {
+    private var photoBackground: some View {
         if let photoUrl = place.placePhoto, let url = URL(string: photoUrl) {
             AsyncImage(url: url) { image in
                 image
                     .resizable()
                     .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: cardHeight)
+                    .clipped()
             } placeholder: {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(fallbackColor)
+                ShimmerView()
+                    .frame(maxWidth: .infinity, maxHeight: cardHeight)
             }
-            .frame(width: photoSize, height: photoSize)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
         } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(fallbackColor)
-                .frame(width: photoSize, height: photoSize)
+            fallbackColor
+                .frame(maxWidth: .infinity, maxHeight: cardHeight)
                 .overlay {
                     Image(systemName: "mappin.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .font(.largeTitle)
+                        .foregroundStyle(.white.opacity(0.5))
                 }
         }
     }
 
-    /// Place name, address, added-by, and inline note.
-    private var placeInfo: some View {
-        VStack(alignment: .leading, spacing: 3) {
+    /// Bottom-to-top gradient overlay for text readability.
+    private var gradientOverlay: some View {
+        LinearGradient(
+            colors: [.clear, .black.opacity(0.1), .black.opacity(0.2), .black.opacity(1.0)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: cardHeight)
+    }
+
+    /// Place name and address overlaid on the gradient.
+    private var placeInfoOverlay: some View {
+        VStack(alignment: .leading, spacing: 2) {
             Text(place.placeName ?? "Unknown Place")
-                .font(.headline)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
                 .lineLimit(1)
 
             if let address = place.placeAddress {
                 Text(address)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
             }
+        }
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+    }
 
+    /// Numbered stop badge in the top-left corner.
+    private var stopBadge: some View {
+        Text("\(number)")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .foregroundStyle(.white)
+            .frame(width: 22, height: 22)
+            .background(Color.black.opacity(0.55))
+            .clipShape(Circle())
+            .padding(8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: - Metadata Below Card
+
+    private var metadataSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
             if let addedBy = place.addedByName {
                 Text("Added by \(addedBy)")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
 
             if let note = place.note, !note.isEmpty {
@@ -137,6 +129,7 @@ struct TripTimelinePlaceCard: View {
                     .lineLimit(2)
             }
         }
+        .padding(.horizontal, 2)
     }
 
     // MARK: - Helpers

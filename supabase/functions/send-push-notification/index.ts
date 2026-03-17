@@ -159,6 +159,44 @@ serve(async (req) => {
         break
       }
 
+      case 'trip_collaborator_added': {
+        title = 'Trip Invitation'
+        const inviterName = record.actor_first_name && record.actor_last_name
+          ? `${record.actor_first_name} ${record.actor_last_name}`
+          : 'Someone'
+        const tripName = record.trip_name || 'a trip'
+        body = `${inviterName} added you to ${tripName}`
+        notificationData.tripId = record.trip_id
+        notificationData.userId = record.actor_id
+        break
+      }
+
+      case 'place_added_to_trip': {
+        title = 'New Place Added'
+        const tripAdderName = record.actor_first_name && record.actor_last_name
+          ? `${record.actor_first_name} ${record.actor_last_name}`
+          : 'Someone'
+        const tripPlaceName = record.place_name || 'a place'
+        const placeTripName = record.trip_name || 'a trip'
+        body = `${tripAdderName} added ${tripPlaceName} to ${placeTripName}`
+        notificationData.tripId = record.trip_id
+        notificationData.placeId = record.place_id
+        notificationData.userId = record.actor_id
+        break
+      }
+
+      case 'trip_updated': {
+        title = 'Trip Updated'
+        const updaterName = record.actor_first_name && record.actor_last_name
+          ? `${record.actor_first_name} ${record.actor_last_name}`
+          : 'Someone'
+        const updatedTripName = record.trip_name || 'a trip'
+        body = `${updaterName} updated ${updatedTripName}`
+        notificationData.tripId = record.trip_id
+        notificationData.userId = record.actor_id
+        break
+      }
+
       default:
         console.log('⚠️ [Push] Unknown notification type:', record.type)
         return new Response(

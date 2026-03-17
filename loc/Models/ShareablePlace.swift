@@ -80,35 +80,23 @@ struct ShareablePlace: Codable, Identifiable {
     }
     
     static func from(url: URL) -> ShareablePlace? {
-        print("🔍 Parsing URL: \(url)")
-        print("🔍 URL scheme: \(url.scheme ?? "nil")")
-        print("🔍 URL host: \(url.host ?? "nil")")
-        print("🔍 URL path: \(url.path)")
-        print("🔍 URL pathComponents: \(url.pathComponents)")
-        
         guard url.scheme == "loc",
               url.host == "place",
               !url.pathComponents.isEmpty else {
-            print("❌ URL validation failed: scheme=\(url.scheme ?? "nil"), host=\(url.host ?? "nil"), pathComponents.count=\(url.pathComponents.count)")
             return nil
         }
-        
+
         let pathComponents = url.pathComponents
-        guard pathComponents.count > 1 else { 
-            print("❌ Not enough path components: \(pathComponents)")
-            return nil 
+        guard pathComponents.count > 1 else {
+            return nil
         }
-        
+
         let placeId = String(pathComponents[1])
-        print("🔍 Extracted placeId: \(placeId)")
-        
+
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let queryItems = components.queryItems else {
-            print("❌ Failed to get URL components or query items")
             return nil
         }
-        
-        print("🔍 Query items: \(queryItems)")
         
         var name: String?
         var address: String?
@@ -118,7 +106,6 @@ struct ShareablePlace: Codable, Identifiable {
         var longitude: Double?
         
         for item in queryItems {
-            print("🔍 Processing query item: \(item.name) = \(item.value ?? "nil")")
             switch item.name {
             case "name":
                 name = item.value
@@ -137,18 +124,14 @@ struct ShareablePlace: Codable, Identifiable {
                     longitude = Double(value)
                 }
             default:
-                print("🔍 Unknown query parameter: \(item.name)")
                 break
             }
         }
         
-        guard let placeName = name else { 
-            print("❌ No place name found in URL")
-            return nil 
+        guard let placeName = name else {
+            return nil
         }
-        
-        print("✅ Successfully parsed ShareablePlace: name=\(placeName), id=\(placeId)")
-        
+
         return ShareablePlace(
             id: placeId,
             name: placeName,

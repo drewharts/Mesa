@@ -30,6 +30,12 @@ class TripsListViewModel: ObservableObject {
 
         do {
             trips = try await tripService.fetchUserTrips(userId: userId)
+        } catch is CancellationError {
+            // Expected when SwiftUI cancels the task (view disappear, refresh restart)
+            return
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // Expected when the underlying URLSession request is cancelled
+            return
         } catch {
             self.error = error.localizedDescription
             print("[TripsListVM] Failed to load trips: \(error)")

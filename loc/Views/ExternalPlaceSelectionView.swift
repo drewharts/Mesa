@@ -66,14 +66,11 @@ struct ExternalPlaceSelectionView: View {
                             PlaceRowView(
                                 place: place,
                                 onBookmarkTapped: {
-                                    print("🔍 [ExternalPlaceSelectionView] Bookmark tapped for place: \(place.name)")
                                     profile.listsViewModel.ensureListsLoaded()
                                     selectedPlaceForList = place
                                     showingListSelection = true
                                 },
                                 onPlaceTapped: {
-                                    print("📍 [ExternalPlaceSelectionView] Place tapped: \(place.name)")
-                                    
                                     // First dismiss this sheet, then navigate to place detail
                                     profile.clearPlaceSelection()
 
@@ -96,7 +93,6 @@ struct ExternalPlaceSelectionView: View {
                     Divider()
                     
                     Button("Done") {
-                        print("🔘 Done button tapped - clearing place selection")
                         profile.clearPlaceSelection()
                     }
                     .font(.headline)

@@ -7,6 +7,7 @@ class NotificationManager: ObservableObject {
     
     @Published var pendingNavigation: PendingNavigation?
     @Published var highlightedReviewId: String?
+    @Published var pendingTripId: String?
     
     private init() {}
     
@@ -52,6 +53,14 @@ class NotificationManager: ObservableObject {
                 object: nil,
                 userInfo: ["listId": listId]
             )
+        }
+    }
+
+    /// Handles trip notification tap by storing pending trip and presenting trips sheet.
+    func handleTripNotificationTap(tripId: String) {
+        DispatchQueue.main.async {
+            self.pendingTripId = tripId
+            PresentationService.shared.present(.tripsList)
         }
     }
 }

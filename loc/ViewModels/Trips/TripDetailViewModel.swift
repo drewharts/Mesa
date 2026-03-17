@@ -323,15 +323,14 @@ class TripDetailViewModel: ObservableObject {
         }
     }
 
-    /// Re-fits the map camera to the currently visible annotations.
-    func fitMapToCurrentAnnotations() {
-        let annotations = buildTripAnnotations(forDay: selectedDayForDetail)
-        mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
-    }
-
     /// Clears trip annotations from the map.
     func clearMapAnnotations() {
         mapCoordinator?.clearTripAnnotations()
+    }
+
+    /// Highlights a trip annotation on the map by setting the selected place ID.
+    func highlightTripAnnotation(placeId: String?) {
+        mapCoordinator?.selectedTripAnnotationPlaceId = placeId
     }
 
     /// Handles a trip place tap from the map by setting navigation state.

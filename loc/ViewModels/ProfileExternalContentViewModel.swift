@@ -705,11 +705,7 @@ class ProfileExternalContentViewModel: ObservableObject {
 
     /// Gets external videos for a place using cached metadata.
     func getExternalVideosSync(for placeId: String) -> [ExternalVideo] {
-        print("🎬 [ProfileExternalContentViewModel] getExternalVideosSync for placeId: \(placeId)")
-        print("  - userExternalPlaces count: \(userExternalPlaces.count)")
-
         let matchingPlaces = userExternalPlaces.values.filter { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
-        print("  - matchingPlaces for this placeId: \(matchingPlaces.count)")
         let currentUserId = getCurrentUserId?()
 
         var videos: [ExternalVideo] = []

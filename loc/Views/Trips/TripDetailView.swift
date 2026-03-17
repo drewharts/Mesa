@@ -32,14 +32,9 @@ struct TripDetailView: View {
         .navigationTitle(viewModel.trip?.name ?? "Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    if viewModel.hasPlacesWithCoordinates {
-                        mapButton
-                    }
-                    if viewModel.canEdit {
-                        tripMenu
-                    }
+            if viewModel.canEdit {
+                ToolbarItem(placement: .topBarTrailing) {
+                    tripMenu
                 }
             }
         }
@@ -51,6 +46,9 @@ struct TripDetailView: View {
         }
         .onChange(of: mapDisplayCoordinatorVM.tappedTripPlaceId) { _, placeId in
             viewModel.handleMapPlaceTap(placeId)
+        }
+        .onChange(of: viewModel.selectedPlaceIdForDetail) { _, placeId in
+            viewModel.highlightTripAnnotation(placeId: placeId)
         }
         .onChange(of: viewModel.selectedDayForDetail) { old, new in
             Task { await viewModel.handleDayFilterChange(old: old, new: new) }
@@ -68,19 +66,9 @@ struct TripDetailView: View {
             await viewModel.loadTripAndShowAnnotations()
         }
         .onDisappear {
-            guard viewModel.selectedDayForDetail == nil else { return }
+            guard viewModel.selectedDayForDetail == nil
+                  && viewModel.selectedPlaceIdForDetail == nil else { return }
             viewModel.clearMapAnnotations()
-        }
-    }
-
-    // MARK: - Map Button
-
-    /// Re-fits the map camera to the currently visible trip annotations.
-    private var mapButton: some View {
-        Button {
-            viewModel.fitMapToCurrentAnnotations()
-        } label: {
-            Image(systemName: "map")
         }
     }
 

@@ -33,9 +33,6 @@ struct CustomImageLoader: View {
                         ProgressView()
                             .scaleEffect(0.8)
                     )
-                    .onAppear {
-                        print("⏳ [CustomImageLoader] LOADING image for URL: \(urlString)")
-                    }
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
