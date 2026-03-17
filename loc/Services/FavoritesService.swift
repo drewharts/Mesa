@@ -55,8 +55,8 @@ class FavoritesService {
     private let supabase: SupabaseManager
     
     // MARK: - Init
-    private init(supabase: SupabaseManager = .shared) {
-        self.supabase = supabase
+    private nonisolated init() {
+        self.supabase = SupabaseManager.shared
     }
     
     // MARK: - Public API

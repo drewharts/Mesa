@@ -61,6 +61,7 @@ struct ProfileFollowCountsView: View {
     let data: ProfileFollowCountsData
     let onFollowersTap: () -> Void
     let onFollowingTap: () -> Void
+    var hideFollowing: Bool = false
     var onAddSocialsTap: (() -> Void)? = nil
 
     @State private var refreshToggle = false
@@ -85,7 +86,10 @@ struct ProfileFollowCountsView: View {
     var body: some View {
         HStack(spacing: 24) {
             followersButton
-            followingButton
+
+            if !hideFollowing {
+                followingButton
+            }
 
             if shouldShowSocialIcons {
                 socialLinksSection

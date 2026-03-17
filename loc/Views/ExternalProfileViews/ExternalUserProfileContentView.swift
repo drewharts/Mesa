@@ -44,7 +44,7 @@ struct ExternalUserProfileContentView: View {
                             }
                         },
                         totalPlacesCount: viewModel.totalPlacesCount,
-                        userName: viewModel.user.firstName ?? viewModel.user.fullName
+                        userName: viewModel.user.firstName.isEmpty ? viewModel.user.fullName : viewModel.user.firstName
                     )
 
                     // Name
@@ -62,7 +62,8 @@ struct ExternalUserProfileContentView: View {
                             tiktokUsername: viewModel.user.tiktokUsername
                         ),
                         onFollowersTap: { showFollowers = true },
-                        onFollowingTap: { showFollowing = true }
+                        onFollowingTap: { showFollowing = true },
+                        hideFollowing: viewModel.isCuratedProfile
                     )
                 }
                 .padding(.top, -8)
@@ -73,12 +74,15 @@ struct ExternalUserProfileContentView: View {
 
                 // Content section
                 VStack(spacing: 20) {
-                    // Favorites & Reviews
-                    ExternalUserProfileFavoritesReviewsView(viewModel: viewModel)
-                        .padding(.top, 16)
+                    // Favorites & Reviews (hidden for curated/brand profiles)
+                    if !viewModel.isCuratedProfile {
+                        ExternalUserProfileFavoritesReviewsView(viewModel: viewModel)
+                            .padding(.top, 16)
+                    }
 
                     // Place Lists
                     ExternalUserProfileListsView(viewModel: viewModel, placeLists: viewModel.userLists)
+                        .padding(.top, viewModel.isCuratedProfile ? 16 : 0)
 
                     Spacer(minLength: 50)
                 }
@@ -102,19 +106,21 @@ struct ExternalUserProfileContentView: View {
                     EmptyView()
                 }
 
-                NavigationLink(
-                    destination: ProfileFollowingListView(viewModel: viewModel)
-                        .environmentObject(profileVM)
-                        .environmentObject(detailPlaceVM)
-                        .environmentObject(userSession)
-                        .environmentObject(selectedPlaceVM)
-                        .environmentObject(userProfileNavigationVM)
-                        .environmentObject(mapDisplayCoordinatorVM)
-                        .environmentObject(locationManager)
-                        .environmentObject(dataManager),
-                    isActive: $showFollowing
-                ) {
-                    EmptyView()
+                if !viewModel.isCuratedProfile {
+                    NavigationLink(
+                        destination: ProfileFollowingListView(viewModel: viewModel)
+                            .environmentObject(profileVM)
+                            .environmentObject(detailPlaceVM)
+                            .environmentObject(userSession)
+                            .environmentObject(selectedPlaceVM)
+                            .environmentObject(userProfileNavigationVM)
+                            .environmentObject(mapDisplayCoordinatorVM)
+                            .environmentObject(locationManager)
+                            .environmentObject(dataManager),
+                        isActive: $showFollowing
+                    ) {
+                        EmptyView()
+                    }
                 }
             }
         )

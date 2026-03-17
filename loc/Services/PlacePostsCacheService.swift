@@ -113,7 +113,7 @@ class PlacePostsCacheService: ObservableObject {
         objectWillChange.send()
 
         Task {
-            guard let currentUserId = authService.currentUserId else {
+            guard authService.currentUserId != nil else {
                 self.loadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
                 self.updateCache(placeId: placeId, posts: [], externalVideos: [])
                 return

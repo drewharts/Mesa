@@ -510,7 +510,6 @@ class MesaBackendService {
 
         // 429 = rate limited, treat as "no refresh needed right now"
         if httpResponse.statusCode == 429 {
-            print("📸 [MesaBackendService] Image refresh rate limited for place \(placeId)")
             return false
         }
 
@@ -520,8 +519,6 @@ class MesaBackendService {
 
         let refreshResponse = try JSONDecoder().decode(ImageRefreshResponse.self, from: data)
         let refreshInitiated = refreshResponse.status == "processing"
-
-        print("📸 [MesaBackendService] Image refresh response: \(refreshResponse.status), queued: \(refreshResponse.reviews_queued)")
 
         return refreshInitiated
     }

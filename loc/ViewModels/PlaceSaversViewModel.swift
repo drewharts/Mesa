@@ -66,15 +66,15 @@ class PlaceSaversViewModel: ObservableObject {
     func setPlace(_ placeId: String?) {
         // Cancel any in-flight fetch
         fetchTask?.cancel()
-        
+
+        // Clear stale data immediately so the previous place's savers don't flash on screen
+        resetState()
+
         currentPlaceId = placeId
         guard let placeId = placeId else {
-            resetState()
             return
         }
-        
-        print("🔍 [PlaceSavers] setPlace called for: \(placeId.prefix(8))...")
-        
+
         // Fetch savers from database in real-time
         fetchSaversFromDatabase(placeId: placeId)
     }

@@ -43,7 +43,14 @@
       "Bash(git diff:*)",
       "Read(//Users/drewhartsfield/.claude/**)",
       "Read(//Users/drewhartsfield/**)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "WebFetch(domain:download.geonames.org)",
+      "Read(//private/tmp/**)",
+      "Bash(unzip -o cities15000.zip)",
+      "Bash(python3:*)",
+      "Bash(gh gist:*)",
+      "mcp__supabase__list_migrations",
+      "Bash(git:*)"
     ],
     "deny": []
   },

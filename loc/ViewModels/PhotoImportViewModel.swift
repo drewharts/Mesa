@@ -80,8 +80,6 @@ class PhotoImportViewModel: ObservableObject {
             // Now check each photo for coordinates until we find one
             for (index, item) in selectedItems.enumerated() {
                 if let imageData = try await item.loadTransferable(type: Data.self) {
-                    print("📸 Checking photo \(index + 1) for GPS coordinates...")
-                    
                     if await extractCoordinatesFromPhoto(data: imageData, photoIndex: index + 1) {
                         foundCoordinates = true
                         break // Stop once we find coordinates
@@ -111,22 +109,14 @@ class PhotoImportViewModel: ObservableObject {
     }
     
     private func extractCoordinatesFromPhoto(data: Data, photoIndex: Int) async -> Bool {
-        print("📸 Starting coordinate extraction for photo \(photoIndex)...")
-        
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
               let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
-            print("❌ Failed to get image properties for photo \(photoIndex)")
             return false
         }
-        
-        print("✅ Got image properties for photo \(photoIndex)")
-        
+
         guard let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any] else {
-            print("❌ No GPS data found in photo \(photoIndex)")
             return false
         }
-        
-        print("✅ Found GPS data in photo \(photoIndex): \(gpsData)")
         
         // Extract GPS coordinates
         if let latitude = gpsData[kCGImagePropertyGPSLatitude as String] as? Double,
@@ -138,13 +128,11 @@ class PhotoImportViewModel: ObservableObject {
             let finalLongitude = (longitudeRef == "W") ? -longitude : longitude
             
             detectedCoordinates = (latitude: finalLatitude, longitude: finalLongitude)
-            print("🎯 Extracted coordinates from photo \(photoIndex): \(finalLatitude), \(finalLongitude)")
-            
+
             // Fetch nearby places
             await fetchNearbyPlaces(latitude: finalLatitude, longitude: finalLongitude)
             return true
         } else {
-            print("❌ Failed to parse coordinate values from photo \(photoIndex)")
             return false
         }
     }
@@ -154,7 +142,6 @@ class PhotoImportViewModel: ObservableObject {
         
         do {
             // First try with default radius (50m)
-            print("🔍 Searching for nearby places within 50m...")
             var response = try await nearbyPlacesService.fetchNearbyPlaces(
                 latitude: latitude,
                 longitude: longitude,
@@ -162,11 +149,9 @@ class PhotoImportViewModel: ObservableObject {
             )
             
             nearbyPlaces = response.features
-            print("🏢 Found \(nearbyPlaces.count) places within 50m")
-            
+
             // If no places found, try with larger radius (250m)
             if nearbyPlaces.isEmpty {
-                print("🔍 No places found within 50m, expanding search to 250m...")
                 response = try await nearbyPlacesService.fetchNearbyPlaces(
                     latitude: latitude,
                     longitude: longitude,
@@ -174,11 +159,9 @@ class PhotoImportViewModel: ObservableObject {
                 )
                 
                 nearbyPlaces = response.features
-                print("🏢 Found \(nearbyPlaces.count) places within 250m")
-                
+
                 // If still no places found, try with even larger radius (1000m)
                 if nearbyPlaces.isEmpty {
-                    print("🔍 No places found within 250m, expanding search to 1000m...")
                     response = try await nearbyPlacesService.fetchNearbyPlaces(
                         latitude: latitude,
                         longitude: longitude,
@@ -186,17 +169,9 @@ class PhotoImportViewModel: ObservableObject {
                     )
                     
                     nearbyPlaces = response.features
-                    print("🏢 Found \(nearbyPlaces.count) places within 1000m")
-                    
-                    if nearbyPlaces.isEmpty {
-                        print("❌ No nearby places found even within 1000m - user can create new place")
-                        searchRadiusUsed = 1000
-                    } else {
-                        print("✅ Expanded search successful - found places within 1000m")
-                        searchRadiusUsed = 1000
-                    }
+
+                    searchRadiusUsed = 1000
                 } else {
-                    print("✅ Expanded search successful - found places within 250m")
                     searchRadiusUsed = 250
                 }
             } else {
@@ -214,8 +189,6 @@ class PhotoImportViewModel: ObservableObject {
         selectedPlace = place
         isUserCreatedPlace = false  // Always Google Place in photo import flow
 
-        print("✅ Selected place: \(place.properties.name)")
-
         // Always fetch from backend to get proper UUID
         guard let googlePlaceId = place.properties.placeId else {
             print("❌ No Google Place ID found")
@@ -229,7 +202,6 @@ class PhotoImportViewModel: ObservableObject {
         do {
             let detailPlace = try await fetchPlaceFromBackend(googlePlaceId: googlePlaceId)
             resolvedPlace = detailPlace
-            print("✅ Resolved place from backend with UUID: \(detailPlace.id)")
         } catch {
             print("❌ Failed to resolve place from backend: \(error)")
             // Fallback to client-side conversion if backend fails
@@ -255,12 +227,9 @@ class PhotoImportViewModel: ObservableObject {
             // For Google Places, fetch from backend (handles deduplication)
             if let googlePlaceId = nearbyPlace.properties.placeId,
                nearbyPlace.properties.source != "user_created" {
-                print("🔄 Fetching place from backend with Google Place ID: \(googlePlaceId)")
                 detailPlace = try await fetchPlaceFromBackend(googlePlaceId: googlePlaceId)
-                print("✅ Got place from backend with UUID: \(detailPlace.id)")
             } else {
                 // User-created places - convert locally (they're unique by definition)
-                print("📝 Converting user-created place locally")
                 detailPlace = convertToDetailPlace(nearbyPlace)
             }
 
@@ -271,7 +240,6 @@ class PhotoImportViewModel: ObservableObject {
                         print("❌ Error saving place to main collection: \(error.localizedDescription)")
                         continuation.resume(throwing: error)
                     } else {
-                        print("✅ Successfully saved place to main collection")
                         continuation.resume()
                     }
                 }
@@ -285,7 +253,6 @@ class PhotoImportViewModel: ObservableObject {
                             print("❌ Error saving place to user's collection: \(error.localizedDescription)")
                             continuation.resume(throwing: error)
                         } else {
-                            print("✅ Successfully saved place to user's myPlaces collection")
                             continuation.resume()
                         }
                     }
@@ -296,8 +263,6 @@ class PhotoImportViewModel: ObservableObject {
             userService.addOrUpdateMapPlace(userId: currentUserId, place: detailPlace) { error in
                 if let error = error {
                     print("❌ Error updating map place: \(error)")
-                } else {
-                    print("✅ Successfully updated map place")
                 }
             }
 
@@ -306,8 +271,6 @@ class PhotoImportViewModel: ObservableObject {
 
             // Notify other components to refresh map annotations
             NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
-
-            print("✅ Place '\(detailPlace.name)' successfully saved to database")
 
             // Notify parent view that a place is successfully saved
             onPlaceSaved?()

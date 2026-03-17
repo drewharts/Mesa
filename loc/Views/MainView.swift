@@ -296,6 +296,10 @@ struct MainView: View {
             case .cityOverview(let cityName, let coordinate, let annotation):
                 cityOverviewSheet(cityName: cityName, coordinate: coordinate, annotation: annotation)
 
+            // Trips
+            case .tripsList:
+                tripsListSheet
+
             // Onboarding
             case .suggestedProfiles:
                 suggestedProfilesSheet
@@ -511,6 +515,21 @@ struct MainView: View {
         .presentationDragIndicator(.visible)
     }
 
+    /// Trips list sheet content.
+    private var tripsListSheet: some View {
+        TripsListView()
+            .environmentObject(userSession)
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(profileViewModel)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(locationManager)
+            .environmentObject(mapDisplayCoordinatorViewModel)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .large))
+    }
+
     /// Loading view for lists.
     private var loadingListView: some View {
         VStack {
@@ -619,12 +638,15 @@ struct MainView: View {
     private var bottomNavigationBar: some View {
         Group {
             if shouldShowBottomNavigationBar {
-                MapBottomNavigationBar(
-                    showSearchPage: $showSearchPage,
-                    shouldNavigateToProfile: $shouldNavigateToProfile,
-                    shouldNavigateToFeed: $shouldNavigateToFeed
-                )
-                .environmentObject(profileViewModel)
+                VStack {
+                    Spacer()
+                    BottomNavigationBar(
+                        showSearchPage: $showSearchPage,
+                        shouldNavigateToProfile: $shouldNavigateToProfile,
+                        shouldNavigateToFeed: $shouldNavigateToFeed
+                    )
+                    .environmentObject(profileViewModel)
+                }
             }
         }
     }

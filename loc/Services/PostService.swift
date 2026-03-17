@@ -9,7 +9,7 @@
 import Foundation
 
 class PostService: ObservableObject {
-    static let shared = PostService()
+    nonisolated(unsafe) static let shared = PostService()
     private let supabase = SupabasePostService.shared
     private let placeService: SupabasePlaceService
     

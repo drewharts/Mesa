@@ -18,12 +18,13 @@ struct BottomNavigationBar: View {
 
     @Binding var showSearchPage: Bool
     @Binding var shouldNavigateToProfile: Bool
-    @Binding var showTripsSheet: Bool
+    @Binding var shouldNavigateToFeed: Bool
 
     // MARK: - Body
 
     var body: some View {
         HStack(spacing: 16) {
+            feedButton
             profileButton
             searchCapsule
             tripsButton
@@ -39,6 +40,20 @@ struct BottomNavigationBar: View {
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .padding(.horizontal, 20)
         .padding(.bottom, 16)
+    }
+
+    // MARK: - Feed Button
+
+    private var feedButton: some View {
+        Button {
+            shouldNavigateToFeed = true
+        } label: {
+            Image("MesaLogo")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 36, height: 36)
+                .clipShape(Circle())
+        }
     }
 
     // MARK: - Profile Button
@@ -90,7 +105,7 @@ struct BottomNavigationBar: View {
 
     private var tripsButton: some View {
         Button {
-            showTripsSheet = true
+            PresentationService.shared.present(.tripsList)
         } label: {
             Image(systemName: "airplane")
                 .font(.system(size: 16, weight: .medium))

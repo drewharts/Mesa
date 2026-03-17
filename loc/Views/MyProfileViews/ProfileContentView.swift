@@ -53,6 +53,7 @@ struct ProfileContentView: View {
                         onFollowingTap: {
                             navigationPath.append(ProfileView.FollowListDestination.following)
                         },
+                        hideFollowing: profile.isCuratedProfile,
                         onAddSocialsTap: {
                             showEditProfileForSocials = true
                         }
@@ -67,13 +68,15 @@ struct ProfileContentView: View {
                         .padding(.top, 15)
                         .padding(.horizontal, 20)
                     
-                    // Favorites/Videos (tabbed) & Lists
-                    ProfileFavoritesExternalPlacesView(
-                        favoritesVM: favoritesVM,
-                        externalContentVM: externalContentVM,
-                        reviewsVM: reviewsVM,
-                        myPlacesVM: myPlacesVM
-                    )
+                    // Favorites/Videos (tabbed) & Lists — hidden for curated profiles
+                    if !profile.isCuratedProfile {
+                        ProfileFavoritesExternalPlacesView(
+                            favoritesVM: favoritesVM,
+                            externalContentVM: externalContentVM,
+                            reviewsVM: reviewsVM,
+                            myPlacesVM: myPlacesVM
+                        )
+                    }
                     ProfileViewListsView(listsVM: listsVM)
 
                     // No Location Data Error

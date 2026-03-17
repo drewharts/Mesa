@@ -118,13 +118,7 @@ class SearchPageViewModel: ObservableObject {
 
     /// Handle view all keywords action
     func handleViewAllKeywords() {
-        print("🔍 [SearchPageViewModel] handleViewAllKeywords called")
-        print("   - matchedKeyword: \(searchViewModel.matchedKeyword ?? "nil")")
-        print("   - currentKeywordTypes: \(searchViewModel.currentKeywordTypes)")
-        print("   - onViewAllKeywords callback set: \(onViewAllKeywords != nil)")
-
         guard let keyword = searchViewModel.matchedKeyword else {
-            print("   ❌ matchedKeyword is nil, returning early")
             return
         }
         onViewAllKeywords?(keyword, searchViewModel.currentKeywordTypes)

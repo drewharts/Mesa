@@ -105,23 +105,23 @@ class ImageService {
         
         
         Task {
-            var loadedImages: [UIImage] = []
-            
-            // Load images in parallel using TaskGroup (same as reviewed section)
-            await withTaskGroup(of: UIImage?.self) { group in
+            // Load images in parallel using TaskGroup
+            let loadedImages: [UIImage] = await withTaskGroup(of: UIImage?.self) { group in
                 for urlString in urls {
                     group.addTask {
                         await self.loadImageFromURL(imageUrl: urlString)
                     }
                 }
-                
+
+                var results: [UIImage] = []
                 for await image in group {
                     if let image = image {
-                        loadedImages.append(image)
+                        results.append(image)
                     }
                 }
+                return results
             }
-            
+
             await MainActor.run {
                 completion(loadedImages.isEmpty ? nil : loadedImages, nil)
             }

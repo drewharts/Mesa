@@ -396,6 +396,11 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         else if type == "place_added_to_list", let listId = userInfo["listId"] as? String {
             NotificationManager.shared.handleListNotificationTap(listId: listId)
         }
+        // Handle trip notifications (collaborator added, place added, trip updated)
+        else if (type == "trip_collaborator_added" || type == "place_added_to_trip" || type == "trip_updated"),
+                let tripId = userInfo["tripId"] as? String {
+            NotificationManager.shared.handleTripNotificationTap(tripId: tripId)
+        }
         // Handle review notifications
         else if let reviewId = userInfo["reviewId"] as? String,
            let placeId = userInfo["placeId"] as? String,
