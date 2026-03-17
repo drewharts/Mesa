@@ -22,6 +22,11 @@ struct PlaceChangeHandler: ViewModifier {
             .onChange(of: selectedPlaceVM.selectedPlace) { oldPlace, newPlace in
                 if isSamePlaceRefresh(old: oldPlace, new: newPlace) {
                     tabsViewModel?.refreshPlaceData(newPlace)
+                    // Recalculate travel time if the refresh brought real coordinates
+                    if let place = newPlace, place.coordinate != nil,
+                       tabsViewModel?.travelTimeViewModel.travelTimes.isEmpty == true {
+                        updateTravelTime(for: place)
+                    }
                 } else {
                     handleNewPlaceSelected(newPlace)
                 }

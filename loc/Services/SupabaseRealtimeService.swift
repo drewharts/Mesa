@@ -16,7 +16,7 @@ class SupabaseRealtimeService: ObservableObject {
     // Store active channels for cleanup
     private var activeChannels: [String: RealtimeChannelV2] = [:]
     
-    private init() {}
+    private nonisolated init() {}
     
     // MARK: - Placeholder Methods (Realtime V2 API needs to be implemented)
     
@@ -76,8 +76,12 @@ class SupabaseRealtimeService: ObservableObject {
     }
     
     deinit {
+        let channels = self.activeChannels
+        let supabase = self.supabase
         Task {
-            await cleanup()
+            for (channelName, _) in channels {
+                await supabase.realtime.channel(channelName).unsubscribe()
+            }
         }
     }
 }

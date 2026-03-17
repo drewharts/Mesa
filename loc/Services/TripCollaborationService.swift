@@ -23,31 +23,6 @@ class TripCollaborationService {
 
     /// Fetches all collaborators for a trip with user details.
     func fetchCollaborators(tripId: String) async throws -> [LightweightCollaborator] {
-        struct Row: Decodable {
-            let id: String
-            let userId: String
-            let role: String
-            let userName: String?
-            let profilePhotoUrl: String?
-
-            enum CodingKeys: String, CodingKey {
-                case id
-                case userId = "user_id"
-                case role
-                case userName = "user_name"
-                case profilePhotoUrl = "profile_photo_url"
-            }
-        }
-
-        let rows: [Row] = try await supabase.client
-            .from("trip_collaborators")
-            .select("id, user_id, role, users!trip_collaborators_user_id_fkey(full_name, profile_photo_url)")
-            .eq("trip_id", value: tripId)
-            .execute()
-            .value
-
-        // The join returns nested user data; decode manually
-        // Fall back to a simpler query approach
         return try await fetchCollaboratorsViaRPC(tripId: tripId)
     }
 

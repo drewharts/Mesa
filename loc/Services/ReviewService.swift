@@ -4,7 +4,7 @@ import Foundation
 /// This wrapper exists for backward compatibility with existing code
 /// New code should use PostService directly
 class ReviewService: ObservableObject {
-    static let shared = ReviewService()
+    nonisolated(unsafe) static let shared = ReviewService()
     private let supabasePostService = SupabasePostService.shared
     
     private init() {}

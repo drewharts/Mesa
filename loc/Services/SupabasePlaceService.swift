@@ -14,7 +14,7 @@ class SupabasePlaceService: ObservableObject {
     static let shared = SupabasePlaceService()
     private let supabase = SupabaseManager.shared
     
-    private init() {    }
+    private nonisolated init() {    }
     
     // MARK: - Place Deletion
     
@@ -326,16 +326,7 @@ class SupabasePlaceService: ObservableObject {
             throw error
         }
         
-        var places: [DetailPlace] = []
-        for (index, record) in response.enumerated() {
-            do {
-                let place = convertToDetailPlace(record)
-                places.append(place)
-            } catch {
-                print("❌ [Supabase] Error converting place \(index + 1) (\(record.name)): \(error)")
-                print("❌ [Supabase] Place record data: \(record)")
-            }
-        }
+        let places = response.map { convertToDetailPlace($0) }
         
         
         return places
@@ -626,11 +617,11 @@ class SupabasePlaceService: ObservableObject {
         Task {
             do {
                 // Test with a simple count query instead of trying to decode PlaceRecord
-                let response = try await supabase.client
+                _ = try await supabase.client
                     .from("places")
                     .select("id", head: true, count: .exact)
                     .execute()
-                
+
                 completion(true, nil)
             } catch {
                 print("❌ [Supabase] Connection test failed: \(error)")
@@ -645,13 +636,12 @@ class SupabasePlaceService: ObservableObject {
                 // Convert DetailPlace to dictionary for Supabase insertion
                 let placeData = convertToPlaceData(place)
                 
-                let response: [PlaceRecord] = try await supabase.client
+                _ = try await supabase.client
                     .from("places")
                     .insert(placeData)
                     .select()
                     .execute()
-                    .value
-                
+
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error adding place to all_places: \(error)")

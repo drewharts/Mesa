@@ -13,7 +13,7 @@ import Supabase
 @MainActor
 class ContactsService {
 
-    private let contactStore = CNContactStore()
+    private nonisolated(unsafe) let contactStore = CNContactStore()
 
     // MARK: - Contacts Access
 

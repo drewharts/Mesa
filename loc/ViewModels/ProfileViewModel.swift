@@ -16,6 +16,11 @@ class ProfileViewModel: ObservableObject {
     @Published var user: ProfileData?
     @Published var userPicture: UIImage?
 
+    /// Whether the current user has a curated/brand profile.
+    var isCuratedProfile: Bool {
+        user?.accountType == .curated
+    }
+
     // Map filtering triggers
     @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
     @Published var showExternalPlacesOnMap: Bool = false // When set, triggers map to show external places
@@ -321,7 +326,10 @@ class ProfileViewModel: ObservableObject {
                 // This happens after login, ensuring data is ready for views
                 // Note: fetchUserExternalPlaces() is NOT called here - it's loaded on-demand
                 // when navigating to PlaceDetailView to avoid unnecessary startup load
+                // Curated profiles skip these — they only show lists
                 Task {
+                    if self.isCuratedProfile { return }
+
                     async let externalPlacesLoad: () = self.externalContentViewModel.loadInitialExternalPlaces()
                     async let reviewsLoad: () = self.reviewsViewModel.loadMyReviewedPlacesWithPagination()
                     async let myPlacesLoad: () = self.myPlacesViewModel.loadInitialMyPlaces()
@@ -658,6 +666,7 @@ class ProfileViewModel: ObservableObject {
     }
 
     /// Fetches profile counts and favorites in parallel, preserving current values on cancellation.
+    /// Curated profiles skip favorites, following count, and total places count.
     func loadProfileCounts() async {
         guard profileCountsLoadingState == .idle else { return }
         guard let userId = user?.id ?? userSession.currentUserId else { return }
@@ -666,21 +675,29 @@ class ProfileViewModel: ObservableObject {
         let fallbacks = captureCurrentCountFallbacks()
         showLoadingIndicatorsIfInitialLoad(fallbacks)
 
-        async let followers: Int = resilientFetch(fallbacks.followers) { try await self.userService.getNumberFollowers(forUserId: userId) }
-        async let following: Int = resilientFetch(fallbacks.following) { try await self.userService.getNumberFollowing(forUserId: userId) }
-        async let favorites: [FavoritePlace] = resilientFetch(fallbacks.favorites) { try await self.userService.fetchUserFavorites(userId: userId) }
-        async let totalUniquePlaces: Int = resilientFetch(fallbacks.uniquePlaces) { try await self.userService.getTotalPlacesCount(forUserId: userId) }
+        if isCuratedProfile {
+            let followersCount = await resilientFetch(fallbacks.followers) { try await self.userService.getNumberFollowers(forUserId: userId) }
+            socialViewModel.followersCount = followersCount
+            socialViewModel.isFollowersLoading = false
+            socialViewModel.isFollowingLoading = false
+        } else {
+            async let followers: Int = resilientFetch(fallbacks.followers) { try await self.userService.getNumberFollowers(forUserId: userId) }
+            async let following: Int = resilientFetch(fallbacks.following) { try await self.userService.getNumberFollowing(forUserId: userId) }
+            async let favorites: [FavoritePlace] = resilientFetch(fallbacks.favorites) { try await self.userService.fetchUserFavorites(userId: userId) }
+            async let totalUniquePlaces: Int = resilientFetch(fallbacks.uniquePlaces) { try await self.userService.getTotalPlacesCount(forUserId: userId) }
 
-        let (followersCount, followingCount, favoritePlaces, uniquePlacesCount) = await (followers, following, favorites, totalUniquePlaces)
+            let (followersCount, followingCount, favoritePlaces, uniquePlacesCount) = await (followers, following, favorites, totalUniquePlaces)
 
-        socialViewModel.followersCount = followersCount
-        socialViewModel.followingCount = followingCount
-        totalUniquePlacesCount = uniquePlacesCount
-        favoritesViewModel.lightweightFavorites = favoritePlaces
-        socialViewModel.isFollowersLoading = false
-        socialViewModel.isFollowingLoading = false
+            socialViewModel.followersCount = followersCount
+            socialViewModel.followingCount = followingCount
+            totalUniquePlacesCount = uniquePlacesCount
+            favoritesViewModel.lightweightFavorites = favoritePlaces
+            socialViewModel.isFollowersLoading = false
+            socialViewModel.isFollowingLoading = false
 
-        addCurrentUserToPlaceSavers(for: favoritePlaces, userId: userId)
+            addCurrentUserToPlaceSavers(for: favoritePlaces, userId: userId)
+        }
+
         profileCountsLoadingState = .loaded
 
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -724,15 +741,18 @@ class ProfileViewModel: ObservableObject {
     }
 
     /// Refreshes all profile data for pull-to-refresh.
+    /// Curated profiles only refresh counts and lists (no favorites, reviews, external content).
     func refreshProfile() async {
         invalidateProfileCounts()
         await loadProfileCounts()
 
-        async let reviews: Void = reviewsViewModel.refreshReviewedPlaces()
-        async let externalPlaces: Void = externalContentViewModel.reloadLightweightExternalPlaces()
-        async let myPlaces: Void = myPlacesViewModel.refreshMyPlaces()
+        if !isCuratedProfile {
+            async let reviews: Void = reviewsViewModel.refreshReviewedPlaces()
+            async let externalPlaces: Void = externalContentViewModel.reloadLightweightExternalPlaces()
+            async let myPlaces: Void = myPlacesViewModel.refreshMyPlaces()
 
-        _ = await (reviews, externalPlaces, myPlaces)
+            _ = await (reviews, externalPlaces, myPlaces)
+        }
     }
 
     /// Handles an external content notification by processing the URL - delegates to externalContentViewModel.

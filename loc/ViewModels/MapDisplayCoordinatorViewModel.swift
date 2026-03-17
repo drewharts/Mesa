@@ -7,12 +7,32 @@
 //
 
 import Foundation
+import MapKit
 import SwiftUI
 
 /// Coordinates map display for external user data.
 /// Single Responsibility: Manages map display triggers and data for external profiles.
 @MainActor
 class MapDisplayCoordinatorViewModel: ObservableObject {
+    // MARK: - Trip Map Display
+
+    /// Trip annotations currently shown on the main map.
+    @Published var activeTripAnnotations: [TripMapAnnotation] = []
+
+    /// The ID of the trip currently shown on the main map.
+    @Published var activeTripId: String? = nil
+
+    /// Whether trip annotations are currently displayed on the map.
+    var hasTripOverlay: Bool {
+        !activeTripAnnotations.isEmpty
+    }
+
+    /// Place ID tapped on a trip map annotation, observed by TripDetailView for navigation.
+    @Published var tappedTripPlaceId: String?
+
+    /// Place ID of the currently highlighted trip annotation (drives pin selection + camera).
+    @Published var selectedTripAnnotationPlaceId: String?
+
     // MARK: - Map Display Triggers
 
     /// Triggers map sheet to show external user's reviews
@@ -158,8 +178,23 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
         }
     }
 
+    /// Sets trip annotations to display on the main map.
+    func showTripOnMap(annotations: [TripMapAnnotation], tripId: String) {
+        activeTripAnnotations = annotations
+        activeTripId = tripId
+    }
+
+    /// Clears trip annotations from the main map.
+    func clearTripAnnotations() {
+        activeTripAnnotations = []
+        activeTripId = nil
+        selectedTripAnnotationPlaceId = nil
+    }
+
     /// Clears all map display state.
     func clearMapDisplayState() {
+        clearTripAnnotations()
+        tappedTripPlaceId = nil
         showExternalReviewsOnMap = false
         showExternalListOnMap = nil
         showExternalFavoritesOnMap = false

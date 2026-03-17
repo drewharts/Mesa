@@ -69,37 +69,27 @@ class DeepLinkManager: ObservableObject {
     // MARK: - Deep Link Processing
     
     func processDeepLink(_ url: URL) async {
-        print("🔗 [DeepLinkManager] processDeepLink called with URL: \(url)")
-        print("🔗 [DeepLinkManager] scheme: \(url.scheme ?? "nil"), host: \(url.host ?? "nil"), path: \(url.path)")
-        
         guard url.scheme == "loc" else {
             print("❌ [DeepLinkManager] Invalid scheme, expected 'loc'")
             return
         }
-        
+
         switch url.host {
         case "place":
-            print("📍 [DeepLinkManager] Routing to handlePlaceDeepLink")
             await handlePlaceDeepLink(url)
         case "list":
-            print("📋 [DeepLinkManager] Routing to handleListDeepLink")
             await handleListDeepLink(url)
         case "profile":
-            print("👤 [DeepLinkManager] Routing to handleProfileDeepLink")
             await handleProfileDeepLink(url)
         case "tiktok-shared":
-            print("📤 [DeepLinkManager] host is 'tiktok-shared', routing to handleContentFromExtension")
             await handleContentFromExtension()
         case "share":
-            print("📤 [DeepLinkManager] host is 'share', checking path...")
             if url.path == "/content" || url.path == "/tiktok" {
-                print("📤 [DeepLinkManager] Path is '\(url.path)', routing to handleExternalContentDeepLink")
                 await handleExternalContentDeepLink(url)
             } else if url.path == "/list" {
-                print("📋 [DeepLinkManager] Path is '/list', routing to handleListShareDeepLink")
                 await handleListShareDeepLink(url)
             } else {
-                print("❌ [DeepLinkManager] Path is '\(url.path)', not '/content', '/tiktok', or '/list'")
+                print("❌ [DeepLinkManager] Unrecognized share path: '\(url.path)'")
             }
         default:
             print("❌ [DeepLinkManager] Unknown host: \(url.host ?? "nil")")
@@ -147,8 +137,6 @@ class DeepLinkManager: ObservableObject {
             return
         }
 
-        print("👤 [DeepLinkManager] Navigating to profile: \(shareableProfile.id)")
-
         // Navigate to profile using UserProfileNavigationViewModel
         userProfileNavigationViewModel.fetchAndSelectUser(userId: shareableProfile.id, currentUserId: currentUserId)
     }
@@ -163,32 +151,24 @@ class DeepLinkManager: ObservableObject {
     }
     
     private func handleExternalContentDeepLink(_ url: URL) async {
-        print("🔗 [DeepLinkManager] handleExternalContentDeepLink called with URL: \(url)")
-
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let urlItem = components.queryItems?.first(where: { $0.name == "url" }),
               let contentURLString = urlItem.value else {
             print("❌ [DeepLinkManager] Failed to extract content URL from deep link")
             return
         }
-
-        print("✅ [DeepLinkManager] Extracted content URL: \(contentURLString)")
         isProcessingDeepLink = true
         await processExternalContentURL(contentURLString)
         isProcessingDeepLink = false
     }
 
     private func handleListShareDeepLink(_ url: URL) async {
-        print("🔗 [DeepLinkManager] handleListShareDeepLink called with URL: \(url)")
-
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let textItem = components.queryItems?.first(where: { $0.name == "text" }),
               let sharedText = textItem.value else {
             print("❌ [DeepLinkManager] Failed to extract shared text from deep link")
             return
         }
-
-        print("✅ [DeepLinkManager] Extracted shared text: \(sharedText)")
 
         // Show a confirmation that the list was shared
         await MainActor.run {
@@ -202,12 +182,9 @@ class DeepLinkManager: ObservableObject {
     }
     
     private func handleContentFromExtension() async {
-        print("🎵 [DeepLinkManager] handleContentFromExtension called")
-        
         // Check App Group first (preferred method) - check both old and new keys for backward compat
         if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa"),
            let contentURLString = sharedDefaults.string(forKey: "sharedTikTokURL") ?? sharedDefaults.string(forKey: "sharedContentURL") {
-            print("✅ [DeepLinkManager] Found content URL in App Group: \(contentURLString)")
             sharedDefaults.removeObject(forKey: "sharedTikTokURL")
             sharedDefaults.removeObject(forKey: "sharedContentURL")
             sharedDefaults.synchronize()
@@ -217,7 +194,6 @@ class DeepLinkManager: ObservableObject {
 
         // Fallback: Check standard UserDefaults - check both old and new keys for backward compat
         if let contentURLString = UserDefaults.standard.string(forKey: "sharedTikTokURL") ?? UserDefaults.standard.string(forKey: "sharedContentURL") {
-            print("✅ [DeepLinkManager] Found content URL in standard UserDefaults: \(contentURLString)")
             UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
             UserDefaults.standard.removeObject(forKey: "sharedContentURL")
             UserDefaults.standard.synchronize()
@@ -229,8 +205,6 @@ class DeepLinkManager: ObservableObject {
     }
     
     private func processExternalContentURL(_ urlString: String) async {
-        print("🎬 [DeepLinkManager] Starting processExternalContentURL for: \(urlString)")
-        
         // Store URL for later use when creating external_place entry
         currentProcessingURL = urlString
         
@@ -255,20 +229,15 @@ class DeepLinkManager: ObservableObject {
             }
         }
         
-        guard shouldProcess else { 
-            print("⏭️ [DeepLinkManager] Skipping duplicate URL")
+        guard shouldProcess else {
             currentProcessingURL = nil
-            return 
+            return
         }
-        
-        print("📞 [DeepLinkManager] Calling ExternalContentService...")
+
         let result = await externalContentService.processURL(urlString)
-        print("📨 [DeepLinkManager] ExternalContentService returned with result")
-        print("🔍 [DeepLinkManager] Processing result...")
         
         switch result {
         case .success(let detailPlaces):
-            print("✅ [DeepLinkManager] Result is .success with \(detailPlaces.count) place(s)")
             if detailPlaces.isEmpty {
                 // Show user-friendly message
                 await MainActor.run {
@@ -281,8 +250,7 @@ class DeepLinkManager: ObservableObject {
             
             if detailPlaces.count == 1 {
                 let place = detailPlaces[0]
-                print("🧭 [DeepLinkManager] Navigating to place: \(place.name)")
-                
+
                 // Navigate directly - backend returns full place details
                 await navigateToPlace(place, contentUrl: urlString)
             } else {
@@ -353,9 +321,7 @@ class DeepLinkManager: ObservableObject {
     
     private func searchPlaceById(_ placeId: String) async -> DetailPlace? {
         do {
-            print("🔍 [DeepLinkManager] Querying Supabase for place: \(placeId)")
             let place = try await SupabasePlaceService.shared.fetchPlaceDetails(placeId: placeId)
-            print("✅ [DeepLinkManager] Successfully fetched place from Supabase: \(place?.name ?? "nil")")
             return place
         } catch {
             print("❌ [DeepLinkManager] Error fetching place by ID: \(error)")
@@ -393,24 +359,19 @@ class DeepLinkManager: ObservableObject {
     // MARK: - Navigation
     
     private func navigateToPlace(_ place: DetailPlace, contentUrl: String? = nil) async {
-        print("📍 [DeepLinkManager] navigateToPlace called for: \(place.name)")
         await MainActor.run {
-            print("📱 [DeepLinkManager] On main thread, setting up place detail view")
             detailPlaceViewModel.places[place.id.uuidString] = place
 
             if let contentUrl = contentUrl {
                 // Import path: show confirmation prompt instead of navigating directly
-                print("🔄 [DeepLinkManager] Showing import place confirmation for: \(place.name)")
                 PresentationService.shared.present(
                     .importPlaceConfirmation(placeId: place.id.uuidString, contentUrl: contentUrl)
                 )
             } else {
                 // Regular deep link: navigate directly to place detail
-                print("🔄 [DeepLinkManager] Calling selectPlaceAndFetchDetails - this will load reviews & external videos")
                 selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                 selectedPlaceViewModel.isDetailSheetPresented = true
             }
-            print("✅ [DeepLinkManager] Place detail sheet presented")
             pendingPlace = nil
         }
 

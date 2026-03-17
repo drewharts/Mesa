@@ -16,10 +16,10 @@ class SupabaseAuthService: ObservableObject {
     @Published var currentUser: Auth.User?
     @Published var session: Session?
     
-    private init() {
+    private nonisolated init() {
         // Set up auth state listener
         Task {
-            await setupAuthListener()
+            await self.setupAuthListener()
         }
     }
     
@@ -214,7 +214,7 @@ class SupabaseAuthService: ObservableObject {
     /// Check if this is a migrated user
     func isMigratedUser() -> Bool {
         guard let metadata = currentUser?.userMetadata else { return false }
-        return metadata["migrated"] as? Bool ?? false
+        return metadata["migrated"]?.value as? Bool ?? false
     }
 }
 

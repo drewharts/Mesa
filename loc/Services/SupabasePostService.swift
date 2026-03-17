@@ -13,7 +13,7 @@ class SupabasePostService: ObservableObject {
     static let shared = SupabasePostService()
     private let supabase = SupabaseManager.shared
     
-    private init() {}
+    private nonisolated init() {}
     
     // MARK: - Save Post
     
@@ -241,8 +241,6 @@ class SupabasePostService: ObservableObject {
             let media: [ExternalReviewMediaRecord]?
         }
 
-        print("📸 [SupabasePostService] Fetching external reviews for placeId: \(placeId), offset: \(reviewOffset)")
-
         let records: [ExternalReviewRecord] = try await supabase.client
             .from("external_reviews")
             .select("id, media")
@@ -251,8 +249,6 @@ class SupabasePostService: ObservableObject {
             .range(from: reviewOffset, to: reviewOffset + reviewLimit - 1)
             .execute()
             .value
-
-        print("📸 [SupabasePostService] Found \(records.count) external review records")
 
         var imageUrls: [String] = []
 
@@ -265,8 +261,6 @@ class SupabasePostService: ObservableObject {
             }
             imageUrls.append(contentsOf: urls)
         }
-
-        print("📸 [SupabasePostService] Extracted \(imageUrls.count) image URLs from reviews")
 
         let nextOffset = reviewOffset + records.count
         let hasMore = records.count == reviewLimit
