@@ -50,7 +50,8 @@
       "Bash(python3:*)",
       "Bash(gh gist:*)",
       "mcp__supabase__list_migrations",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(sort -k2)"
     ],
     "deny": []
   },

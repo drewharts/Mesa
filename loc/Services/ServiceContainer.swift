@@ -28,6 +28,10 @@ class ServiceContainer: ObservableObject {
     // MARK: - Contacts
     lazy var contactsService = ContactsService()
 
+    // MARK: - Monetization Services
+    lazy var storeKitService = StoreKitService.shared
+    lazy var listPurchaseService = ListPurchaseService.shared
+
     // MARK: - Cache Services
     lazy var postsCacheService = PlacePostsCacheService.shared
 
@@ -72,5 +76,18 @@ class ServiceContainer: ObservableObject {
     func setupServices() {
         // Any cross-service setup can go here
         // For example, if services need references to each other
+        setupStoreKit()
+    }
+
+    /// Loads StoreKit products and starts listening for transaction updates
+    private func setupStoreKit() {
+        Task {
+            await storeKitService.loadProducts()
+        }
+        storeKitService.startTransactionListener { [weak self] transactionId in
+            Task { [weak self] in
+                await self?.listPurchaseService.removePurchase(transactionId: transactionId)
+            }
+        }
     }
 } 

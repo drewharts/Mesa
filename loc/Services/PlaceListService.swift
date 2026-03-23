@@ -260,6 +260,19 @@ class PlaceListService {
             .execute()
     }
 
+    /// Updates the price tier for a place list (nil = free)
+    func updateListPricing(listId: String, priceTier: String?) async throws {
+        struct UpdateData: Encodable {
+            let price_tier: String?
+        }
+
+        try await supabase.client
+            .from("place_lists")
+            .update(UpdateData(price_tier: priceTier))
+            .eq("id", value: listId)
+            .execute()
+    }
+
     /// Updates the privacy setting for a place list.
     func updateListPrivacy(listId: String, isPublic: Bool) async throws {
         struct UpdateData: Encodable {

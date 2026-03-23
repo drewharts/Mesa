@@ -5,11 +5,11 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.get_user_place_lists_by_proximity(p_user_id text, p_user_lat double precision DEFAULT NULL::double precision, p_user_lng double precision DEFAULT NULL::double precision)
- RETURNS TABLE(id text, user_id text, name text, description text, average_location text, is_public boolean, image text, created_at timestamp without time zone, updated_at timestamp without time zone, distance_meters double precision)
+ RETURNS TABLE(id text, user_id text, name text, description text, average_location text, is_public boolean, image text, created_at timestamp without time zone, updated_at timestamp without time zone, distance_meters double precision, price_tier text)
  LANGUAGE plpgsql
 AS $function$BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         pl.id,
         pl.user_id,
         pl.name,
@@ -26,7 +26,8 @@ AS $function$BEGIN
                     ST_SetSRID(ST_MakePoint(p_user_lng, p_user_lat), 4326)::geography
                 )
             ELSE NULL
-        END AS distance_meters
+        END AS distance_meters,
+        pl.price_tier
     FROM place_lists pl
     WHERE pl.user_id = p_user_id
     ORDER BY 
