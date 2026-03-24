@@ -18,27 +18,14 @@ struct ListPricingPickerView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(PriceTier.allCases, id: \.self) { tier in
-                    priceTierChip(tier)
+                    PriceTierChipView(
+                        tier: tier,
+                        isSelected: viewModel.selectedTier == tier,
+                        onTap: { viewModel.selectedTier = tier }
+                    )
                 }
             }
             .padding(.vertical, 4)
-        }
-    }
-
-    /// Individual price tier selection chip
-    private var priceTierChip: (PriceTier) -> some View {
-        { tier in
-            Text(tier.displayPrice)
-                .font(.subheadline)
-                .fontWeight(viewModel.selectedTier == tier ? .semibold : .regular)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(viewModel.selectedTier == tier ? Color.blue : Color(.systemGray6))
-                .foregroundStyle(viewModel.selectedTier == tier ? .white : .primary)
-                .clipShape(Capsule())
-                .onTapGesture {
-                    viewModel.selectedTier = tier
-                }
         }
     }
 }

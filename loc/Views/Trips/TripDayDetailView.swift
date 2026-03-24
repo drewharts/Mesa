@@ -57,16 +57,15 @@ struct TripDayDetailView: View {
         .navigationDestination(item: $selectedPlaceId) { placeId in
             PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
         }
-        .sheet(isPresented: $showAddPlaceSheet) {
+        .sheet(isPresented: $showAddPlaceSheet, onDismiss: {
+            Task { await viewModel.loadTrip() }
+        }) {
             if let userId = ServiceContainer.shared.authService.currentUserId {
                 AddPlaceToTripSheet(
                     tripId: viewModel.tripId,
                     targetDayIndex: dayIndex,
                     existingPlaceIds: viewModel.allPlaceIdsInTrip,
-                    userId: userId,
-                    onDismiss: {
-                        Task { await viewModel.loadTrip() }
-                    }
+                    userId: userId
                 )
             }
         }

@@ -13,7 +13,7 @@ class CreatorEarningsViewModel: ObservableObject {
 
     /// Loads earnings summary for the current user
     func loadEarnings() async {
-        guard let userId = SupabaseManager.shared.currentUserId else { return }
+        guard let userId = await SupabaseManager.shared.currentUserId else { return }
         isLoading = true
 
         do {

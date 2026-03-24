@@ -35,7 +35,7 @@ class ListPurchaseViewModel: ObservableObject {
 
     /// Checks whether the current user has already purchased this list
     func checkPurchaseStatus() async {
-        guard let userId = SupabaseManager.shared.currentUserId else { return }
+        guard let userId = await SupabaseManager.shared.currentUserId else { return }
         do {
             hasPurchased = try await listPurchaseService.hasUserPurchasedList(
                 userId: userId, listId: listId
@@ -47,7 +47,7 @@ class ListPurchaseViewModel: ObservableObject {
 
     /// Triggers the full StoreKit purchase flow and records in DB
     func purchase() async {
-        guard let userId = SupabaseManager.shared.currentUserId else {
+        guard let userId = await SupabaseManager.shared.currentUserId else {
             purchaseState = .failed("Not signed in")
             return
         }

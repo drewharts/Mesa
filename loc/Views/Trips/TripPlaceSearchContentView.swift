@@ -77,9 +77,9 @@ struct TripPlaceSearchContentView: View {
                     TripSearchResultRowView(
                         suggestion: suggestion,
                         isAdding: viewModel.isAddingPlace.contains(suggestion.id),
-                        isInTrip: viewModel.placesInTrip.contains(suggestion.id),
-                        onAdd: { viewModel.searchAndAddPlace(suggestion: suggestion) },
-                        onRemove: { viewModel.searchAndAddPlace(suggestion: suggestion) }
+                        isInTrip: viewModel.addedSuggestionIds.contains(suggestion.id),
+                        onAdd: { Task { await viewModel.searchAndAddPlace(suggestion: suggestion) } },
+                        onRemove: { Task { await viewModel.searchAndAddPlace(suggestion: suggestion) } }
                     )
                 }
             }

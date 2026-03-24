@@ -54,6 +54,6 @@ struct TripSearchResultRowView: View {
                 actionIcon
             }
         }
-        .disabled(isAdding)
+        .disabled(isAdding || isInTrip)
     }
 }

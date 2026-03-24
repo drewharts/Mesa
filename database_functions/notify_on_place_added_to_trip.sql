@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Function: notify_on_place_added_to_trip
 -- ============================================================================
--- This function creates notifications when a place is added to a trip day.
+-- This function creates notifications when a place is added to a trip.
 --
 -- Who gets notified:
 -- - Trip owner (if they didn't add the place)
@@ -20,14 +20,13 @@ DECLARE
     actor RECORD;
     place RECORD;
     trip_info RECORD;
-    trip_day_info RECORD;
 BEGIN
-    -- Fetch the trip_day to get the trip_id
-    SELECT trip_id INTO trip_day_info FROM trip_days WHERE id = NEW.trip_day_id;
+    -- Fetch trip details and owner directly from NEW.trip_id
+    SELECT id, name, owner_id INTO trip_info FROM trips WHERE id = NEW.trip_id;
 
-    -- If no trip day found, skip notification
+    -- If no trip found, skip notification
     IF NOT FOUND THEN
-        RAISE NOTICE '⚠️ No trip_day found for trip_day_id: %', NEW.trip_day_id;
+        RAISE NOTICE '⚠️ No trip found for trip_id: %', NEW.trip_id;
         RETURN NEW;
     END IF;
 
@@ -51,15 +50,6 @@ BEGIN
     -- If no place found, skip notification
     IF NOT FOUND THEN
         RAISE NOTICE '⚠️ No place found for place_id: %', NEW.place_id;
-        RETURN NEW;
-    END IF;
-
-    -- Fetch trip details and owner
-    SELECT id, name, owner_id INTO trip_info FROM trips WHERE id = trip_day_info.trip_id;
-
-    -- If no trip found, skip notification
-    IF NOT FOUND THEN
-        RAISE NOTICE '⚠️ No trip found for trip_id: %', trip_day_info.trip_id;
         RETURN NEW;
     END IF;
 
