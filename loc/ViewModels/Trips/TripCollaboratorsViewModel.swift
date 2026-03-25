@@ -21,6 +21,10 @@ class TripCollaboratorsViewModel: ObservableObject {
     @Published private(set) var error: String?
     @Published var showError = false
 
+    // MARK: - Child ViewModels
+
+    let inviteViewModel: TripInviteViewModel
+
     // MARK: - Dependencies
 
     private let tripCollaborationService = ServiceContainer.shared.tripCollaborationService
@@ -39,10 +43,26 @@ class TripCollaboratorsViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(tripId: String, currentUserId: String) {
+    init(tripId: String, currentUserId: String, tripName: String, currentUserName: String) {
         self.tripId = tripId
         self.currentUserId = currentUserId
+        self.inviteViewModel = TripInviteViewModel(
+            tripId: tripId,
+            currentUserId: currentUserId,
+            tripName: tripName,
+            currentUserName: currentUserName
+        )
         setupSearchPipeline()
+        forwardChildObjectWillChange()
+    }
+
+    /// Forwards child ViewModel's objectWillChange so the parent view re-renders.
+    private func forwardChildObjectWillChange() {
+        inviteViewModel.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Setup

@@ -24,6 +24,7 @@ class ServiceContainer: ObservableObject {
     lazy var collaborationService = CollaborationService.shared
     lazy var tripService = TripService.shared
     lazy var tripCollaborationService = TripCollaborationService.shared
+    lazy var tripInvitationService = TripInvitationService()
 
     // MARK: - Contacts
     lazy var contactsService = ContactsService()
