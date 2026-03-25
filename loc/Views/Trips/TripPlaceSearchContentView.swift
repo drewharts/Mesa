@@ -78,6 +78,8 @@ struct TripPlaceSearchContentView: View {
                         suggestion: suggestion,
                         isAdding: viewModel.isAddingPlace.contains(suggestion.id),
                         isInTrip: viewModel.addedSuggestionIds.contains(suggestion.id),
+                        isResolving: viewModel.isResolvingSuggestion == suggestion.id,
+                        onNavigate: { Task { await viewModel.resolveAndNavigateToPlaceDetail(suggestion: suggestion) } },
                         onAdd: { Task { await viewModel.searchAndAddPlace(suggestion: suggestion) } },
                         onRemove: { Task { await viewModel.searchAndAddPlace(suggestion: suggestion) } }
                     )

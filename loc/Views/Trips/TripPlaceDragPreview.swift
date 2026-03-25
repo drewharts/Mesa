@@ -7,24 +7,17 @@
 
 import SwiftUI
 
-/// Capsule preview shown while dragging a place row between days.
+/// Compact rounded preview shown while dragging a place row between days.
 struct TripPlaceDragPreview: View {
-    let placeName: String
-
     private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "mappin.circle.fill")
-                .foregroundColor(mesaCharcoal)
-            Text(placeName)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
+        Image(systemName: "mappin.circle.fill")
+            .font(.title2)
+            .foregroundStyle(.white)
+            .frame(width: 40, height: 40)
+            .background(mesaCharcoal)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
     }
 }

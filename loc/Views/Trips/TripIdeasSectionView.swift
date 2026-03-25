@@ -96,7 +96,7 @@ struct TripIdeasSectionView: View {
                         .padding(6)
                     }
                     .draggable(place.id) {
-                        TripPlaceDragPreview(placeName: place.placeName ?? "Place")
+                        TripPlaceDragPreview()
                     }
                 }
             }

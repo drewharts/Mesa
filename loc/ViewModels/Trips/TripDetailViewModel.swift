@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Combine
 
 @MainActor
 class TripDetailViewModel: ObservableObject {
@@ -25,6 +26,10 @@ class TripDetailViewModel: ObservableObject {
     @Published var selectedPlaceIdForDetail: String?
     @Published var showCollaboratorsSheet = false
 
+    // MARK: - Child ViewModels
+
+    let travelTimesViewModel = TripTravelTimesViewModel()
+
     // MARK: - Dependencies
 
     private let tripService = ServiceContainer.shared.tripService
@@ -34,6 +39,7 @@ class TripDetailViewModel: ObservableObject {
 
     let tripId: String
     private var hasPerformedInitialLoad = false
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Map Coordinator
 
@@ -95,6 +101,9 @@ class TripDetailViewModel: ObservableObject {
 
     init(tripId: String) {
         self.tripId = tripId
+        travelTimesViewModel.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     // MARK: - Load Trip
@@ -118,6 +127,7 @@ class TripDetailViewModel: ObservableObject {
                 grouped[key]?.sort { $0.sortOrder < $1.sortOrder }
             }
             dayPlaces = grouped
+            travelTimesViewModel.recalculate(dayPlaces: dayPlaces)
 
             // Prefetch external content metadata for PopupPlaceCard thumbnail display
             let contentUrls = result.dayPlaces.compactMap(\.contentUrl).filter { !$0.isEmpty }
@@ -181,6 +191,7 @@ class TripDetailViewModel: ObservableObject {
             places[index] = place
         }
         dayPlaces[dayIndex] = places
+        travelTimesViewModel.recalculateDay(dayIndex: dayIndex, places: places)
 
         // Persist reorder via RPC
         let placeIds = places.map(\.id)
@@ -207,6 +218,8 @@ class TripDetailViewModel: ObservableObject {
 
         dayPlaces[sourceDayIndex]?.removeAll { $0.id == entryId }
         dayPlaces[toDayIndex, default: []].append(movedPlace)
+        travelTimesViewModel.recalculateDay(dayIndex: sourceDayIndex, places: dayPlaces[sourceDayIndex] ?? [])
+        travelTimesViewModel.recalculateDay(dayIndex: toDayIndex, places: dayPlaces[toDayIndex] ?? [])
 
         // Persist to backend
         do {
@@ -233,17 +246,9 @@ class TripDetailViewModel: ObservableObject {
 
     // MARK: - Remove Place
 
-    /// Removes a place entry from any day's itinerary by its entry ID.
+    /// Moves a place from a calendar day back to Ideas (dayIndex = -1).
     func removePlaceFromDay(entryId: String) async {
-        guard let (dayIndex, _) = findPlaceEntry(entryId: entryId) else { return }
-
-        do {
-            try await tripService.removePlaceFromDay(entryId: entryId)
-            dayPlaces[dayIndex]?.removeAll { $0.id == entryId }
-        } catch {
-            self.error = error.localizedDescription
-            print("[TripDetailVM] Failed to remove place: \(error)")
-        }
+        await movePlaceToDifferentDay(entryId: entryId, toDayIndex: TripDayPlace.ideasDayIndex)
     }
 
     // MARK: - Add Place
@@ -269,9 +274,17 @@ class TripDetailViewModel: ObservableObject {
 
     // MARK: - Ideas
 
-    /// Removes an Idea entry by its entry ID.
+    /// Deletes an Idea entry permanently by its entry ID.
     func removeIdea(entryId: String) async {
-        await removePlaceFromDay(entryId: entryId)
+        guard let (dayIndex, _) = findPlaceEntry(entryId: entryId) else { return }
+
+        do {
+            try await tripService.removePlaceFromDay(entryId: entryId)
+            dayPlaces[dayIndex]?.removeAll { $0.id == entryId }
+        } catch {
+            self.error = error.localizedDescription
+            print("[TripDetailVM] Failed to remove idea: \(error)")
+        }
     }
 
     /// Moves an Idea to a specific calendar day.

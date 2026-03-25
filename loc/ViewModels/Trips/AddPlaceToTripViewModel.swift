@@ -48,6 +48,8 @@ class AddPlaceToTripViewModel: ObservableObject {
     @Published var searchText: String = ""
     @Published var isSearching = false
     @Published var errorMessage: String?
+    @Published var resolvedPlaceId: String?
+    @Published var isResolvingSuggestion: String?
 
     // MARK: - Confirmation Toast State
 
@@ -60,7 +62,7 @@ class AddPlaceToTripViewModel: ObservableObject {
         return lists.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 
-    /// Callback to dismiss the sheet and navigate to place detail.
+    /// Callback to push place detail within the sheet's NavigationStack.
     var onViewPlaceDetail: ((String) -> Void)?
 
     // MARK: - Dependencies
@@ -296,6 +298,28 @@ class AddPlaceToTripViewModel: ObservableObject {
         searchText = ""
         searchResults = []
         errorMessage = nil
+    }
+
+    // MARK: - Search Suggestion Resolution
+
+    /// Resolves a search suggestion to a Mesa place and publishes its ID for navigation.
+    func resolveAndNavigateToPlaceDetail(suggestion: MesaPlaceSuggestion) async {
+        guard isResolvingSuggestion == nil else { return }
+        isResolvingSuggestion = suggestion.id
+
+        do {
+            let mesaBackendService = MesaBackendService()
+            let detailPlace = try await mesaBackendService.fetchPlaceDetails(
+                placeId: suggestion.id,
+                source: suggestion.source
+            )
+            resolvedPlaceId = detailPlace.id.uuidString
+        } catch {
+            errorMessage = "Failed to load place details"
+            print("[AddPlaceToTripVM] Failed to resolve suggestion: \(error)")
+        }
+
+        isResolvingSuggestion = nil
     }
 
     // MARK: - Confirmation Toast

@@ -14,8 +14,8 @@ struct AddPlaceToTripSheet: View {
     let existingPlaceIds: Set<String>
     let userId: String
     @StateObject private var viewModel: AddPlaceToTripViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var placeIdForDetail: String?
 
     init(
         tripId: String,
@@ -54,10 +54,18 @@ struct AddPlaceToTripSheet: View {
                     }
                 }
             }
+            .navigationDestination(item: $placeIdForDetail) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 0, shouldAnimateMap: false)
+            }
+            .onChange(of: viewModel.resolvedPlaceId) { _, placeId in
+                if let placeId {
+                    placeIdForDetail = placeId
+                    viewModel.resolvedPlaceId = nil
+                }
+            }
             .task {
-                viewModel.onViewPlaceDetail = { [weak selectedPlaceVM] placeId in
-                    selectedPlaceVM?.navigateToPlace(placeId: placeId)
-                    dismiss()
+                viewModel.onViewPlaceDetail = { placeId in
+                    placeIdForDetail = placeId
                 }
                 await viewModel.loadInitialData()
             }

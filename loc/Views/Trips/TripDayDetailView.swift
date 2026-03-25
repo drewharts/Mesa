@@ -25,6 +25,7 @@ struct TripDayDetailView: View {
             places: places,
             canEdit: viewModel.canEdit,
             isEditing: isEditing,
+            travelTimeSegments: viewModel.travelTimesViewModel.segments,
             onMove: { fromOffsets, toOffset in
                 viewModel.reorderPlaces(dayIndex: dayIndex, fromOffsets: fromOffsets, toOffset: toOffset)
             },
