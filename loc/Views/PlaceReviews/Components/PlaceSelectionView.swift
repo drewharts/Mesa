@@ -1,245 +1,176 @@
 //  PlaceSelectionView.swift
 //  loc
 //
-//  Created by Andrew Hartsfield II on 12/12/24.
-//
+//  SMART Component: Coordinates place selection from photo GPS data.
+//  Single Responsibility: Present nearby places and handle selection or creation.
 
 import SwiftUI
 import CoreLocation
 
 struct PlaceSelectionView: View {
-    @ObservedObject var photoImportVM: PhotoImportViewModel
-    @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    
-    @State private var showCreatePlacePopup = false
-    
+    @StateObject private var viewModel: PlaceSelectionViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    /// Initializes the place selection sheet with required dependencies.
+    init(
+        photoImportVM: PhotoImportViewModel,
+        profileVM: ProfileViewModel,
+        selectedPlaceVM: SelectedPlaceViewModel,
+        detailPlaceVM: DetailPlaceViewModel
+    ) {
+        self._viewModel = StateObject(wrappedValue: PlaceSelectionViewModel(
+            photoImportVM: photoImportVM,
+            profileVM: profileVM,
+            selectedPlaceVM: selectedPlaceVM,
+            detailPlaceVM: detailPlaceVM
+        ))
+    }
+
+    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Header
-                VStack(spacing: 8) {
-                    Text("📍 Select a Place")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                    
-                    if photoImportVM.nearbyPlaces.isEmpty {
-                        Text("No places found near your photo")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        Text("(searched within \(photoImportVM.searchRadiusUsed)m)")
-                            .font(.caption)
-                            .foregroundColor(.gray.opacity(0.7))
-                        Text("Create a new place at this location")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    } else {
-                        Text("Found \(photoImportVM.nearbyPlaces.count) places near your photo")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        if photoImportVM.searchRadiusUsed > 50 {
-                            Text("(expanded search to \(photoImportVM.searchRadiusUsed)m)")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        } else {
-                            Text("(within \(photoImportVM.searchRadiusUsed)m)")
-                                .font(.caption)
-                                .foregroundColor(.gray.opacity(0.7))
-                        }
-                    }
+                PlaceSelectionPhotoHeader(
+                    thumbnail: viewModel.photoThumbnail,
+                    placeCount: viewModel.nearbyPlaceCount,
+                    isLoading: viewModel.isProcessingPhoto || viewModel.isLoadingNearbyPlaces
+                )
+
+                if let coords = viewModel.detectedCoordinates {
+                    PlaceSelectionMiniMap(
+                        latitude: coords.latitude,
+                        longitude: coords.longitude
+                    )
+                    .padding(.top, 12)
                 }
-                .padding(.top, 20)
-                .padding(.horizontal, 20)
-                
-                // Places List, Loading State, or Empty State
-                if photoImportVM.isProcessingPhoto || photoImportVM.isLoadingNearbyPlaces {
-                    VStack(spacing: 20) {
-                        Spacer()
-                        
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        
-                        VStack(spacing: 8) {
-                            if photoImportVM.isProcessingPhoto {
-                                Text("Processing Photos...")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.gray)
-                                
-                                Text("Extracting location data from your photos")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.center)
-                            } else {
-                                Text("Finding Nearby Places...")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.gray)
-                                
-                                Text("Searching for places near your photo location")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                        
-                        Spacer()
-                    }
-                } else if photoImportVM.nearbyPlaces.isEmpty {
-                    VStack(spacing: 20) {
-                        Spacer()
-                        
-                        Image(systemName: "location.circle")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray.opacity(0.5))
-                        
-                        VStack(spacing: 8) {
-                            Text("No places found")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.gray)
-                            
-                            Text("Create a new place at the location where this photo was taken")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
-                        }
-                        
-                        Spacer()
-                    }
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(photoImportVM.nearbyPlaces) { place in
-                                PlaceSelectionRowView(
-                                    place: place,
-                                    onSelect: {
-                                        selectedPlaceVM.allowAutoPresent = false
-                                        Task {
-                                            await photoImportVM.selectPlace(place)
-                                        }
-                                    },
-                                    isLoading: photoImportVM.isSavingPlace || photoImportVM.isResolvingPlace
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                    }
+
+                if viewModel.availableTypeFilters.count >= 2 {
+                    PlaceSelectionTypeFilter(
+                        types: viewModel.availableTypeFilters,
+                        selectedType: viewModel.selectedTypeFilter,
+                        onSelectType: { viewModel.filterByType($0) }
+                    )
                 }
-                
-                // Create New Place Button
-                Button(action: {
-                    showCreatePlacePopup = true
-                }) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Create New Place")
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .cornerRadius(12)
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+
+                contentSection
+                createPlaceButton
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        // Clear the selection since user cancelled the flow
-                        photoImportVM.clearSelection()
-                        presentationMode.wrappedValue.dismiss()
+                        viewModel.cancel()
+                        dismiss()
                     }
                 }
             }
-            .sheet(isPresented: $showCreatePlacePopup) {
-                if let coordinate = photoImportVM.detectedCoordinates {
-                    CreatePlacePopupView(
-                        coordinate: CLLocationCoordinate2D(
-                            latitude: coordinate.latitude,
-                            longitude: coordinate.longitude
-                        )
-                    ) { name, description in
-                        createNewPlace(name: name, description: description, coordinate: coordinate)
-                    }
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
+            .sheet(isPresented: $viewModel.showCreatePlacePopup) {
+                createPlaceSheet
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var contentSection: some View {
+        if viewModel.isProcessingPhoto || viewModel.isLoadingNearbyPlaces {
+            shimmerPlaceholders
+        } else if viewModel.filteredPlaces.isEmpty {
+            emptyState
+        } else {
+            placesList
+        }
+    }
+
+    private var placesList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(viewModel.filteredPlaces) { place in
+                    PlaceSelectionRowView(
+                        place: place,
+                        formattedDistance: viewModel.formatDistance(
+                            meters: place.properties.distanceMeters ?? 0
+                        ),
+                        typeEmoji: viewModel.placeTypeEmoji(for: place),
+                        onSelect: { viewModel.selectPlace(place) },
+                        isLoading: viewModel.isPlaceBusy
+                    )
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
         }
     }
-    
-    private func createNewPlace(name: String, description: String?, coordinate: (latitude: Double, longitude: Double)) {
-        let generatedId = UUID().uuidString
-        if let userId = profile.user?.id {
-            // Create the coordinate
-            let clCoordinate = CLLocationCoordinate2D(
-                latitude: coordinate.latitude,
-                longitude: coordinate.longitude
-            )
-            
-            selectedPlaceVM.allowAutoPresent = true // Allow auto-present for newly created places
-            // Use the existing createNewPlace method from SelectedPlaceViewModel
-            selectedPlaceVM.createNewPlace(
-                idString: generatedId,
-                name: name,
-                description: description,
-                coordinate: clCoordinate,
-                userId: userId,
-                profileVM: profile,
-                detailPlaceVM: detailPlaceVM
-            )
-            
-            // Create a temporary NearbyPlaceFeature from the new place
-            let newNearbyPlace = createNearbyPlaceFeature(id: generatedId, name: name, description: description, coordinate: coordinate)
 
-            // Select the newly created place
-            Task {
-                await photoImportVM.selectPlace(newNearbyPlace)
+    private var shimmerPlaceholders: some View {
+        VStack(spacing: 12) {
+            ForEach(0..<3, id: \.self) { _ in
+                ShimmerView()
+                    .frame(height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
 
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "mappin.slash")
+                .font(.system(size: 48))
+                .foregroundColor(Color(.systemGray3))
+
+            VStack(spacing: 6) {
+                Text("No places found")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+
+                Text("Create a new place at this location")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+            Spacer()
         }
     }
-    
-    private func createNearbyPlaceFeature(id: String, name: String, description: String?, coordinate: (latitude: Double, longitude: Double)) -> NearbyPlaceFeature {
-        // Create a temporary NearbyPlaceFeature for the newly created place
-        let properties = NearbyPlaceProperties(
-            address: description ?? "User created location",
-            distanceMeters: 0,
-            name: name,
-            source: "user_created",
-            businessStatus: nil,
-            createdAt: nil,
-            openNow: nil,
-            permanentlyClosed: nil,
-            photoReference: nil,
-            priceLevel: nil,
-            rating: nil,
-            types: nil,
-            updatedAt: nil,
-            userRatingsTotal: nil,
-            description: description,
-            id: id,
-            placeId: nil
-        )
-        
-        let geometry = NearbyPlaceGeometry(
-            coordinates: [coordinate.longitude, coordinate.latitude],
-            type: "Point"
-        )
-        
-        return NearbyPlaceFeature(
-            geometry: geometry,
-            properties: properties,
-            type: "Feature"
-        )
+
+    private var createPlaceButton: some View {
+        Button {
+            viewModel.showCreatePlacePopup = true
+        } label: {
+            HStack {
+                Image(systemName: "plus.circle.fill")
+                Text("Create New Place")
+                    .fontWeight(.semibold)
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(mesaCharcoal)
+            .clipShape(Capsule())
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+        .padding(.top, 8)
     }
-} 
+
+    @ViewBuilder
+    private var createPlaceSheet: some View {
+        if let coordinate = viewModel.detectedCoordinates {
+            CreatePlacePopupView(
+                coordinate: CLLocationCoordinate2D(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+            ) { name, description in
+                viewModel.createNewPlace(name: name, description: description)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+    }
+}

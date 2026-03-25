@@ -19,7 +19,8 @@ RETURNS TABLE(
     place_count bigint,
     city text,
     average_location text,
-    description text
+    description text,
+    price_tier text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -37,10 +38,11 @@ BEGIN
         COUNT(pli.place_id) AS place_count,
         pl.city,
         ST_AsText(pl.average_location) AS average_location,
-        pl.description
+        pl.description,
+        pl.price_tier
     FROM place_lists pl
     LEFT JOIN place_list_items pli ON pl.id::text = pli.list_id::text
     WHERE pl.id::text = p_list_id
-    GROUP BY pl.id, pl.name, pl.is_public, pl.image, pl.created_at, pl.updated_at, pl.average_location, pl.description, pl.city;
+    GROUP BY pl.id, pl.name, pl.is_public, pl.image, pl.created_at, pl.updated_at, pl.average_location, pl.description, pl.city, pl.price_tier;
 END;
 $function$;

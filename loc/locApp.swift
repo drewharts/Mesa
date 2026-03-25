@@ -217,6 +217,15 @@ struct locApp: App {
                     // Check for shared content URLs when app becomes active
                     checkForSharedContentURL()
                 }
+                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TripInvitationRedeemed"))) { notification in
+                    let tripName = notification.userInfo?["tripName"] as? String ?? "a trip"
+                    appCoordinator.showError(title: "Trip Invitation", message: "You've been added to \"\(tripName)\"!")
+                }
+                .alert(appCoordinator.alertTitle, isPresented: $appCoordinator.showAlert) {
+                    Button("OK") { }
+                } message: {
+                    Text(appCoordinator.alertMessage)
+                }
         }
     }
     
@@ -292,6 +301,17 @@ struct locApp: App {
             deepLinkComponents.scheme = "loc"
             deepLinkComponents.host = "profile"
             deepLinkComponents.path = "/\(userId)"
+            deepLinkComponents.queryItems = incomingComponents.queryItems
+
+            return deepLinkComponents.url
+
+        } else if path.hasPrefix("/invite/") {
+            let token = String(path.dropFirst("/invite/".count))
+
+            var deepLinkComponents = URLComponents()
+            deepLinkComponents.scheme = "loc"
+            deepLinkComponents.host = "invite"
+            deepLinkComponents.path = "/\(token)"
             deepLinkComponents.queryItems = incomingComponents.queryItems
 
             return deepLinkComponents.url

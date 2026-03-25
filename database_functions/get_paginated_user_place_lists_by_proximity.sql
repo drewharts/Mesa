@@ -26,7 +26,8 @@ RETURNS TABLE(
     collaborator_count BIGINT,
     collaborator_photos TEXT[],
     description TEXT,
-    city TEXT
+    city TEXT,
+    price_tier TEXT
 )
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -47,7 +48,8 @@ BEGIN
         combined.collaborator_count,
         combined.collaborator_photos,
         combined.description,
-        combined.city
+        combined.city,
+        combined.price_tier
     FROM (
         -- Lists WITH average_location (sorted by proximity)
     SELECT
@@ -73,6 +75,7 @@ BEGIN
             ) AS collaborator_photos,
             pl.description,
             pl.city,
+            pl.price_tier,
             0 AS sort_order  -- Lists with location come first
     FROM place_lists pl
     WHERE pl.user_id = p_user_id
@@ -104,6 +107,7 @@ BEGIN
             ) AS collaborator_photos,
             pl.description,
             pl.city,
+            pl.price_tier,
             1 AS sort_order  -- Lists without location come after
         FROM place_lists pl
         WHERE pl.user_id = p_user_id

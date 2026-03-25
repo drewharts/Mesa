@@ -12,6 +12,7 @@ struct LightweightPlaceList: Identifiable {
     let place_count: Int
     let city: String?
     var description: String?
+    var price_tier: String?
 
     // MARK: - Location Field
     // WKT string from ST_AsText() e.g. "POINT(-73.98 40.76)"
@@ -34,6 +35,15 @@ struct LightweightPlaceList: Identifiable {
     var collaborator_photos: [String]?
 
     var id: String { list_id }
+
+    /// Whether this list requires purchase to access full content
+    var isPaid: Bool { price_tier != nil }
+
+    /// Parsed PriceTier enum from the raw string
+    var priceTier: PriceTier? {
+        guard let price_tier else { return nil }
+        return PriceTier(rawValue: price_tier)
+    }
 
     /// Convenience: Check if this list has collaborators
     var hasCollaborators: Bool {
@@ -80,6 +90,7 @@ struct LightweightPlaceList: Identifiable {
         place_count: Int,
         city: String?,
         description: String? = nil,
+        price_tier: String? = nil,
         average_location_raw: String? = nil,
         collaborator_count: Int? = nil,
         is_shared: Bool? = nil,
@@ -98,6 +109,7 @@ struct LightweightPlaceList: Identifiable {
         self.place_count = place_count
         self.city = city
         self.description = description
+        self.price_tier = price_tier
         self.average_location_raw = average_location_raw
         self.collaborator_count = collaborator_count
         self.is_shared = is_shared
@@ -122,6 +134,7 @@ extension LightweightPlaceList: Codable {
         case place_count
         case city
         case description
+        case price_tier
         case average_location
         case collaborator_count
         case is_shared
@@ -147,6 +160,7 @@ extension LightweightPlaceList: Codable {
         distance_meters = try container.decodeIfPresent(Double.self, forKey: .distance_meters)
         city = try container.decodeIfPresent(String.self, forKey: .city)
         description = try container.decodeIfPresent(String.self, forKey: .description)
+        price_tier = try container.decodeIfPresent(String.self, forKey: .price_tier)
 
         // All RPCs return average_location as WKT text via ST_AsText().
         // GeoJSON fallback guards against PostgREST returning raw geometry if an RPC omits ST_AsText().
@@ -191,6 +205,7 @@ extension LightweightPlaceList: Codable {
         try container.encodeIfPresent(distance_meters, forKey: .distance_meters)
         try container.encodeIfPresent(city, forKey: .city)
         try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(price_tier, forKey: .price_tier)
         try container.encodeIfPresent(average_location_raw, forKey: .average_location)
 
         try container.encodeIfPresent(collaborator_count, forKey: .collaborator_count)

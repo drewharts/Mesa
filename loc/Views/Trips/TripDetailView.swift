@@ -57,7 +57,9 @@ struct TripDetailView: View {
             if let userId = userSession.currentUserId {
                 ManageTripCollaboratorsSheet(
                     tripId: viewModel.tripId,
-                    currentUserId: userId
+                    currentUserId: userId,
+                    tripName: viewModel.trip?.name ?? "Trip",
+                    currentUserName: userSession.profileViewModel?.user?.fullName ?? "A friend"
                 )
             }
         }

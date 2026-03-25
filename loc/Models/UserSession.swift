@@ -104,6 +104,13 @@ class UserSession: ObservableObject {
             }
             
             self.registerForFCMToken()
+
+            // Redeem any pending trip invitations on session restore
+            if let userId = self.currentUserId {
+                Task { @MainActor in
+                    await self.redeemPendingTripInvitations(userId: userId)
+                }
+            }
         } catch {
             print("ℹ️ No existing Supabase session: \(error.localizedDescription)")
             await MainActor.run {
@@ -135,10 +142,61 @@ class UserSession: ObservableObject {
     func setUserLoggedIn(uid: String) {
         self.isUserLoggedIn = true
         self.currentUserId = uid
-        
+
         // Process any pending push notification token (SRP: delegate to service)
         Task { @MainActor in
             await PushNotificationService.shared.processPendingToken(for: uid)
+        }
+
+        // Redeem any pending trip invitations (token-based or phone-based)
+        Task { @MainActor in
+            await redeemPendingTripInvitations(userId: uid)
+        }
+    }
+
+    // MARK: - Trip Invitation Redemption
+
+    /// Redeems pending trip invitations after login — checks for token-based and phone-based invites.
+    private func redeemPendingTripInvitations(userId: String) async {
+        let invitationService = await ServiceContainer.shared.tripInvitationService
+        await redeemTokenBasedInvitation(service: invitationService, userId: userId)
+        await redeemPhoneBasedInvitations(service: invitationService, userId: userId)
+    }
+
+    /// Redeems a deep-link invite token stored in UserDefaults before the user logged in.
+    private func redeemTokenBasedInvitation(service: TripInvitationService, userId: String) async {
+        guard let pendingToken = UserDefaults.standard.string(forKey: "pendingInviteToken") else { return }
+        UserDefaults.standard.removeObject(forKey: "pendingInviteToken")
+        do {
+            let redeemed = try await service.redeemInvitationByToken(userId: userId, token: pendingToken)
+            for trip in redeemed {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("TripInvitationRedeemed"),
+                    object: nil,
+                    userInfo: ["tripId": trip.tripId, "tripName": trip.tripName]
+                )
+            }
+        } catch {
+            print("❌ [UserSession] Failed to redeem invite token: \(error)")
+        }
+    }
+
+    /// Looks up the user's phone number and redeems any invitations sent to that number.
+    private func redeemPhoneBasedInvitations(service: TripInvitationService, userId: String) async {
+        do {
+            let profile = try await userService.fetchUserById(userId: userId)
+            guard let phone = profile.phoneNumber, !phone.isEmpty else { return }
+
+            let redeemed = try await service.redeemPendingInvitations(userId: userId, phoneNumber: phone)
+            for trip in redeemed {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("TripInvitationRedeemed"),
+                    object: nil,
+                    userInfo: ["tripId": trip.tripId, "tripName": trip.tripName]
+                )
+            }
+        } catch {
+            print("❌ [UserSession] Failed to redeem phone-based invitations: \(error)")
         }
     }
     

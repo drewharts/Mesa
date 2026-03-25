@@ -154,9 +154,10 @@ struct LightweightListPopupView: View {
         .sheet(isPresented: $showSettingsSheet) {
             ListSettingsSheet(
                 listId: currentList.list_id,
-                initialIsPublic: currentList.is_public
+                initialIsPublic: currentList.is_public,
+                currentPriceTier: currentList.price_tier
             )
-            .presentationDetents([.height(200)])
+            .presentationDetents([.medium])
         }
         .sheet(isPresented: $showAddPlaceSheet) {
             if let userId = profile.user?.id {

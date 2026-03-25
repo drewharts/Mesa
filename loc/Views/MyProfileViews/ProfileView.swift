@@ -263,13 +263,10 @@ struct ToolbarModifier: ViewModifier {
                 )
             }
 
-            PhotosPicker(
-                selection: $photoImportVM.selectedItems,
-                maxSelectionCount: 10,
-                matching: .images,
-                photoLibrary: .shared()
-            ) {
-                Image(systemName: "photo.badge.plus")
+            Button {
+                photoImportVM.handleImportButtonTap()
+            } label: {
+                Image(systemName: "camera.fill")
                     .foregroundColor(.black)
                     .font(.body)
             }
@@ -292,8 +289,37 @@ struct SheetsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .photosPicker(
+                isPresented: $photoImportVM.showPhotoPicker,
+                selection: $photoImportVM.selectedItems,
+                maxSelectionCount: 20,
+                matching: .images,
+                photoLibrary: .shared()
+            )
+            .alert("Import Photos", isPresented: $photoImportVM.showImportOnboarding) {
+                Button("Got it") {
+                    photoImportVM.confirmOnboarding()
+                }
+            } message: {
+                Text("Select up to 20 photos from different places — we'll recognize each location and send you through a quick review for each one.")
+            }
             .sheet(isPresented: $photoImportVM.showPlaceSelection) {
-                PlaceSelectionView(photoImportVM: photoImportVM)
+                PlaceSelectionView(
+                    photoImportVM: photoImportVM,
+                    profileVM: profile,
+                    selectedPlaceVM: selectedPlaceVM,
+                    detailPlaceVM: placeVM
+                )
+            }
+            .sheet(isPresented: $photoImportVM.showClusterOverview) {
+                PhotoClusterOverviewView(
+                    clusteringVM: photoImportVM.clusteringVM,
+                    photoImportVM: photoImportVM,
+                    profileVM: profile
+                )
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(placeVM)
+                .environmentObject(userSession)
             }
             .sheet(isPresented: Binding(
                 get: { externalContentVM.isShowingPlaceSelection },
@@ -421,7 +447,8 @@ struct StateChangesModifier: ViewModifier {
                 handleCreatePostChange()
             }
             .onChange(of: photoImportVM.showPostCreation) {
-                if photoImportVM.showPostCreation {
+                // Skip in multi-cluster mode — the overview handles its own flow
+                if photoImportVM.showPostCreation && !photoImportVM.showClusterOverview {
                     photoImportVM.showPostCreation = false
                     showCreatePost = true
                 }
