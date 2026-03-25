@@ -25,9 +25,9 @@ struct BottomNavigationBar: View {
     var body: some View {
         HStack(spacing: 16) {
             feedButton
-            profileButton
-            searchCapsule
             tripsButton
+            searchCapsule
+            profileButton
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

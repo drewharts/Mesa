@@ -1,113 +1,98 @@
 //  PlaceSelectionRowView.swift
 //  loc
 //
-//  Created by Andrew Hartsfield II on 12/12/24.
-//
+//  DUMB Component: Card displaying a nearby place option for selection.
+//  Single Responsibility: Render a single place row in the selection list.
 
 import SwiftUI
 
 struct PlaceSelectionRowView: View {
     let place: NearbyPlaceFeature
+    let formattedDistance: String
+    let typeEmoji: String
     let onSelect: () -> Void
     let isLoading: Bool
-    
-    init(place: NearbyPlaceFeature, onSelect: @escaping () -> Void, isLoading: Bool = false) {
-        self.place = place
-        self.onSelect = onSelect
-        self.isLoading = isLoading
-    }
-    
-    private func formatDistance(meters: Double) -> String {
-        let miles = meters * 0.000621371
-        
-        if miles < 0.1 {
-            // For very short distances, show in feet
-            let feet = meters * 3.28084
-            return String(format: "%.0f ft", feet)
-        } else if miles < 1.0 {
-            // For distances less than 1 mile, show with 2 decimal places
-            return String(format: "%.2f mi", miles)
-        } else {
-            // For distances 1 mile or more, show with 1 decimal place
-            return String(format: "%.1f mi", miles)
-        }
-    }
-    
+
+    private let cardBackground = Color(red: 248/255, green: 248/255, blue: 250/255)
+
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                // Place Icon
-                VStack {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                    
-                    Spacer()
-                }
-                
-                // Place Info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(place.properties.name)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.black)
-                        .multilineTextAlignment(.leading)
-                    
-                    // Show description for saved places, address for Google Places
-                    if let description = place.properties.description, !description.isEmpty {
-                        Text(description)
-                            .font(.subheadline)
-                            .foregroundColor(.purple)
-                            .multilineTextAlignment(.leading)
-                    } else {
-                        Text(place.properties.address.isEmpty ? "Address not available" : place.properties.address)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.leading)
-                    }
-                    
-                    HStack {
-                        // Distance
-                        HStack(spacing: 4) {
-                            Image(systemName: "location")
-                            Text(formatDistance(meters: place.properties.distanceMeters ?? 0))
-                        }
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                        
-                        Spacer()
-                        
-                        // Rating if available
-                        if let rating = place.properties.rating {
-                            HStack(spacing: 2) {
-                                Image(systemName: "star.fill")
-                                Text(String(format: "%.1f", rating))
-                            }
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        }
-                    }
-                }
-                
+                emojiTile
+                placeInfo
                 Spacer()
-                
-                // Selection Arrow or Loading Indicator
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .foregroundColor(.blue)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
+                trailingIndicator
             }
             .padding(16)
             .background(Color.white)
             .cornerRadius(12)
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
         .disabled(isLoading)
     }
-} 
+
+    private var emojiTile: some View {
+        Text(typeEmoji)
+            .font(.system(size: 24))
+            .frame(width: 48, height: 48)
+            .background(cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var placeInfo: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(place.properties.name)
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.leading)
+                .lineLimit(1)
+
+            Text(place.properties.address.isEmpty ? "Address not available" : place.properties.address)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+
+            metadataRow
+        }
+    }
+
+    private var metadataRow: some View {
+        HStack(spacing: 8) {
+            if let rating = place.properties.rating {
+                HStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.orange)
+                    Text(String(format: "%.1f", rating))
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+                Text("·")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 2) {
+                Image(systemName: "mappin")
+                Text(formattedDistance)
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
+    }
+
+    private var trailingIndicator: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(0.8)
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
