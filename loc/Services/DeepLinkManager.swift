@@ -83,6 +83,8 @@ class DeepLinkManager: ObservableObject {
             await handleProfileDeepLink(url)
         case "tiktok-shared":
             await handleContentFromExtension()
+        case "invite":
+            await handleInviteDeepLink(url)
         case "share":
             if url.path == "/content" || url.path == "/tiktok" {
                 await handleExternalContentDeepLink(url)
@@ -181,6 +183,38 @@ class DeepLinkManager: ObservableObject {
         }
     }
     
+    /// Extracts the invite token from the URL and redeems it, or stashes it for post-login redemption.
+    private func handleInviteDeepLink(_ url: URL) async {
+        // Extract token from path: loc://invite/{token}
+        let token = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !token.isEmpty else {
+            print("❌ [DeepLinkManager] Missing invite token in URL")
+            return
+        }
+
+        guard let userId = userSession?.currentUserId else {
+            // Not logged in — stash token for post-login redemption
+            UserDefaults.standard.set(token, forKey: "pendingInviteToken")
+            print("📩 [DeepLinkManager] Stored pending invite token for post-login")
+            return
+        }
+
+        // Logged in — redeem immediately
+        let invitationService = ServiceContainer.shared.tripInvitationService
+        do {
+            let redeemed = try await invitationService.redeemInvitationByToken(userId: userId, token: token)
+            for trip in redeemed {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("TripInvitationRedeemed"),
+                    object: nil,
+                    userInfo: ["tripId": trip.tripId, "tripName": trip.tripName]
+                )
+            }
+        } catch {
+            print("❌ [DeepLinkManager] Failed to redeem invite token: \(error)")
+        }
+    }
+
     private func handleContentFromExtension() async {
         // Check App Group first (preferred method) - check both old and new keys for backward compat
         if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa"),

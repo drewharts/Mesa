@@ -30,6 +30,13 @@ class PhotoImportViewModel: ObservableObject {
     @Published var isInPhotoImportFlow: Bool = false
     @Published var resolvedPlace: DetailPlace?
     @Published var isResolvingPlace: Bool = false
+    @Published var photoThumbnail: UIImage?
+    @Published var showClusterOverview: Bool = false
+    @Published var showPhotoPicker: Bool = false
+    @Published var showImportOnboarding: Bool = false
+    @Published var clusteringVM: PhotoClusteringViewModel
+
+    private static let onboardingKey = "hasSeenPhotoImportOnboarding"
 
     private let nearbyPlacesService: NearbyPlacesService
     private let placeService: PlaceService
@@ -46,95 +53,103 @@ class PhotoImportViewModel: ObservableObject {
         self.placeService = placeService
         self.userService = userService
         self.mesaBackendService = mesaBackendService
+        self.clusteringVM = PhotoClusteringViewModel(nearbyPlacesService: nearbyPlacesService)
     }
 
     // Callback for when a place is successfully saved
     var onPlaceSaved: (() -> Void)?
     var onPlaceSavedWithDetail: ((DetailPlace) -> Void)?
+
+    /// Handles import button tap: shows onboarding on first use, opens picker otherwise.
+    func handleImportButtonTap() {
+        if UserDefaults.standard.bool(forKey: Self.onboardingKey) {
+            showPhotoPicker = true
+        } else {
+            showImportOnboarding = true
+        }
+    }
+
+    /// Confirms onboarding, marks as seen, and opens the photo picker.
+    func confirmOnboarding() {
+        UserDefaults.standard.set(true, forKey: Self.onboardingKey)
+        showImportOnboarding = false
+        showPhotoPicker = true
+    }
     
+    /// Processes selected photos: loads images, clusters by GPS, and routes to the appropriate flow.
     func processSelectedPhotos() async {
         isInPhotoImportFlow = true
         guard !selectedItems.isEmpty else { return }
-        
+
         isProcessingPhoto = true
         selectedImages = []
         detectedCoordinates = nil
         noLocationDataError = false
-        
-        // Show place selection screen immediately while processing
-        await MainActor.run {
-            showPlaceSelection = true
-        }
-        
+
         do {
-            var foundCoordinates = false
-            
-            // Load all images first
+            // Load all images and their raw data
+            var imageDataPairs: [(UIImage, Data)] = []
             for item in selectedItems {
                 if let imageData = try await item.loadTransferable(type: Data.self),
                    let image = UIImage(data: imageData) {
                     selectedImages.append(image)
+                    imageDataPairs.append((image, imageData))
                 }
             }
-            
-            // Now check each photo for coordinates until we find one
-            for (index, item) in selectedItems.enumerated() {
-                if let imageData = try await item.loadTransferable(type: Data.self) {
-                    if await extractCoordinatesFromPhoto(data: imageData, photoIndex: index + 1) {
-                        foundCoordinates = true
-                        break // Stop once we find coordinates
-                    }
-                }
+            photoThumbnail = selectedImages.first
+
+            // Cluster photos by GPS proximity
+            clusteringVM.clusterPhotos(photoDataPairs: imageDataPairs)
+            let clusterCount = clusteringVM.clusters.count
+
+            if clusterCount == 0 {
+                // No GPS in any photo
+                noLocationDataError = true
+                isInPhotoImportFlow = false
+            } else if clusterCount == 1 {
+                // Single cluster — fast path: use existing PlaceSelectionView
+                let cluster = clusteringVM.clusters[0]
+                detectedCoordinates = (latitude: cluster.latitude, longitude: cluster.longitude)
+                showPlaceSelection = true
+                await fetchNearbyPlaces(latitude: cluster.latitude, longitude: cluster.longitude)
+            } else {
+                // Multiple clusters — show overview
+                showClusterOverview = true
+                await clusteringVM.fetchAllNearbyPlaces()
             }
-            
-            // If no coordinates found in any photo, show error
-            if !foundCoordinates {
-                print("❌ No GPS coordinates found in any of the selected photos")
-                await MainActor.run {
-                    noLocationDataError = true
-                    showPlaceSelection = false // Hide place selection on error
-                    isInPhotoImportFlow = false
-                }
-            }
-            
         } catch {
             print("Failed to load photos: \(error.localizedDescription)")
-            await MainActor.run {
-                showPlaceSelection = false
-                isInPhotoImportFlow = false
-            }
+            isInPhotoImportFlow = false
         }
-        
+
         isProcessingPhoto = false
     }
     
-    private func extractCoordinatesFromPhoto(data: Data, photoIndex: Int) async -> Bool {
+    /// Extracts GPS coordinates from EXIF data in a photo. Returns nil if no GPS data found.
+    static func extractGPSCoordinates(from data: Data) -> (latitude: Double, longitude: Double)? {
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
-              let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
+              let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any],
+              let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
+              let latitude = gpsData[kCGImagePropertyGPSLatitude as String] as? Double,
+              let longitude = gpsData[kCGImagePropertyGPSLongitude as String] as? Double,
+              let latitudeRef = gpsData[kCGImagePropertyGPSLatitudeRef as String] as? String,
+              let longitudeRef = gpsData[kCGImagePropertyGPSLongitudeRef as String] as? String else {
+            return nil
+        }
+
+        let finalLatitude = (latitudeRef == "S") ? -latitude : latitude
+        let finalLongitude = (longitudeRef == "W") ? -longitude : longitude
+        return (latitude: finalLatitude, longitude: finalLongitude)
+    }
+
+    private func extractCoordinatesFromPhoto(data: Data, photoIndex: Int) async -> Bool {
+        guard let coords = Self.extractGPSCoordinates(from: data) else {
             return false
         }
 
-        guard let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any] else {
-            return false
-        }
-        
-        // Extract GPS coordinates
-        if let latitude = gpsData[kCGImagePropertyGPSLatitude as String] as? Double,
-           let longitude = gpsData[kCGImagePropertyGPSLongitude as String] as? Double,
-           let latitudeRef = gpsData[kCGImagePropertyGPSLatitudeRef as String] as? String,
-           let longitudeRef = gpsData[kCGImagePropertyGPSLongitudeRef as String] as? String {
-            
-            let finalLatitude = (latitudeRef == "S") ? -latitude : latitude
-            let finalLongitude = (longitudeRef == "W") ? -longitude : longitude
-            
-            detectedCoordinates = (latitude: finalLatitude, longitude: finalLongitude)
-
-            // Fetch nearby places
-            await fetchNearbyPlaces(latitude: finalLatitude, longitude: finalLongitude)
-            return true
-        } else {
-            return false
-        }
+        detectedCoordinates = coords
+        await fetchNearbyPlaces(latitude: coords.latitude, longitude: coords.longitude)
+        return true
     }
     
     func fetchNearbyPlaces(latitude: Double, longitude: Double) async {
@@ -409,6 +424,21 @@ class PhotoImportViewModel: ObservableObject {
         isSavingPlace = false
     }
     
+    /// Resets only the cluster-scoped state (coordinates, nearby places, selected place).
+    /// Used when canceling from a per-cluster PlaceSelectionView within the overview flow.
+    func clearClusterSelection() {
+        detectedCoordinates = nil
+        nearbyPlaces = []
+        selectedPlace = nil
+        showPlaceSelection = false
+        showPostCreation = false
+        searchRadiusUsed = 50
+        resolvedPlace = nil
+        isResolvingPlace = false
+        photoThumbnail = nil
+    }
+
+    /// Resets all photo import state to defaults.
     func clearSelection() {
         selectedItems = []
         selectedImages = []
@@ -417,6 +447,9 @@ class PhotoImportViewModel: ObservableObject {
         selectedPlace = nil
         showPlaceSelection = false
         showPostCreation = false
+        showClusterOverview = false
+        showPhotoPicker = false
+        showImportOnboarding = false
         noLocationDataError = false
         shouldNavigateToPlaceDetail = false
         createdPlaceForDetail = nil
@@ -425,5 +458,7 @@ class PhotoImportViewModel: ObservableObject {
         isInPhotoImportFlow = false
         resolvedPlace = nil
         isResolvingPlace = false
+        photoThumbnail = nil
+        clusteringVM.reset()
     }
 } 

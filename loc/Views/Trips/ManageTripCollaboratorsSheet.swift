@@ -11,40 +11,36 @@ import SwiftUI
 struct ManageTripCollaboratorsSheet: View {
     @StateObject private var viewModel: TripCollaboratorsViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedTab = 0
 
     private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
 
-    init(tripId: String, currentUserId: String) {
+    init(tripId: String, currentUserId: String, tripName: String, currentUserName: String) {
         _viewModel = StateObject(wrappedValue: TripCollaboratorsViewModel(
             tripId: tripId,
-            currentUserId: currentUserId
+            currentUserId: currentUserId,
+            tripName: tripName,
+            currentUserName: currentUserName
         ))
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Search bar
-                searchBar
+                // Tab picker
+                Picker("Add Method", selection: $selectedTab) {
+                    Text("Search Users").tag(0)
+                    Text("Invite by Text").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding()
 
-                // Content
-                ScrollView {
-                    VStack(spacing: 16) {
-                        // Current collaborators
-                        if viewModel.isLoading {
-                            ProgressView()
-                                .padding()
-                        } else if !viewModel.collaborators.isEmpty {
-                            collaboratorsList
-                        }
-
-                        // Search results
-                        if viewModel.isSearching {
-                            ProgressView("Searching...")
-                                .padding()
-                        } else if !viewModel.searchResults.isEmpty {
-                            searchResultsList
-                        }
+                if selectedTab == 0 {
+                    searchUsersContent
+                } else {
+                    ScrollView {
+                        TripInviteByTextView(viewModel: viewModel.inviteViewModel)
+                            .padding(.top, 8)
                     }
                 }
             }
@@ -62,6 +58,50 @@ struct ManageTripCollaboratorsSheet: View {
             }
             .task {
                 await viewModel.loadCollaborators()
+            }
+            .sheet(isPresented: Binding(
+                get: { viewModel.inviteViewModel.showMessageComposer },
+                set: { viewModel.inviteViewModel.showMessageComposer = $0 }
+            )) {
+                if MessageComposeView.canSendText {
+                    MessageComposeView(
+                        recipients: [viewModel.inviteViewModel.recipientPhone],
+                        body: viewModel.inviteViewModel.inviteMessage
+                    ) { result in
+                        switch result {
+                        case .sent:
+                            viewModel.inviteViewModel.confirmInvitationSent()
+                        default:
+                            viewModel.inviteViewModel.cancelInvitation()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Search Users Content
+
+    private var searchUsersContent: some View {
+        VStack(spacing: 0) {
+            searchBar
+
+            ScrollView {
+                VStack(spacing: 16) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .padding()
+                    } else if !viewModel.collaborators.isEmpty {
+                        collaboratorsList
+                    }
+
+                    if viewModel.isSearching {
+                        ProgressView("Searching...")
+                            .padding()
+                    } else if !viewModel.searchResults.isEmpty {
+                        searchResultsList
+                    }
+                }
             }
         }
     }

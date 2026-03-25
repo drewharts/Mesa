@@ -10,6 +10,17 @@ import Foundation
 import Combine
 import SwiftUI
 
+/// Typed confirmation for trip place add/remove toast display.
+struct TripPlaceConfirmation: Equatable {
+    enum ActionType {
+        case added
+        case removed
+    }
+
+    let message: String
+    let type: ActionType
+}
+
 @MainActor
 class AddPlaceToTripViewModel: ObservableObject {
 
@@ -30,12 +41,19 @@ class AddPlaceToTripViewModel: ObservableObject {
     @Published var selectedListPlaces: [LightweightPlace] = []
     @Published var searchResults: [MesaPlaceSuggestion] = []
     @Published var placesInTrip: Set<String> = []
+    @Published var addedSuggestionIds: Set<String> = []
     @Published var isLoadingInitial = false
     @Published var isLoadingListPlaces = false
     @Published var isAddingPlace: Set<String> = []
     @Published var searchText: String = ""
     @Published var isSearching = false
     @Published var errorMessage: String?
+    @Published var resolvedPlaceId: String?
+    @Published var isResolvingSuggestion: String?
+
+    // MARK: - Confirmation Toast State
+
+    @Published var confirmation: TripPlaceConfirmation?
 
     /// Returns lists filtered by the list search text, or all lists if search is empty.
     var filteredLists: [LightweightPlaceList] {
@@ -44,7 +62,7 @@ class AddPlaceToTripViewModel: ObservableObject {
         return lists.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 
-    /// Callback to dismiss the sheet and navigate to place detail.
+    /// Callback to push place detail within the sheet's NavigationStack.
     var onViewPlaceDetail: ((String) -> Void)?
 
     // MARK: - Dependencies
@@ -57,6 +75,7 @@ class AddPlaceToTripViewModel: ObservableObject {
     private let searchService = PlaceSearchService()
 
     private var searchTask: Task<Void, Never>?
+    private var confirmationDismissTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -157,6 +176,7 @@ class AddPlaceToTripViewModel: ObservableObject {
                     addedBy: userId
                 )
             }
+            showConfirmation("Added to trip", type: .added)
         } catch {
             // Revert optimistic update on failure
             placesInTrip.remove(placeId)
@@ -226,43 +246,51 @@ class AddPlaceToTripViewModel: ObservableObject {
     // MARK: - Search and Add
 
     /// Resolves a search suggestion to a full place and adds it to the trip.
-    func searchAndAddPlace(suggestion: MesaPlaceSuggestion) {
+    func searchAndAddPlace(suggestion: MesaPlaceSuggestion) async {
         let suggestionId = suggestion.id
         guard !isAddingPlace.contains(suggestionId) else { return }
 
         isAddingPlace.insert(suggestionId)
         errorMessage = nil
 
-        searchService.selectSuggestion(suggestion) { [weak self] detailPlace in
-            guard let self else { return }
-            Task { @MainActor in
-                let placeId = detailPlace.id.uuidString
-                self.placesInTrip.insert(placeId)
+        do {
+            let mesaBackendService = MesaBackendService()
+            let detailPlace = try await mesaBackendService.fetchPlaceDetails(
+                placeId: suggestion.id,
+                source: suggestion.source
+            )
+            let placeId = detailPlace.id.uuidString
+            placesInTrip.insert(placeId)
 
-                do {
-                    if let dayIndex = self.targetDayIndex {
-                        try await self.tripService.addPlaceToDay(
-                            tripId: self.tripId,
-                            placeId: placeId,
-                            dayIndex: dayIndex,
-                            addedBy: self.userId
-                        )
-                    } else {
-                        try await self.tripService.addPlaceAsIdea(
-                            tripId: self.tripId,
-                            placeId: placeId,
-                            addedBy: self.userId
-                        )
-                    }
-                } catch {
-                    self.placesInTrip.remove(placeId)
-                    self.errorMessage = "Failed to add place"
-                    print("[AddPlaceToTripVM] Failed to add search place: \(error)")
+            do {
+                if let dayIndex = targetDayIndex {
+                    try await tripService.addPlaceToDay(
+                        tripId: tripId,
+                        placeId: placeId,
+                        dayIndex: dayIndex,
+                        addedBy: userId
+                    )
+                } else {
+                    try await tripService.addPlaceAsIdea(
+                        tripId: tripId,
+                        placeId: placeId,
+                        addedBy: userId
+                    )
                 }
-
-                self.isAddingPlace.remove(suggestionId)
+                addedSuggestionIds.insert(suggestionId)
+                showConfirmation("Added to trip", type: .added)
+            } catch {
+                placesInTrip.remove(placeId)
+                addedSuggestionIds.remove(suggestionId)
+                errorMessage = "Failed to add place"
+                print("[AddPlaceToTripVM] Failed to add search place: \(error)")
             }
+        } catch {
+            errorMessage = "Failed to add place"
+            print("[AddPlaceToTripVM] Failed to fetch place details: \(error)")
         }
+
+        isAddingPlace.remove(suggestionId)
     }
 
     /// Clears the search state.
@@ -270,5 +298,41 @@ class AddPlaceToTripViewModel: ObservableObject {
         searchText = ""
         searchResults = []
         errorMessage = nil
+    }
+
+    // MARK: - Search Suggestion Resolution
+
+    /// Resolves a search suggestion to a Mesa place and publishes its ID for navigation.
+    func resolveAndNavigateToPlaceDetail(suggestion: MesaPlaceSuggestion) async {
+        guard isResolvingSuggestion == nil else { return }
+        isResolvingSuggestion = suggestion.id
+
+        do {
+            let mesaBackendService = MesaBackendService()
+            let detailPlace = try await mesaBackendService.fetchPlaceDetails(
+                placeId: suggestion.id,
+                source: suggestion.source
+            )
+            resolvedPlaceId = detailPlace.id.uuidString
+        } catch {
+            errorMessage = "Failed to load place details"
+            print("[AddPlaceToTripVM] Failed to resolve suggestion: \(error)")
+        }
+
+        isResolvingSuggestion = nil
+    }
+
+    // MARK: - Confirmation Toast
+
+    /// Shows a confirmation toast and auto-clears it after 1.5 seconds.
+    private func showConfirmation(_ message: String, type: TripPlaceConfirmation.ActionType) {
+        confirmationDismissTask?.cancel()
+        confirmation = TripPlaceConfirmation(message: message, type: type)
+        confirmationDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if !Task.isCancelled {
+                self?.confirmation = nil
+            }
+        }
     }
 }

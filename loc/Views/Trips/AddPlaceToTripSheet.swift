@@ -13,24 +13,20 @@ struct AddPlaceToTripSheet: View {
     let targetDayIndex: Int?
     let existingPlaceIds: Set<String>
     let userId: String
-    let onDismiss: () -> Void
-
     @StateObject private var viewModel: AddPlaceToTripViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var placeIdForDetail: String?
 
     init(
         tripId: String,
         targetDayIndex: Int?,
         existingPlaceIds: Set<String>,
-        userId: String,
-        onDismiss: @escaping () -> Void
+        userId: String
     ) {
         self.tripId = tripId
         self.targetDayIndex = targetDayIndex
         self.existingPlaceIds = existingPlaceIds
         self.userId = userId
-        self.onDismiss = onDismiss
         self._viewModel = StateObject(wrappedValue: AddPlaceToTripViewModel(
             tripId: tripId,
             targetDayIndex: targetDayIndex,
@@ -45,21 +41,31 @@ struct AddPlaceToTripSheet: View {
                 tabPicker
                 tabContent
             }
+            .overlay(alignment: .bottom) {
+                confirmationToast
+            }
+            .animation(.easeInOut(duration: 0.25), value: viewModel.confirmation)
             .navigationTitle("Add Place")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
-                        onDismiss()
                         dismiss()
                     }
                 }
             }
+            .navigationDestination(item: $placeIdForDetail) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 0, shouldAnimateMap: false)
+            }
+            .onChange(of: viewModel.resolvedPlaceId) { _, placeId in
+                if let placeId {
+                    placeIdForDetail = placeId
+                    viewModel.resolvedPlaceId = nil
+                }
+            }
             .task {
-                viewModel.onViewPlaceDetail = { [weak selectedPlaceVM, onDismiss] placeId in
-                    selectedPlaceVM?.navigateToPlace(placeId: placeId)
-                    onDismiss()
-                    dismiss()
+                viewModel.onViewPlaceDetail = { placeId in
+                    placeIdForDetail = placeId
                 }
                 await viewModel.loadInitialData()
             }
@@ -90,6 +96,32 @@ struct AddPlaceToTripSheet: View {
             TripBrowsePlacesView(viewModel: viewModel)
         case .search:
             TripPlaceSearchContentView(viewModel: viewModel)
+        }
+    }
+
+    // MARK: - Confirmation Toast
+
+    /// Toast overlay showing add/remove confirmation, matching the ListSelectionSheet pattern.
+    @ViewBuilder
+    private var confirmationToast: some View {
+        if let confirmation = viewModel.confirmation {
+            let icon = confirmation.type == .removed ? "minus.circle.fill" : "checkmark.circle.fill"
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(confirmation.message)
+                    .font(.subheadline.weight(.medium))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(Color(.darkGray))
+            )
+            .padding(.bottom, 16)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .allowsHitTesting(false)
         }
     }
 }

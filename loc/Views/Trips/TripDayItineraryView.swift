@@ -12,6 +12,7 @@ struct TripDayItineraryView: View {
     let places: [TripDayPlace]
     let canEdit: Bool
     let isEditing: Bool
+    let travelTimeSegments: [String: TripTravelTimeSegment]
     let onMove: (IndexSet, Int) -> Void
     let onDelete: (String) -> Void
     let onPlaceTap: (String) -> Void
@@ -49,24 +50,33 @@ struct TripDayItineraryView: View {
     private var placesList: some View {
         List {
             ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                TripDayPlaceCard(
-                    place: place,
-                    number: index + 1,
-                    onTap: { onPlaceTap(place.placeId) }
-                )
+                VStack(spacing: 0) {
+                    if index > 0 {
+                        let prev = places[index - 1]
+                        TripTravelTimeConnectorView(
+                            segment: travelTimeSegments["\(prev.placeId)->\(place.placeId)"]
+                        )
+                    }
+                    TripDayPlaceCard(
+                        place: place,
+                        number: index + 1,
+                        onTap: { onPlaceTap(place.placeId) }
+                    )
+                }
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .draggable(place.id) {
-                    TripPlaceDragPreview(placeName: place.placeName ?? "Place")
+                    TripPlaceDragPreview()
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     if canEdit {
-                        Button(role: .destructive) {
+                        Button {
                             onDelete(place.id)
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Label("Ideas", systemImage: "lightbulb")
                         }
+                        .tint(.orange)
                     }
                 }
             }

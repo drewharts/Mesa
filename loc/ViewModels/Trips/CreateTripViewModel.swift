@@ -51,10 +51,15 @@ class CreateTripViewModel: ObservableObject {
     @Published private(set) var contributorSearchResults: [ProfileData] = []
     @Published private(set) var isSearchingContributors = false
 
+    // SMS Invitations (deferred until trip is created)
+    @Published var invitedPhoneNumbers: [String] = []
+    @Published var phoneInput: String = ""
+
     // MARK: - Dependencies
 
     private let tripService = ServiceContainer.shared.tripService
     private let tripCollaborationService = ServiceContainer.shared.tripCollaborationService
+    private let tripInvitationService = ServiceContainer.shared.tripInvitationService
     private let userService = ServiceContainer.shared.userService
 
     // MARK: - Private
@@ -155,6 +160,15 @@ class CreateTripViewModel: ObservableObject {
                     userId: contributor.id,
                     role: .editor,
                     addedBy: ownerId
+                )
+            }
+
+            // 3. Create SMS invitations for non-users
+            for phone in invitedPhoneNumbers {
+                try? await tripInvitationService.createInvitation(
+                    tripId: trip.id,
+                    phone: phone,
+                    invitedBy: ownerId
                 )
             }
 
@@ -266,6 +280,22 @@ class CreateTripViewModel: ObservableObject {
         contributorSearchResults = []
     }
 
+    // MARK: - Phone Invitations
+
+    /// Validates and adds a phone number to the deferred invitation list.
+    func addPhoneInvitation() {
+        let trimmed = phoneInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalized = PhoneNumberNormalizer.normalize(trimmed, dialCode: "1") else { return }
+        guard !invitedPhoneNumbers.contains(normalized) else { return }
+        invitedPhoneNumbers.append(normalized)
+        phoneInput = ""
+    }
+
+    /// Removes a phone number from the deferred invitation list.
+    func removePhoneInvitation(_ phone: String) {
+        invitedPhoneNumbers.removeAll { $0 == phone }
+    }
+
     // MARK: - Reset
 
     /// Resets the wizard to its initial state.
@@ -278,5 +308,7 @@ class CreateTripViewModel: ObservableObject {
         selectedContributors = []
         contributorSearchText = ""
         contributorSearchResults = []
+        invitedPhoneNumbers = []
+        phoneInput = ""
     }
 }

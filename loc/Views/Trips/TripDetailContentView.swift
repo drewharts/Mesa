@@ -50,16 +50,15 @@ struct TripDetailContentView: View {
                 }
             }
         }
-        .sheet(isPresented: $showAddPlaceSheet) {
+        .sheet(isPresented: $showAddPlaceSheet, onDismiss: {
+            Task { await viewModel.loadTrip() }
+        }) {
             if let userId = ServiceContainer.shared.authService.currentUserId {
                 AddPlaceToTripSheet(
                     tripId: trip.id,
                     targetDayIndex: nil,
                     existingPlaceIds: viewModel.allPlaceIdsInTrip,
-                    userId: userId,
-                    onDismiss: {
-                        Task { await viewModel.loadTrip() }
-                    }
+                    userId: userId
                 )
             }
         }

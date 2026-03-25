@@ -25,6 +25,7 @@ struct TripDayDetailView: View {
             places: places,
             canEdit: viewModel.canEdit,
             isEditing: isEditing,
+            travelTimeSegments: viewModel.travelTimesViewModel.segments,
             onMove: { fromOffsets, toOffset in
                 viewModel.reorderPlaces(dayIndex: dayIndex, fromOffsets: fromOffsets, toOffset: toOffset)
             },
@@ -57,16 +58,15 @@ struct TripDayDetailView: View {
         .navigationDestination(item: $selectedPlaceId) { placeId in
             PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
         }
-        .sheet(isPresented: $showAddPlaceSheet) {
+        .sheet(isPresented: $showAddPlaceSheet, onDismiss: {
+            Task { await viewModel.loadTrip() }
+        }) {
             if let userId = ServiceContainer.shared.authService.currentUserId {
                 AddPlaceToTripSheet(
                     tripId: viewModel.tripId,
                     targetDayIndex: dayIndex,
                     existingPlaceIds: viewModel.allPlaceIdsInTrip,
-                    userId: userId,
-                    onDismiss: {
-                        Task { await viewModel.loadTrip() }
-                    }
+                    userId: userId
                 )
             }
         }

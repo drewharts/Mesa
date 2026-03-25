@@ -7,11 +7,13 @@
 
 import SwiftUI
 
-/// Search result row displaying place name, address, and an add/checkmark action icon.
+/// Search result row with tappable text area for navigation and separate add/remove action icon.
 struct TripSearchResultRowView: View {
     let suggestion: MesaPlaceSuggestion
     let isAdding: Bool
     let isInTrip: Bool
+    let isResolving: Bool
+    let onNavigate: () -> Void
     let onAdd: () -> Void
     let onRemove: () -> Void
 
@@ -34,8 +36,8 @@ struct TripSearchResultRowView: View {
     }
 
     var body: some View {
-        Button(action: onAdd) {
-            HStack {
+        HStack {
+            Button(action: onNavigate) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(suggestion.name)
                         .font(.body)
@@ -48,12 +50,20 @@ struct TripSearchResultRowView: View {
                             .lineLimit(1)
                     }
                 }
+            }
+            .disabled(isResolving)
 
-                Spacer()
+            Spacer()
 
-                actionIcon
+            if isResolving {
+                ProgressView()
+                    .scaleEffect(0.8)
+            } else {
+                Button(action: isInTrip ? onRemove : onAdd) {
+                    actionIcon
+                }
+                .disabled(isAdding)
             }
         }
-        .disabled(isAdding)
     }
 }
