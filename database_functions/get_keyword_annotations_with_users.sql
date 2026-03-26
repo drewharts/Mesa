@@ -44,6 +44,7 @@ BEGIN
             p.name AS place_name,
             p.location AS place_coordinate,
             COALESCE(
+                p.user_corrected_category,
                 (SELECT cat FROM unnest(p.categories) AS cat
                  WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
                  LIMIT 1),

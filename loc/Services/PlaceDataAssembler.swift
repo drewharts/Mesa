@@ -51,6 +51,7 @@ enum PlaceDataAssembler {
         place.isCustom = record.is_custom
         place.menuUrl = record.menu_url
         place.websiteUrl = record.website
+        place.userCorrectedCategory = record.user_corrected_category
     }
 
     /// Parses AnyCodable open_hours into a string array, handling multiple formats.

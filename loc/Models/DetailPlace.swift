@@ -42,6 +42,9 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     // AI suggestion field - explains why AI recommended this place
     var aiSuggestionReason: String?
 
+    // User-corrected category overriding the auto-derived one from Google Places
+    var userCorrectedCategory: String?
+
     // Backend-specific fields (ignored by iOS but needed for decoding)
     var googlePlaceId: String?
     var source: String?
@@ -85,6 +88,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case thumbnailUrl  // Legacy field name "thumbnailUrl"
         case isCustom = "is_custom"
         case aiSuggestionReason
+        case userCorrectedCategory = "user_corrected_category"
     }
     
     // Custom decoding to handle backend's coordinates format
@@ -123,6 +127,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.isCustom = nil
         self.isDroppedPin = false
         self.aiSuggestionReason = nil
+        self.userCorrectedCategory = nil
 
         // Now decode all the optional properties
         try decodeBasicProperties(from: container)
@@ -204,6 +209,9 @@ struct DetailPlace: Codable, Identifiable, Equatable {
 
         // Decode AI suggestion reason (from AI search endpoint)
         self.aiSuggestionReason = try container.decodeIfPresent(String.self, forKey: .aiSuggestionReason)
+
+        // Decode user-corrected category override
+        self.userCorrectedCategory = try container.decodeIfPresent(String.self, forKey: .userCorrectedCategory)
     }
     
     private static func decodeID(from container: KeyedDecodingContainer<CodingKeys>) throws -> UUID {
@@ -263,6 +271,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(photoUrls, forKey: .photoUrls)
         try container.encodeIfPresent(isCustom, forKey: .isCustom)
         try container.encodeIfPresent(aiSuggestionReason, forKey: .aiSuggestionReason)
+        try container.encodeIfPresent(userCorrectedCategory, forKey: .userCorrectedCategory)
     }
 
     // Existing initializers unchanged
@@ -294,6 +303,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.createdAt = nil
         self.isCustom = nil
         self.aiSuggestionReason = nil
+        self.userCorrectedCategory = nil
     }
 
     init(place: Place) {
@@ -324,6 +334,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.createdAt = nil
         self.isCustom = nil
         self.aiSuggestionReason = nil
+        self.userCorrectedCategory = nil
     }
 
     init(id: UUID, name: String, address: String?, city: String?) {
@@ -355,6 +366,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.createdAt = nil
         self.isCustom = nil
         self.aiSuggestionReason = nil
+        self.userCorrectedCategory = nil
     }
 
     /// Creates a minimal DetailPlace for immediate navigation from search suggestions.
@@ -394,6 +406,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.createdAt = nil
         self.isCustom = nil
         self.aiSuggestionReason = nil
+        self.userCorrectedCategory = nil
     }
 
     // Removed MapboxSearch SearchResult initializer - now using Google Places API

@@ -24,6 +24,7 @@ SELECT
     p.location AS coordinate,
     array_agg(COALESCE(pli.added_by, pl.user_id) ORDER BY COALESCE(pli.added_by, pl.user_id)) AS user_ids,
     COALESCE(
+        p.user_corrected_category,
         (SELECT cat FROM unnest(p.categories) AS cat
          WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
          LIMIT 1),
@@ -47,5 +48,5 @@ AND (
         AND plc.user_id = p_querying_user_id
     )
 )
-GROUP BY pli.place_id, p.name, p.location, p.categories;
+GROUP BY pli.place_id, p.name, p.location, p.categories, p.user_corrected_category;
 $function$;

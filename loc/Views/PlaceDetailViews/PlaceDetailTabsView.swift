@@ -39,6 +39,7 @@ struct PlaceDetailTabsView: View {
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
     @State private var showingHoursSheet = false
+    @State private var showingCategoryCorrectionSheet = false
     @State private var showingNoteSheet = false
     @State private var showPlacePhotoSelector = false
     @State private var travelSelectorState: TravelTimeSelectorState?
@@ -84,6 +85,19 @@ struct PlaceDetailTabsView: View {
                 currentStatus: viewModel.openStatus
             )
             .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        // Category Correction Sheet - correct the place's category
+        .sheet(isPresented: $showingCategoryCorrectionSheet) {
+            CategoryCorrectionSheet(
+                placeId: viewModel.currentPlace?.id.uuidString ?? "",
+                currentCategory: viewModel.restaurantType,
+                hasCorrectionOverride: viewModel.currentPlace?.userCorrectedCategory != nil,
+                onCorrectionSaved: { category in
+                    viewModel.applyCategoryCorrection(category)
+                }
+            )
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
         // Note Sheet - edit private notes for this place
@@ -229,9 +243,13 @@ struct PlaceDetailTabsView: View {
                     }
                 )
             } else if let restaurantType = viewModel.restaurantType {
-                Text(restaurantType)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
+                Button {
+                    showingCategoryCorrectionSheet = true
+                } label: {
+                    Text(restaurantType)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
             }
             
             OpenStatusBadgeView(status: viewModel.openStatus) {

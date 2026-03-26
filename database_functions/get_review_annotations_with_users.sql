@@ -43,6 +43,7 @@ BEGIN
             p.location AS coordinate,
             ARRAY[r.user_id] AS user_ids,
             COALESCE(
+                p.user_corrected_category,
                 (SELECT cat FROM unnest(p.categories) AS cat
                  WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
                  LIMIT 1),

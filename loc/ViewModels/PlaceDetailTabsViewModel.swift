@@ -439,11 +439,24 @@ class PlaceDetailTabsViewModel: ObservableObject {
         isDroppedPin = place?.isDroppedPin == true
 
         if let place = place {
-            // For custom places, view shows "Created by [photo]" instead of type
-            // Still compute type in case we want to show both in the future
-            restaurantType = getRestaurantType(for: place)
+            // Prefer user-corrected category over auto-derived
+            if let corrected = place.userCorrectedCategory {
+                restaurantType = corrected
+            } else {
+                restaurantType = getRestaurantType(for: place)
+            }
         } else {
             restaurantType = nil
+        }
+    }
+
+    /// Updates the locally cached category after a user correction.
+    func applyCategoryCorrection(_ category: String?) {
+        currentPlace?.userCorrectedCategory = category
+        if let category = category {
+            restaurantType = category
+        } else if let place = currentPlace {
+            restaurantType = getRestaurantType(for: place)
         }
     }
     

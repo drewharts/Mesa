@@ -16,8 +16,22 @@ class SupabasePlaceService: ObservableObject {
     
     private nonisolated init() {    }
     
+    // MARK: - Place Category Correction
+
+    /// Updates the user-corrected category for a place.
+    func updatePlaceCorrectedCategory(placeId: String, category: String?) async throws {
+        struct UpdateData: Encodable {
+            let user_corrected_category: String?
+        }
+        try await supabase.client
+            .from("places")
+            .update(UpdateData(user_corrected_category: category))
+            .eq("id", value: placeId)
+            .execute()
+    }
+
     // MARK: - Place Deletion
-    
+
     func deletePlaceFromMyPlaces(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         Task {
             do {                
@@ -102,6 +116,7 @@ class SupabasePlaceService: ObservableObject {
         let source: String?
         let updated_at: String?
         let is_custom: Bool
+        let user_corrected_category: String?
     }
     
     /// Converts DetailPlace to PlaceInsertData for Supabase insertion
@@ -141,7 +156,8 @@ class SupabasePlaceService: ObservableObject {
             serves_dinner: place.serversDinner,
             source: place.isCustom == true ? "custom" : place.source,
             updated_at: nil, // Let database handle this
-            is_custom: place.isCustom ?? false
+            is_custom: place.isCustom ?? false,
+            user_corrected_category: place.userCorrectedCategory
         )
     }
     
@@ -2106,12 +2122,14 @@ struct PlaceRecord: Codable {
     let source: String?
     let updated_at: String?
     let is_custom: Bool?
-    
+    let user_corrected_category: String?
+
     enum CodingKeys: String, CodingKey {
         case id, name, address, city, description, location, rating, rating_count, price_level
         case categories, phone, website, menu_url, instagram, twitter, google_places_id, mapbox_id
         case fid, cid, thumbnail_url, photo_urls, open_hours, reservable
         case serves_breakfast, serves_lunch, serves_dinner, source, updated_at, is_custom
+        case user_corrected_category
     }
     
     init(from decoder: Decoder) throws {
@@ -2145,7 +2163,8 @@ struct PlaceRecord: Codable {
         source = try container.decodeIfPresent(String.self, forKey: .source)
         updated_at = try container.decodeIfPresent(String.self, forKey: .updated_at)
         is_custom = try container.decodeIfPresent(Bool.self, forKey: .is_custom)
-        
+        user_corrected_category = try container.decodeIfPresent(String.self, forKey: .user_corrected_category)
+
         // Handle open_hours as jsonb - can be any JSON structure
         open_hours = try container.decodeIfPresent(AnyCodable.self, forKey: .open_hours)
     }
