@@ -18,6 +18,7 @@ class PhotoFeedViewModel: ObservableObject {
     @Published var isLoadingMore = false
     @Published var hasMorePages = true
     @Published var currentUserProfile: ProfileData?
+    @Published var crownedPostIds: Set<String> = []
 
     // MARK: - Child ViewModels
 
@@ -75,6 +76,7 @@ class PhotoFeedViewModel: ObservableObject {
 
         await profileFetch
         isLoading = false
+        Task { await loadCrownStates() }
     }
 
     /// Loads the next page of feed items when scrolling near the end.
@@ -109,6 +111,51 @@ class PhotoFeedViewModel: ObservableObject {
     func updateCommentCount(for itemId: String, count: Int) {
         guard let index = feedItems.firstIndex(where: { $0.id == itemId }) else { return }
         feedItems[index].commentCount = count
+    }
+
+    /// Loads crown states for all feed items for the current user.
+    func loadCrownStates() async {
+        guard let currentUserId = ServiceContainer.shared.authService.currentUserId else { return }
+        do {
+            let likedIds = try await postService.fetchLikedPostIds(userId: currentUserId)
+            crownedPostIds = Set(likedIds)
+        } catch {
+            print("[PhotoFeedViewModel] Failed to load crown states: \(error)")
+        }
+    }
+
+    /// Toggles the crown (like) state for a post.
+    func toggleCrown(postId: String) {
+        guard let currentUserId = ServiceContainer.shared.authService.currentUserId else { return }
+        let wasCrowned = crownedPostIds.contains(postId)
+
+        // Optimistic update
+        if wasCrowned {
+            crownedPostIds.remove(postId)
+            if let index = feedItems.firstIndex(where: { $0.id == postId }) {
+                feedItems[index].likes = max(0, feedItems[index].likes - 1)
+            }
+        } else {
+            crownedPostIds.insert(postId)
+            if let index = feedItems.firstIndex(where: { $0.id == postId }) {
+                feedItems[index].likes += 1
+            }
+        }
+
+        // Persist
+        if wasCrowned {
+            postService.unlikePost(postId: postId, userId: currentUserId) { error in
+                if let error = error {
+                    print("[PhotoFeedViewModel] Failed to uncrown: \(error)")
+                }
+            }
+        } else {
+            postService.likePost(postId: postId, userId: currentUserId) { error in
+                if let error = error {
+                    print("[PhotoFeedViewModel] Failed to crown: \(error)")
+                }
+            }
+        }
     }
 
     /// Resets and reloads the feed from the beginning.

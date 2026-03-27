@@ -151,7 +151,10 @@ struct PhotoFeedView: View {
                         },
                         onPlaceTapped: { placeId in
                             navigationPath.append(placeId)
-                        }
+                        },
+                        isCrowned: viewModel.crownedPostIds.contains(item.id),
+                        crownCount: item.likes,
+                        onCrown: { viewModel.toggleCrown(postId: item.id) }
                     )
                     .task {
                         await viewModel.loadMoreIfNeeded(currentItem: item)

@@ -15,6 +15,9 @@ struct FeedCardView: View {
     let onCommentCountChanged: (Int) -> Void
     let onProfileTapped: (String) -> Void
     let onPlaceTapped: (String) -> Void
+    let isCrowned: Bool
+    let crownCount: Int
+    let onCrown: () -> Void
 
     @State private var fullscreenIndex: Int?
     @State private var showComments = false
@@ -25,7 +28,10 @@ struct FeedCardView: View {
             onComment: { showComments = true },
             onZoom: { index in fullscreenIndex = index },
             onProfileTapped: { onProfileTapped(item.userId) },
-            onPlaceTapped: { onPlaceTapped(item.placeId) }
+            onPlaceTapped: { onPlaceTapped(item.placeId) },
+            isCrowned: isCrowned,
+            crownCount: crownCount,
+            onCrown: onCrown
         )
         .fullScreenCover(item: fullscreenBinding) { wrapper in
             FullscreenMediaGalleryView(

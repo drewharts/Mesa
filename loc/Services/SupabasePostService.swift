@@ -208,6 +208,20 @@ class SupabasePostService: ObservableObject {
         }
     }
     
+    /// Fetches all post IDs that a user has liked from the review_likes table.
+    func fetchLikedPostIds(userId: String) async throws -> [String] {
+        struct LikeRecord: Decodable {
+            let review_id: String
+        }
+        let records: [LikeRecord] = try await supabase.client
+            .from("review_likes")
+            .select("review_id")
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        return records.map(\.review_id)
+    }
+
     // MARK: - Posted Place Checks
     
     func getPostedPlaceIds(userId: String, placeIds: [String]) async throws -> Set<String> {
