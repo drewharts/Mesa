@@ -300,7 +300,7 @@ class PlacePhotosViewModel: ObservableObject {
         photoLoadingStates[placeId] = .loaded
     }
 
-    /// Collects unique photo URLs from posts, excluding already-loaded URLs.
+    /// Collects unique photo URLs from posts, falling back to place.photoUrls when no posts exist.
     private func collectUniquePhotoURLs(for placeId: String) -> [String] {
         let posts = currentPosts
         let loadedURLs = loadedPlacePhotoURLs[placeId] ?? []
@@ -310,6 +310,16 @@ class PlacePhotosViewModel: ObservableObject {
 
         for post in posts {
             for url in post.images {
+                guard !loadedURLs.contains(url), !seenURLs.contains(url) else { continue }
+                seenURLs.insert(url)
+                uniqueURLs.append(url)
+            }
+        }
+
+        // Fall back to place-level cached photos (e.g. Google Places API photos)
+        // when no user post photos are available
+        if uniqueURLs.isEmpty, let placePhotos = place?.photoUrls {
+            for url in placePhotos {
                 guard !loadedURLs.contains(url), !seenURLs.contains(url) else { continue }
                 seenURLs.insert(url)
                 uniqueURLs.append(url)
