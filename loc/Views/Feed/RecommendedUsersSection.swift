@@ -55,7 +55,7 @@ struct RecommendedUsersSection: View {
 
     private var userScrollRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 12) {
+            LazyHStack(spacing: 14) {
                 ForEach(users) { user in
                     RecommendedUserCard(
                         profile: user,

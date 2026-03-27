@@ -20,7 +20,7 @@ struct RecommendedUserCard: View {
             nameLabel
             followButton
         }
-        .frame(width: 100)
+        .frame(width: 140)
         .onTapGesture {
             onProfileTap()
         }
@@ -31,18 +31,18 @@ struct RecommendedUserCard: View {
     private var profileImage: some View {
         CachedProfileImage(
             url: profile.profilePhotoURL?.absoluteString,
-            size: 56,
+            size: 72,
             fallbackInitial: String(profile.firstName.prefix(1))
         )
     }
 
     private var nameLabel: some View {
         Text(profile.fullName)
-            .font(.caption)
+            .font(.subheadline)
             .fontWeight(.medium)
             .lineLimit(2)
             .multilineTextAlignment(.center)
-            .frame(height: 32)
+            .frame(height: 36)
     }
 
     private var followButton: some View {
@@ -50,11 +50,11 @@ struct RecommendedUserCard: View {
             onFollowTap()
         } label: {
             Text(isFollowing ? "Following" : "Follow")
-                .font(.caption2)
+                .font(.caption)
                 .fontWeight(.semibold)
                 .foregroundColor(isFollowing ? .secondary : .white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
                 .background(isFollowing ? Color(.systemGray5) : Color.blue)
                 .clipShape(Capsule())
         }
