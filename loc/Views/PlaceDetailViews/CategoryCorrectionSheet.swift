@@ -70,7 +70,11 @@ struct CategoryCorrectionSheet: View {
             ForEach(viewModel.filteredGroups, id: \.section) { group in
                 Section(group.section) {
                     ForEach(group.types, id: \.self) { type in
-                        categoryRow(type)
+                        CategoryCorrectionRow(
+                            type: type,
+                            isSelected: viewModel.selectedCategory == type,
+                            onTap: { viewModel.selectCategory(type) }
+                        )
                     }
                 }
             }
@@ -90,26 +94,6 @@ struct CategoryCorrectionSheet: View {
                 .foregroundColor(.blue)
             }
             .disabled(viewModel.isSaving)
-        }
-    }
-
-    /// Renders a single category row with emoji and checkmark.
-    private func categoryRow(_ type: String) -> some View {
-        Button {
-            viewModel.selectCategory(type)
-        } label: {
-            HStack {
-                Text(PlaceTypeEmoji.emoji(for: type))
-                    .font(.title3)
-                Text(type)
-                    .foregroundColor(.primary)
-                Spacer()
-                if viewModel.selectedCategory == type {
-                    Image(systemName: "checkmark")
-                        .foregroundColor(.blue)
-                        .fontWeight(.semibold)
-                }
-            }
         }
     }
 
