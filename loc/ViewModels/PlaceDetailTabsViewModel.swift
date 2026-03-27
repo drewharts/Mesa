@@ -324,6 +324,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
         Task {
             await checkPlaceListMembership(place: place)
         }
+
+        // Trigger backend photo fallback if place has no cached photos
+        triggerPhotoFallbackIfNeeded(place)
     }
 
     /// Called by View when posts/rating change (legacy method for backward compatibility).
@@ -447,6 +450,20 @@ class PlaceDetailTabsViewModel: ObservableObject {
             }
         } else {
             restaurantType = nil
+        }
+    }
+
+    /// Hits the backend to trigger the Google Places photo fallback for places with no cached photos.
+    private func triggerPhotoFallbackIfNeeded(_ place: DetailPlace?) {
+        guard let place = place,
+              let googlePlaceId = place.googlePlaceId,
+              !googlePlaceId.isEmpty,
+              place.isCustom != true,
+              (place.photoUrls ?? []).isEmpty
+        else { return }
+
+        Task {
+            _ = try? await MesaBackendService.shared.fetchPlaceDetails(placeId: googlePlaceId, source: "google")
         }
     }
 
