@@ -437,7 +437,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 let reviewId = userInfo["reviewId"] as? String,
                 let placeId = userInfo["placeId"] as? String,
                 let notificationType = userInfo["type"] as? String,
-                notificationType == "comment" {
+                (notificationType == "comment" || notificationType == "comment_reply") {
             // For comments, we still navigate to the review (which will show the comments)
             // The reviewAuthorId is the person who should receive the notification
             let reviewAuthorId = userInfo["reviewAuthorId"] as? String ?? "unknown"

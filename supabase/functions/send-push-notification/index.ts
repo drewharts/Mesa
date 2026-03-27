@@ -133,7 +133,20 @@ serve(async (req) => {
         notificationData.placeId = record.place_id
         notificationData.userId = record.actor_id
         break
-        
+
+      case 'comment_reply':
+        title = 'New Reply'
+        const replierName = record.actor_first_name && record.actor_last_name
+          ? `${record.actor_first_name} ${record.actor_last_name}`
+          : 'Someone'
+        body = `${replierName} replied to your comment`
+        notificationData.commentId = record.comment_id
+        notificationData.reviewId = record.review_id
+        notificationData.placeId = record.place_id
+        notificationData.userId = record.actor_id
+        notificationData.type = 'comment_reply'
+        break
+
       case 'like':
         title = 'New Like'
         const likerName = record.actor_first_name && record.actor_last_name
