@@ -268,6 +268,30 @@ class MapViewModel: ObservableObject {
         filteringViewModel.clearAllFilters()
     }
 
+    // MARK: - Annotation Tap Handling
+
+    /// Resolves a tapped annotation to a DetailPlace for immediate navigation.
+    /// Returns cached full details if available, otherwise builds a partial place from annotation data.
+    func resolveAnnotationForNavigation(_ annotation: PlaceAnnotation) -> DetailPlace {
+        if let cached = cachedPlaceDetails(for: annotation.id) {
+            return cached
+        }
+        var partialPlace = DetailPlace(
+            id: UUID(uuidString: annotation.id) ?? UUID(),
+            name: annotation.name,
+            address: nil,
+            city: nil
+        )
+        partialPlace.coordinate = annotation.coordinate
+        partialPlace.categories = [annotation.placeType]
+        return partialPlace
+    }
+
+    /// Whether the given annotation has full details cached locally.
+    func hasFullDetails(for annotation: PlaceAnnotation) -> Bool {
+        return cachedPlaceDetails(for: annotation.id) != nil
+    }
+
     // MARK: - Annotation Selection (Delegated)
 
     /// Sets a preserved annotation from a DetailPlace so it remains visible during zoom out.
@@ -294,6 +318,11 @@ class MapViewModel: ObservableObject {
     }
 
     // MARK: - Place Details (Delegated)
+
+    /// Returns cached place details for a given ID, or nil if not cached.
+    func cachedPlaceDetails(for placeId: String) -> DetailPlace? {
+        return viewportViewModel.cachedPlaceDetails(for: placeId)
+    }
 
     /// Loads full place details on demand when user taps an annotation.
     func loadPlaceDetails(for annotation: PlaceAnnotation) async -> DetailPlace? {

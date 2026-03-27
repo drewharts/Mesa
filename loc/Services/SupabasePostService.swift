@@ -208,6 +208,20 @@ class SupabasePostService: ObservableObject {
         }
     }
     
+    /// Fetches all post IDs that a user has liked from the review_likes table.
+    func fetchLikedPostIds(userId: String) async throws -> [String] {
+        struct LikeRecord: Decodable {
+            let review_id: String
+        }
+        let records: [LikeRecord] = try await supabase.client
+            .from("review_likes")
+            .select("review_id")
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        return records.map(\.review_id)
+    }
+
     // MARK: - Posted Place Checks
     
     func getPostedPlaceIds(userId: String, placeIds: [String]) async throws -> Set<String> {
@@ -286,7 +300,7 @@ class SupabasePostService: ObservableObject {
     func fetchComments(reviewId: String) async throws -> [Comment] {
         let response: [CommentWithUserRecord] = try await supabase.client
             .from("comments")
-            .select("id, review_id, user_id, text, images, likes, timestamp, users:user_id(first_name, last_name, profile_photo_url)")
+            .select("id, review_id, user_id, text, images, likes, timestamp, parent_comment_id, users:user_id(first_name, last_name, profile_photo_url)")
             .eq("review_id", value: reviewId)
             .order("timestamp", ascending: true)
             .execute()
@@ -303,13 +317,14 @@ class SupabasePostService: ObservableObject {
                 commentText: record.text,
                 timestamp: record.timestamp,
                 images: record.images ?? [],
-                likes: record.likes ?? 0
+                likes: record.likes ?? 0,
+                parentCommentId: record.parent_comment_id
             )
         }
     }
 
     /// Adds a comment to a review and returns the created Comment.
-    func addComment(reviewId: String, placeId: String, userId: String, text: String, userFirstName: String, userLastName: String, profilePhotoUrl: String) async throws -> Comment {
+    func addComment(reviewId: String, placeId: String, userId: String, text: String, userFirstName: String, userLastName: String, profilePhotoUrl: String, parentCommentId: String? = nil) async throws -> Comment {
         let commentId = UUID().uuidString
         let now = Date()
 
@@ -321,7 +336,8 @@ class SupabasePostService: ObservableObject {
             text: text,
             images: [],
             likes: 0,
-            timestamp: now
+            timestamp: now,
+            parent_comment_id: parentCommentId
         )
 
         try await supabase.client
@@ -339,7 +355,8 @@ class SupabasePostService: ObservableObject {
             commentText: text,
             timestamp: now,
             images: [],
-            likes: 0
+            likes: 0,
+            parentCommentId: parentCommentId
         )
     }
 
@@ -393,6 +410,25 @@ class SupabasePostService: ObservableObject {
                 longitude: record.longitude ?? 0
             )
         }
+    }
+
+    // MARK: - Explore Feed
+
+    /// Fetches paginated global external videos for the Explore feed.
+    func fetchExploreVideos(limit: Int = 20, offset: Int = 0) async throws -> [ExploreVideoItem] {
+        struct Params: Encodable {
+            let p_limit: Int
+            let p_offset: Int
+        }
+
+        let params = Params(p_limit: limit, p_offset: offset)
+
+        let items: [ExploreVideoItem] = try await supabase.client
+            .rpc("get_explore_external_videos", params: params)
+            .execute()
+            .value
+
+        return items
     }
 
     // MARK: - Helper Methods
@@ -561,6 +597,7 @@ struct CommentWithUserRecord: Codable {
     let images: [String]?
     let likes: Int?
     let timestamp: Date
+    let parent_comment_id: String?
     let users: CommentUserRecord?
 }
 
@@ -573,5 +610,6 @@ struct CommentInsertRecord: Codable {
     let images: [String]
     let likes: Int
     let timestamp: Date
+    let parent_comment_id: String?
 }
 

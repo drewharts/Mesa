@@ -324,6 +324,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
         Task {
             await checkPlaceListMembership(place: place)
         }
+
+        // Trigger backend photo fallback if place has no cached photos
+        triggerPhotoFallbackIfNeeded(place)
     }
 
     /// Called by View when posts/rating change (legacy method for backward compatibility).
@@ -439,11 +442,38 @@ class PlaceDetailTabsViewModel: ObservableObject {
         isDroppedPin = place?.isDroppedPin == true
 
         if let place = place {
-            // For custom places, view shows "Created by [photo]" instead of type
-            // Still compute type in case we want to show both in the future
-            restaurantType = getRestaurantType(for: place)
+            // Prefer user-corrected category over auto-derived
+            if let corrected = place.userCorrectedCategory {
+                restaurantType = corrected
+            } else {
+                restaurantType = getRestaurantType(for: place)
+            }
         } else {
             restaurantType = nil
+        }
+    }
+
+    /// Hits the backend to trigger the Google Places photo fallback for places with no cached photos.
+    private func triggerPhotoFallbackIfNeeded(_ place: DetailPlace?) {
+        guard let place = place,
+              let googlePlaceId = place.googlePlaceId,
+              !googlePlaceId.isEmpty,
+              place.isCustom != true,
+              (place.photoUrls ?? []).isEmpty
+        else { return }
+
+        Task {
+            _ = try? await MesaBackendService.shared.fetchPlaceDetails(placeId: googlePlaceId, source: "google")
+        }
+    }
+
+    /// Updates the locally cached category after a user correction.
+    func applyCategoryCorrection(_ category: String?) {
+        currentPlace?.userCorrectedCategory = category
+        if let category = category {
+            restaurantType = category
+        } else if let place = currentPlace {
+            restaurantType = getRestaurantType(for: place)
         }
     }
     

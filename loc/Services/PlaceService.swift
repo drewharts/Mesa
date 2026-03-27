@@ -429,6 +429,11 @@ class PlaceService: ObservableObject {
         completion(nil)
     }
     
+    /// Updates the user-corrected category for a place.
+    func updatePlaceCorrectedCategory(placeId: String, category: String?) async throws {
+        try await SupabasePlaceService.shared.updatePlaceCorrectedCategory(placeId: placeId, category: category)
+    }
+
     func deletePlaceFromMyPlaces(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         Task { @MainActor in
             SupabasePlaceService.shared.deletePlaceFromMyPlaces(userId: userId, placeId: placeId, completion: completion)

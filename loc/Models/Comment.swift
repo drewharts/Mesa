@@ -18,6 +18,7 @@ struct Comment: Codable, Identifiable {
     let timestamp: Date
     var images: [String]
     var likes: Int
+    let parentCommentId: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -30,5 +31,6 @@ struct Comment: Codable, Identifiable {
         case timestamp
         case images
         case likes
+        case parentCommentId = "parent_comment_id"
     }
 }

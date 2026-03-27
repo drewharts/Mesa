@@ -16,6 +16,7 @@ SELECT
     p.location AS coordinate,
     array_agg(DISTINCT r.user_id ORDER BY r.user_id) AS user_ids,
     COALESCE(
+        p.user_corrected_category,
         (SELECT cat FROM unnest(p.categories) AS cat
          WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
          LIMIT 1),
@@ -26,5 +27,5 @@ FROM reviews r
 INNER JOIN places p ON r.place_id = p.id
 WHERE r.user_id = ANY(p_user_ids)
 AND ST_Intersects(p.location, p_bbox)
-GROUP BY r.place_id, p.name, p.location, p.categories;
+GROUP BY r.place_id, p.name, p.location, p.categories, p.user_corrected_category;
 $function$;

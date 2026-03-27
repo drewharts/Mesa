@@ -48,6 +48,10 @@ enum AppSheetType: Identifiable, Equatable {
 
     case cityOverview(cityName: String, coordinate: CLLocationCoordinate2D, annotation: CityAnnotation?)
 
+    // MARK: - Feed
+
+    case feed
+
     // MARK: - Trips
 
     case tripsList
@@ -90,6 +94,8 @@ enum AppSheetType: Identifiable, Equatable {
             return "nearbyDiscovery"
         case .cityOverview(let cityName, _, _):
             return "cityOverview-\(cityName)"
+        case .feed:
+            return "feed"
         case .tripsList:
             return "tripsList"
         case .suggestedProfiles:
@@ -128,6 +134,8 @@ enum AppSheetType: Identifiable, Equatable {
         case (.keywordResults(let lhsKeyword, let lhsTypes), .keywordResults(let rhsKeyword, let rhsTypes)):
             return lhsKeyword == rhsKeyword && lhsTypes == rhsTypes
         case (.nearbyDiscovery, .nearbyDiscovery):
+            return true
+        case (.feed, .feed):
             return true
         case (.tripsList, .tripsList):
             return true

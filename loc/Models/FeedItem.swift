@@ -18,7 +18,7 @@ struct FeedItem: Codable, Identifiable {
     let caption: String
     let imageUrls: [String]
     let timestamp: Date
-    let likes: Int
+    var likes: Int
     var commentCount: Int
     let wouldReturn: Bool?
     let latitude: Double

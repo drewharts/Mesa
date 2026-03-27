@@ -53,8 +53,8 @@ struct PostProfileInformationView: View {
                         guard let currentUserId = userSession.currentUserId else { return }
                         selectedPlaceVM.likePost(post, userId: currentUserId)
                     }) {
-                        Image(systemName: "heart.fill")
-                            .foregroundColor((userSession.currentUserId != nil && post.userId == userSession.currentUserId) ? .gray : (selectedPlaceVM.isPostLiked(post.id) ? .red : .gray))
+                        Image(systemName: selectedPlaceVM.isPostLiked(post.id) ? "crown.fill" : "crown")
+                            .foregroundColor((userSession.currentUserId != nil && post.userId == userSession.currentUserId) ? .gray : (selectedPlaceVM.isPostLiked(post.id) ? .yellow : .gray))
                             .opacity((userSession.currentUserId != nil && post.userId == userSession.currentUserId) ? 0.3 : 0.7)
                     }
                     .disabled(userSession.currentUserId != nil && post.userId == userSession.currentUserId)

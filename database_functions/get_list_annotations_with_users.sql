@@ -46,6 +46,7 @@ BEGIN
             p.location AS coordinate,
             array_agg(COALESCE(pli.added_by, pl.user_id) ORDER BY COALESCE(pli.added_by, pl.user_id)) AS user_ids,
             COALESCE(
+                p.user_corrected_category,
                 (SELECT cat FROM unnest(p.categories) AS cat
                  WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
                  LIMIT 1),
@@ -57,7 +58,7 @@ BEGIN
         INNER JOIN places p ON pli.place_id = p.id
         WHERE pli.list_id = p_list_id
         AND ST_Intersects(p.location, v_bbox)
-        GROUP BY pli.place_id, p.name, p.location, p.categories
+        GROUP BY pli.place_id, p.name, p.location, p.categories, p.user_corrected_category
     ),
     aggregated AS (
         SELECT 

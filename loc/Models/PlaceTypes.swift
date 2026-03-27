@@ -107,4 +107,59 @@ struct PlaceTypes {
     ]
     
     static let defaultType = "Place"
+
+    /// Recognized types organized by section for the category correction picker.
+    static let groupedTypes: [(section: String, types: [String])] = [
+        ("Food & Dining", [
+            "American", "Japanese", "Korean", "Mexican", "Italian", "Chinese", "Greek", "Vietnamese",
+            "Barbecue", "Indian", "Pizza", "Coffee Shop", "Steakhouse", "Venezuelan", "Columbian",
+            "Peruvian", "Salvadoran", "Argentinian", "Brazilian", "Spanish", "French", "German",
+            "Thai", "Turkish", "Moroccan", "Lebanese", "Egyptian", "Restaurant", "Cafe",
+            "Bakery", "Bar", "Pub", "Food Truck", "Ice Cream", "Dessert", "Seafood", "Sushi",
+            "Burger", "Sandwich", "Deli", "BBQ", "Tex-Mex", "Mediterranean", "Middle Eastern",
+            "Asian", "Fusion", "Vegetarian", "Vegan", "Gluten-Free", "Fast Food", "Fine Dining",
+            "Buffet", "Food Court", "Market", "Grocery", "Convenience Store", "Liquor Store"
+        ]),
+        ("Parks & Nature", [
+            "National Park", "State Park", "City Park", "Regional Park", "Botanical Garden",
+            "Zoo", "Aquarium", "Wildlife Sanctuary", "Nature Reserve", "Forest", "Beach",
+            "Lake", "River", "Waterfall", "Mountain", "Trail", "Hiking", "Camping", "Recreation Area",
+            "Playground", "Dog Park", "Garden", "Arboretum", "Conservatory", "Marina", "Pier",
+            "Boardwalk", "Scenic Overlook", "Viewpoint", "Observation Deck", "Canyon", "Cave",
+            "Hot Springs", "Geyser", "Volcano", "Island", "Peninsula", "Bay", "Harbor"
+        ]),
+        ("Entertainment & Recreation", [
+            "Movie Theater", "Cinema", "Theater", "Concert Hall", "Arena", "Stadium", "Amphitheater",
+            "Museum", "Art Gallery", "Science Center", "Planetarium", "Observatory", "Library",
+            "Bookstore", "Arcade", "Bowling Alley", "Mini Golf", "Golf Course", "Tennis Court",
+            "Basketball Court", "Soccer Field", "Baseball Field", "Swimming Pool", "Gym",
+            "Fitness Center", "Yoga Studio", "Spa", "Salon", "Barber Shop",
+            "Escape Room", "Laser Tag", "Rock Climbing", "Skate Park", "Ice Skating", "Roller Skating"
+        ]),
+        ("Shopping & Retail", [
+            "Mall", "Shopping Center", "Department Store", "Clothing Store", "Shoe Store",
+            "Jewelry Store", "Electronics Store", "Toy Store", "Game Store", "Music Store",
+            "Record Store", "Antique Store", "Thrift Store", "Vintage", "Furniture Store",
+            "Home Goods", "Hardware Store", "Garden Center", "Pet Store", "Pharmacy"
+        ]),
+        ("Accommodation & Hospitality", [
+            "Hotel", "Motel", "Resort", "Inn", "Bed and Breakfast", "Hostel", "Cabin", "Lodge",
+            "Campground", "Vacation Rental", "Airbnb", "Guest House", "Cottage", "Villa",
+            "Glamping", "Spa Resort", "Golf Resort", "Ski Resort"
+        ]),
+        ("Religious & Cultural", [
+            "Church", "Cathedral", "Temple", "Mosque", "Synagogue", "Chapel", "Shrine", "Monastery",
+            "Cemetery", "Memorial", "Monument", "Lighthouse", "Castle", "Palace", "Fort",
+            "Ruins", "Archaeological Site", "Historic Site", "Heritage Site", "Landmark",
+            "Cultural Center", "Community Center"
+        ]),
+        ("Events & Venues", [
+            "Wedding Venue", "Event Space", "Conference Center", "Convention Center",
+            "Fairgrounds", "Racetrack", "Casino", "Auction House", "Flea Market", "Farmer's Market",
+            "Amusement Park", "Theme Park", "Water Park", "Festival Grounds"
+        ]),
+        ("Other", [
+            "Attraction", "Tourist Attraction", "Point of Interest", "Destination", "Place"
+        ])
+    ]
 } 

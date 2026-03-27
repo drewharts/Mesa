@@ -112,6 +112,7 @@ BEGIN
             -- Use FIRST category (most specific) - Google puts generic types last
             -- If first category is generic, fall back through the array
             COALESCE(
+                p.user_corrected_category,
                 -- Try first non-generic category
                 (SELECT cat FROM unnest(p.categories) AS cat
                  WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')

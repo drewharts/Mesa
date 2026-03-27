@@ -105,6 +105,29 @@ class PostService: ObservableObject {
         }
     }
     
+    /// Fetches all post IDs that a user has liked.
+    func fetchLikedPostIds(userId: String) async throws -> [String] {
+        return try await supabase.fetchLikedPostIds(userId: userId)
+    }
+
+    /// Likes a post (simplified signature without placeId).
+    func likePost(postId: String, userId: String, completion: @escaping (Error?) -> Void) {
+        Task { @MainActor in
+            supabase.likePost(postId: postId, userId: userId) { error in
+                completion(error)
+            }
+        }
+    }
+
+    /// Unlikes a post (simplified signature without placeId).
+    func unlikePost(postId: String, userId: String, completion: @escaping (Error?) -> Void) {
+        Task { @MainActor in
+            supabase.unlikePost(postId: postId, userId: userId) { error in
+                completion(error)
+            }
+        }
+    }
+
     func togglePostLike(userId: String, placeId: String, postId: String, currentlyLiked: Bool, completion: @escaping (Result<Bool, Error>) -> Void) {
         if currentlyLiked {
             unlikePost(userId: userId, placeId: placeId, postId: postId) { result in

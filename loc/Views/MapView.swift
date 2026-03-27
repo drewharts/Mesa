@@ -32,9 +32,10 @@ struct MapView: View {
     
     var onMapTap: ((CLLocationCoordinate2D) -> Void)?
     
-    // Check when a place is actively selected (detail sheet or any popup)
+    // Check when a place is actively selected (detail sheet, any popup, or feed navigation)
     private var isPlaceSelected: Bool {
         selectedPlaceVM.isDetailSheetPresented ||
+        selectedPlaceVM.selectedPlace != nil ||
         mapViewModel.showingListPopup ||
         mapViewModel.showingExternalPlacesPopup ||
         mapViewModel.showingReviewsPopup ||
@@ -226,21 +227,23 @@ struct MapView: View {
             .shadow(radius: 4)
     }
     
-    // Handle annotation tap
+    /// Handles annotation tap with immediate navigation, backfilling full details in background.
     private func handleAnnotationTap(_ annotation: PlaceAnnotation) {
-        // Cancel any in-flight tap discovery (SpatialTapGesture fires simultaneously)
         mapViewModel.tapDiscoveryViewModel.resetState()
 
-        // Skip if this place is already selected AND detail sheet is visible
         if selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id &&
            selectedPlaceVM.isDetailSheetPresented {
             return
         }
-        Task {
-            if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
-                await MainActor.run {
-                    mapViewModel.setPreservedAnnotation(for: place)
-                    navigateToPlace(place)
+
+        let place = mapViewModel.resolveAnnotationForNavigation(annotation)
+        mapViewModel.setPreservedAnnotation(for: place)
+        navigateToPlace(place)
+
+        if !mapViewModel.hasFullDetails(for: annotation) {
+            Task {
+                if let fullPlace = await mapViewModel.loadPlaceDetails(for: annotation) {
+                    selectedPlaceVM.selectPlace(fullPlace, shouldAnimateMap: false)
                 }
             }
         }

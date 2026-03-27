@@ -8,33 +8,73 @@
 
 import SwiftUI
 
+/// Tab options for the feed screen.
+enum FeedTab {
+    case feed
+    case explore
+}
+
 struct PhotoFeedView: View {
     @StateObject private var viewModel: PhotoFeedViewModel
-    @Environment(\.dismiss) private var dismiss
+    @StateObject private var exploreViewModel = ExploreViewModel()
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @State private var selectedTab: FeedTab = .feed
+    @State private var navigationPath = NavigationPath()
 
     private let userId: String
-    private let onNavigateToProfile: (String) -> Void
 
-    /// Initializes the feed view for a specific user with an optional profile navigation callback.
-    init(userId: String, onNavigateToProfile: @escaping (String) -> Void = { _ in }) {
+    /// Initializes the feed view for a specific user.
+    init(userId: String) {
         self.userId = userId
-        self.onNavigateToProfile = onNavigateToProfile
         self._viewModel = StateObject(wrappedValue: PhotoFeedViewModel(userId: userId))
     }
 
     var body: some View {
-        NavigationStack {
-            feedContent
-                .navigationTitle("Feed")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        dismissButton
-                    }
-                }
+        NavigationStack(path: $navigationPath) {
+            VStack(spacing: 0) {
+                feedTabHeader
+                tabContent
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: String.self) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
+            }
         }
         .task {
             await viewModel.loadFeed()
+        }
+    }
+
+    // MARK: - Tab Header
+
+    private var feedTabHeader: some View {
+        HStack(spacing: 32) {
+            FeedTabButton(title: "Feed", isSelected: selectedTab == .feed) {
+                withAnimation(.easeInOut(duration: 0.2)) { selectedTab = .feed }
+            }
+            FeedTabButton(title: "Explore", isSelected: selectedTab == .explore) {
+                withAnimation(.easeInOut(duration: 0.2)) { selectedTab = .explore }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+    }
+
+    // MARK: - Tab Content
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .feed:
+            feedContent
+        case .explore:
+            ExploreFeedView(viewModel: exploreViewModel, onPlaceTap: { placeId in
+                navigationPath.append(placeId)
+            })
         }
     }
 
@@ -77,7 +117,9 @@ struct PhotoFeedView: View {
                     Task { await vm.toggleFollow(profileId: profileId) }
                 },
                 onProfileTap: { profileId in
-                    onNavigateToProfile(profileId)
+                    PresentationService.shared.dismiss()
+                    guard let currentUserId = userSession.currentUserId else { return }
+                    userProfileNavigationVM.fetchAndSelectUser(userId: profileId, currentUserId: currentUserId)
                 },
                 onDismiss: { vm.dismiss() }
             )
@@ -97,14 +139,22 @@ struct PhotoFeedView: View {
                 ForEach(Array(viewModel.feedItems.enumerated()), id: \.element.id) { index, item in
                     FeedCardView(
                         item: item,
-                        isFlipped: viewModel.flippedCardId == item.id,
                         currentUserId: userId,
                         currentUserProfile: viewModel.currentUserProfile,
-                        onFlip: { viewModel.toggleFlip(for: item.id) },
                         onCommentCountChanged: { count in
                             viewModel.updateCommentCount(for: item.id, count: count)
                         },
-                        onProfileTapped: onNavigateToProfile
+                        onProfileTapped: { profileId in
+                            PresentationService.shared.dismiss()
+                            guard let currentUserId = userSession.currentUserId else { return }
+                            userProfileNavigationVM.fetchAndSelectUser(userId: profileId, currentUserId: currentUserId)
+                        },
+                        onPlaceTapped: { placeId in
+                            navigationPath.append(placeId)
+                        },
+                        isCrowned: viewModel.crownedPostIds.contains(item.id),
+                        crownCount: item.likes,
+                        onCrown: { viewModel.toggleCrown(postId: item.id) }
                     )
                     .task {
                         await viewModel.loadMoreIfNeeded(currentItem: item)
@@ -136,16 +186,4 @@ struct PhotoFeedView: View {
         )
     }
 
-    // MARK: - Dismiss Button
-
-    private var dismissButton: some View {
-        Button {
-            dismiss()
-        } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.secondary)
-        }
-        .buttonStyle(.plain)
-    }
 }

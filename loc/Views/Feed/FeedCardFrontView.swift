@@ -13,6 +13,10 @@ struct FeedCardFrontView: View {
     let onComment: () -> Void
     let onZoom: (Int) -> Void
     let onProfileTapped: () -> Void
+    let onPlaceTapped: () -> Void
+    let isCrowned: Bool
+    let crownCount: Int
+    let onCrown: () -> Void
 
     @State private var currentIndex: Int? = 0
     @State private var didTriggerZoom: Bool = false
@@ -51,27 +55,31 @@ struct FeedCardFrontView: View {
     private var headerRow: some View {
         HStack(spacing: 10) {
             Button(action: onProfileTapped) {
-                HStack(spacing: 10) {
-                    CachedProfileImage(
-                        url: item.profilePhotoUrl,
-                        size: 32,
-                        fallbackInitial: userInitial
-                    )
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(fullName)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-
-                        Text(item.placeName)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
+                CachedProfileImage(
+                    url: item.profilePhotoUrl,
+                    size: 32,
+                    fallbackInitial: userInitial
+                )
             }
             .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Button(action: onProfileTapped) {
+                    Text(fullName)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: onPlaceTapped) {
+                    Text(item.placeName)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+            }
 
             Spacer()
         }
@@ -162,7 +170,7 @@ struct FeedCardFrontView: View {
     // MARK: - Action Bar
 
     private var actionBar: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 16) {
             Button(action: onComment) {
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.right")
@@ -174,6 +182,21 @@ struct FeedCardFrontView: View {
                     }
                 }
                 .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onCrown) {
+                HStack(spacing: 4) {
+                    Image(systemName: isCrowned ? "crown.fill" : "crown")
+                        .font(.system(size: 16))
+                        .foregroundColor(isCrowned ? .yellow : .secondary)
+                    if crownCount > 0 {
+                        Text("\(crownCount)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
             .buttonStyle(.plain)
 

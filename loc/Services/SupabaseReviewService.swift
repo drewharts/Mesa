@@ -108,7 +108,8 @@ class SupabaseReviewService: ObservableObject {
                         commentText: record.text,
                         timestamp: timestamp,
                         images: record.photo_urls ?? [],
-                        likes: 0
+                        likes: 0,
+                        parentCommentId: nil
                     )
                 }
                 
