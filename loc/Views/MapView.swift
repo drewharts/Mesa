@@ -226,41 +226,24 @@ struct MapView: View {
             .shadow(radius: 4)
     }
     
-    /// Handles annotation tap with immediate navigation using annotation data,
-    /// then backfills full details from the backend in background.
+    /// Handles annotation tap with immediate navigation, backfilling full details in background.
     private func handleAnnotationTap(_ annotation: PlaceAnnotation) {
-        // Cancel any in-flight tap discovery (SpatialTapGesture fires simultaneously)
         mapViewModel.tapDiscoveryViewModel.resetState()
 
-        // Skip if this place is already selected AND detail sheet is visible
         if selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id &&
            selectedPlaceVM.isDetailSheetPresented {
             return
         }
 
-        // Use cached full details if available (instant)
-        if let cached = mapViewModel.cachedPlaceDetails(for: annotation.id) {
-            mapViewModel.setPreservedAnnotation(for: cached)
-            navigateToPlace(cached)
-            return
-        }
+        let place = mapViewModel.resolveAnnotationForNavigation(annotation)
+        mapViewModel.setPreservedAnnotation(for: place)
+        navigateToPlace(place)
 
-        // Navigate immediately with partial data from annotation
-        var partialPlace = DetailPlace(
-            id: UUID(uuidString: annotation.id) ?? UUID(),
-            name: annotation.name,
-            address: nil,
-            city: nil
-        )
-        partialPlace.coordinate = annotation.coordinate
-        partialPlace.categories = [annotation.placeType]
-        mapViewModel.setPreservedAnnotation(for: partialPlace)
-        navigateToPlace(partialPlace)
-
-        // Fetch full details in background, then update the selected place
-        Task {
-            if let fullPlace = await mapViewModel.loadPlaceDetails(for: annotation) {
-                selectedPlaceVM.selectPlace(fullPlace, shouldAnimateMap: false)
+        if !mapViewModel.hasFullDetails(for: annotation) {
+            Task {
+                if let fullPlace = await mapViewModel.loadPlaceDetails(for: annotation) {
+                    selectedPlaceVM.selectPlace(fullPlace, shouldAnimateMap: false)
+                }
             }
         }
     }
