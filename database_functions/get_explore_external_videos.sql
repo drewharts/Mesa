@@ -15,9 +15,8 @@ RETURNS TABLE(
     source text,
     place_id text,
     place_name text,
-    user_id text,
-    user_full_name text,
-    user_profile_photo_url text,
+    place_type text,
+    city text,
     added_at timestamp without time zone
 )
 LANGUAGE sql
@@ -30,9 +29,15 @@ SELECT
     ep.source,
     ep.place_id,
     p.name AS place_name,
-    ep.user_id,
-    u.full_name AS user_full_name,
-    u.profile_photo_url AS user_profile_photo_url,
+    COALESCE(
+        p.user_corrected_category,
+        (SELECT cat FROM unnest(p.categories) AS cat
+         WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
+         LIMIT 1),
+        p.categories[1],
+        'Place'
+    ) AS place_type,
+    p.city,
     ep.added_at
 FROM external_places ep
 JOIN places p ON UPPER(ep.place_id) = UPPER(p.id::text)

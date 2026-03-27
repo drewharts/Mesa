@@ -37,10 +37,12 @@ struct ExploreFeedTile: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(.white)
                 .lineLimit(1)
-            Text(video.userFullName)
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.8))
-                .lineLimit(1)
+            if !video.subtitle.isEmpty {
+                Text(video.subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
+            }
         }
         .padding(8)
     }

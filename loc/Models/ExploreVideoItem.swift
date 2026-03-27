@@ -13,12 +13,16 @@ struct ExploreVideoItem: Identifiable, Codable {
     let source: String
     let placeId: String
     let placeName: String
-    let userId: String
-    let userFullName: String
-    let userProfilePhotoUrl: String?
+    let placeType: String?
+    let city: String?
     let addedAt: String?
 
     var id: String { externalPlaceId }
+
+    /// Formatted subtitle combining place type and city (e.g. "Korean · Mexico City").
+    var subtitle: String {
+        [placeType, city].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
+    }
 
     enum CodingKeys: String, CodingKey {
         case externalPlaceId = "external_place_id"
@@ -26,9 +30,8 @@ struct ExploreVideoItem: Identifiable, Codable {
         case source
         case placeId = "place_id"
         case placeName = "place_name"
-        case userId = "user_id"
-        case userFullName = "user_full_name"
-        case userProfilePhotoUrl = "user_profile_photo_url"
+        case placeType = "place_type"
+        case city
         case addedAt = "added_at"
     }
 }
