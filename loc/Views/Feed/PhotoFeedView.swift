@@ -139,10 +139,8 @@ struct PhotoFeedView: View {
                 ForEach(Array(viewModel.feedItems.enumerated()), id: \.element.id) { index, item in
                     FeedCardView(
                         item: item,
-                        isFlipped: viewModel.flippedCardId == item.id,
                         currentUserId: userId,
                         currentUserProfile: viewModel.currentUserProfile,
-                        onFlip: { viewModel.toggleFlip(for: item.id) },
                         onCommentCountChanged: { count in
                             viewModel.updateCommentCount(for: item.id, count: count)
                         },
@@ -150,6 +148,9 @@ struct PhotoFeedView: View {
                             PresentationService.shared.dismiss()
                             guard let currentUserId = userSession.currentUserId else { return }
                             userProfileNavigationVM.fetchAndSelectUser(userId: profileId, currentUserId: currentUserId)
+                        },
+                        onPlaceTapped: { placeId in
+                            navigationPath.append(placeId)
                         }
                     )
                     .task {

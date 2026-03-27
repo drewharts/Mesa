@@ -17,7 +17,6 @@ class PhotoFeedViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var hasMorePages = true
-    @Published var flippedCardId: String?
     @Published var currentUserProfile: ProfileData?
 
     // MARK: - Child ViewModels
@@ -106,15 +105,6 @@ class PhotoFeedViewModel: ObservableObject {
         isLoadingMore = false
     }
 
-    /// Toggles the flip state for a feed card (only one card flipped at a time).
-    func toggleFlip(for itemId: String) {
-        if flippedCardId == itemId {
-            flippedCardId = nil
-        } else {
-            flippedCardId = itemId
-        }
-    }
-
     /// Updates the local comment count for a feed item after the comments sheet is dismissed.
     func updateCommentCount(for itemId: String, count: Int) {
         guard let index = feedItems.firstIndex(where: { $0.id == itemId }) else { return }
@@ -123,7 +113,6 @@ class PhotoFeedViewModel: ObservableObject {
 
     /// Resets and reloads the feed from the beginning.
     func refresh() async {
-        flippedCardId = nil
         currentOffset = 0
         hasMorePages = true
 

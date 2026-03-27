@@ -2,51 +2,31 @@
 //  FeedCardView.swift
 //  loc
 //
-//  DUMB Component: Flip container for a feed card (front = photo, back = map).
-//  Single Responsibility: Manage 3D rotation between front and back faces,
-//  and present fullscreen gallery on pinch-to-zoom.
+//  DUMB Component: Feed card showing a review with photos.
+//  Single Responsibility: Present photo card with comment sheet and fullscreen gallery.
 //
 
 import SwiftUI
 
 struct FeedCardView: View {
     let item: FeedItem
-    let isFlipped: Bool
     let currentUserId: String
     let currentUserProfile: ProfileData?
-    let onFlip: () -> Void
     let onCommentCountChanged: (Int) -> Void
     let onProfileTapped: (String) -> Void
+    let onPlaceTapped: (String) -> Void
 
     @State private var fullscreenIndex: Int?
     @State private var showComments = false
 
     var body: some View {
-        Group {
-            if isFlipped {
-                FeedCardBackView(item: item)
-                    .rotation3DEffect(
-                        .degrees(0),
-                        axis: (x: 0, y: 1, z: 0)
-                    )
-            } else {
-                FeedCardFrontView(
-                    item: item,
-                    onComment: { showComments = true },
-                    onZoom: { index in fullscreenIndex = index },
-                    onProfileTapped: { onProfileTapped(item.userId) }
-                )
-                .rotation3DEffect(
-                    .degrees(0),
-                    axis: (x: 0, y: 1, z: 0)
-                )
-            }
-        }
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.5)) {
-                onFlip()
-            }
-        }
+        FeedCardFrontView(
+            item: item,
+            onComment: { showComments = true },
+            onZoom: { index in fullscreenIndex = index },
+            onProfileTapped: { onProfileTapped(item.userId) },
+            onPlaceTapped: { onPlaceTapped(item.placeId) }
+        )
         .fullScreenCover(item: fullscreenBinding) { wrapper in
             FullscreenMediaGalleryView(
                 mediaItems: item.imageUrls.map { PostMediaItem(imageUrl: $0) },
