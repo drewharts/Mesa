@@ -395,6 +395,25 @@ class SupabasePostService: ObservableObject {
         }
     }
 
+    // MARK: - Explore Feed
+
+    /// Fetches paginated global external videos for the Explore feed.
+    func fetchExploreVideos(limit: Int = 20, offset: Int = 0) async throws -> [ExploreVideoItem] {
+        struct Params: Encodable {
+            let p_limit: Int
+            let p_offset: Int
+        }
+
+        let params = Params(p_limit: limit, p_offset: offset)
+
+        let items: [ExploreVideoItem] = try await supabase.client
+            .rpc("get_explore_external_videos", params: params)
+            .execute()
+            .value
+
+        return items
+    }
+
     // MARK: - Helper Methods
     
     private func parseTimestamp(_ timestampString: String) -> Date {

@@ -8,9 +8,17 @@
 
 import SwiftUI
 
+/// Tab options for the feed screen.
+enum FeedTab {
+    case feed
+    case explore
+}
+
 struct PhotoFeedView: View {
     @StateObject private var viewModel: PhotoFeedViewModel
+    @StateObject private var exploreViewModel = ExploreViewModel()
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedTab: FeedTab = .feed
 
     private let userId: String
     private let onNavigateToProfile: (String) -> Void
@@ -24,17 +32,48 @@ struct PhotoFeedView: View {
 
     var body: some View {
         NavigationStack {
-            feedContent
-                .navigationTitle("Feed")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        dismissButton
-                    }
+            VStack(spacing: 0) {
+                feedTabHeader
+                tabContent
+            }
+            .navigationTitle(selectedTab == .feed ? "Feed" : "Explore")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    dismissButton
                 }
+            }
         }
         .task {
             await viewModel.loadFeed()
+        }
+    }
+
+    // MARK: - Tab Header
+
+    private var feedTabHeader: some View {
+        HStack(spacing: 24) {
+            FeedTabButton(title: "Feed", isSelected: selectedTab == .feed) {
+                withAnimation(.easeInOut(duration: 0.2)) { selectedTab = .feed }
+            }
+            FeedTabButton(title: "Explore", isSelected: selectedTab == .explore) {
+                withAnimation(.easeInOut(duration: 0.2)) { selectedTab = .explore }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Tab Content
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .feed:
+            feedContent
+        case .explore:
+            ExploreFeedView(viewModel: exploreViewModel)
         }
     }
 
