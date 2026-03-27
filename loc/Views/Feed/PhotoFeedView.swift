@@ -22,11 +22,17 @@ struct PhotoFeedView: View {
 
     private let userId: String
     private let onNavigateToProfile: (String) -> Void
+    private let onNavigateToPlace: (String) -> Void
 
-    /// Initializes the feed view for a specific user with an optional profile navigation callback.
-    init(userId: String, onNavigateToProfile: @escaping (String) -> Void = { _ in }) {
+    /// Initializes the feed view with callbacks for profile and place navigation.
+    init(
+        userId: String,
+        onNavigateToProfile: @escaping (String) -> Void = { _ in },
+        onNavigateToPlace: @escaping (String) -> Void = { _ in }
+    ) {
         self.userId = userId
         self.onNavigateToProfile = onNavigateToProfile
+        self.onNavigateToPlace = onNavigateToPlace
         self._viewModel = StateObject(wrappedValue: PhotoFeedViewModel(userId: userId))
     }
 
@@ -73,7 +79,7 @@ struct PhotoFeedView: View {
         case .feed:
             feedContent
         case .explore:
-            ExploreFeedView(viewModel: exploreViewModel)
+            ExploreFeedView(viewModel: exploreViewModel, onPlaceTap: onNavigateToPlace)
         }
     }
 

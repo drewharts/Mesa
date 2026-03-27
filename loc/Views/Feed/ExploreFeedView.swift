@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ExploreFeedView: View {
     @ObservedObject var viewModel: ExploreViewModel
+    let onPlaceTap: (String) -> Void
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -41,7 +42,7 @@ struct ExploreFeedView: View {
         LazyVGrid(columns: columns, spacing: 10) {
             ForEach(viewModel.videos) { video in
                 ExploreFeedTile(video: video) {
-                    openVideo(video.url)
+                    onPlaceTap(video.placeId)
                 }
                 .onAppear {
                     loadMoreIfNeeded(video)
@@ -80,11 +81,4 @@ struct ExploreFeedView: View {
         }
     }
 
-    /// Opens a video URL in the default browser.
-    private var openVideo: (String) -> Void {
-        { urlString in
-            guard let url = URL(string: urlString) else { return }
-            UIApplication.shared.open(url)
-        }
-    }
 }

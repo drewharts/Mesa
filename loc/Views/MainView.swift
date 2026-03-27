@@ -39,6 +39,7 @@ struct MainView: View {
     @State private var shouldNavigateToProfile = false
     @State private var shouldNavigateToFeed = false
     @State private var pendingFeedProfileUserId: String?
+    @State private var pendingFeedPlaceId: String?
     @State private var showSearchPage = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
@@ -183,19 +184,30 @@ struct MainView: View {
                     onNavigateToProfile: { userId in
                         pendingFeedProfileUserId = userId
                         shouldNavigateToFeed = false
+                    },
+                    onNavigateToPlace: { placeId in
+                        pendingFeedPlaceId = placeId
+                        shouldNavigateToFeed = false
                     }
                 )
             }
             .onChange(of: shouldNavigateToFeed) { _, newValue in
-                guard !newValue, let userId = pendingFeedProfileUserId else { return }
-                pendingFeedProfileUserId = nil
-                if userId == userSession.currentUserId {
-                    shouldNavigateToProfile = true
-                } else {
-                    userProfileNavigationViewModel.fetchAndSelectUser(
-                        userId: userId,
-                        currentUserId: userSession.currentUserId ?? ""
-                    )
+                guard !newValue else { return }
+                if let userId = pendingFeedProfileUserId {
+                    pendingFeedProfileUserId = nil
+                    if userId == userSession.currentUserId {
+                        shouldNavigateToProfile = true
+                    } else {
+                        userProfileNavigationViewModel.fetchAndSelectUser(
+                            userId: userId,
+                            currentUserId: userSession.currentUserId ?? ""
+                        )
+                    }
+                }
+                if let placeId = pendingFeedPlaceId {
+                    pendingFeedPlaceId = nil
+                    selectedPlaceVM.navigateToPlace(placeId: placeId)
+                    selectedPlaceVM.isDetailSheetPresented = true
                 }
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
