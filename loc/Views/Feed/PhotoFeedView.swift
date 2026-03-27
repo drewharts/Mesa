@@ -21,6 +21,7 @@ struct PhotoFeedView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @State private var selectedTab: FeedTab = .feed
+    @State private var navigationPath = NavigationPath()
 
     private let userId: String
 
@@ -31,9 +32,15 @@ struct PhotoFeedView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            feedTabHeader
-            tabContent
+        NavigationStack(path: $navigationPath) {
+            VStack(spacing: 0) {
+                feedTabHeader
+                tabContent
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: String.self) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
         }
         .task {
             await viewModel.loadFeed()
@@ -43,7 +50,7 @@ struct PhotoFeedView: View {
     // MARK: - Tab Header
 
     private var feedTabHeader: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 32) {
             FeedTabButton(title: "Feed", isSelected: selectedTab == .feed) {
                 withAnimation(.easeInOut(duration: 0.2)) { selectedTab = .feed }
             }
@@ -52,8 +59,9 @@ struct PhotoFeedView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Tab Content
@@ -65,9 +73,7 @@ struct PhotoFeedView: View {
             feedContent
         case .explore:
             ExploreFeedView(viewModel: exploreViewModel, onPlaceTap: { placeId in
-                PresentationService.shared.dismiss()
-                selectedPlaceVM.navigateToPlace(placeId: placeId)
-                selectedPlaceVM.isDetailSheetPresented = true
+                navigationPath.append(placeId)
             })
         }
     }
