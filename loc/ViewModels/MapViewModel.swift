@@ -295,6 +295,11 @@ class MapViewModel: ObservableObject {
 
     // MARK: - Place Details (Delegated)
 
+    /// Returns cached place details for a given ID, or nil if not cached.
+    func cachedPlaceDetails(for placeId: String) -> DetailPlace? {
+        return viewportViewModel.cachedPlaceDetails(for: placeId)
+    }
+
     /// Loads full place details on demand when user taps an annotation.
     func loadPlaceDetails(for annotation: PlaceAnnotation) async -> DetailPlace? {
         return await viewportViewModel.loadPlaceDetails(for: annotation)

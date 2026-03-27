@@ -59,6 +59,11 @@ class MapViewportViewModel: ObservableObject {
 
     // MARK: - Place Details
 
+    /// Returns cached place details for a given ID, or nil if not cached.
+    func cachedPlaceDetails(for placeId: String) -> DetailPlace? {
+        return placeDetailsCache[placeId]
+    }
+
     /// Loads full place details on demand when user taps an annotation.
     /// Uses Mesa backend which checks Supabase cache first, then falls back to external APIs.
     func loadPlaceDetails(for annotation: PlaceAnnotation) async -> DetailPlace? {
