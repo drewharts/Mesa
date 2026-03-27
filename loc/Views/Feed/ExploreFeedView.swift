@@ -41,10 +41,10 @@ struct ExploreFeedView: View {
         LazyVGrid(columns: columns, spacing: 10) {
             ForEach(viewModel.videos) { video in
                 ExploreFeedTile(video: video) {
-                    openVideo(url: video.url)
+                    openVideo(video.url)
                 }
                 .onAppear {
-                    loadMoreIfNeeded(video: video)
+                    loadMoreIfNeeded(video)
                 }
             }
         }
