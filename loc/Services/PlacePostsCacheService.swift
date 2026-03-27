@@ -57,10 +57,19 @@ class PlacePostsCacheService: ObservableObject {
         }
     }
 
+    private var cancellables = Set<AnyCancellable>()
+
     // MARK: - Initialization
 
-    /// Private initializer to enforce singleton pattern.
-    private init() {}
+    /// Private initializer to enforce singleton pattern. Subscribes to correction notifications.
+    private init() {
+        NotificationCenter.default.publisher(for: .externalPlaceCorrected)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.externalVideosCache.removeAll()
+            }
+            .store(in: &cancellables)
+    }
 
     // MARK: - Public Accessors
 

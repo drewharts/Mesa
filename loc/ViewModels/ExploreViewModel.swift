@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 @MainActor
 class ExploreViewModel: ObservableObject {
@@ -17,6 +18,17 @@ class ExploreViewModel: ObservableObject {
     private var currentOffset: Int = 0
     private let pageSize: Int = 20
     private(set) var hasMorePages: Bool = true
+    private var cancellables = Set<AnyCancellable>()
+
+    /// Sets up subscription to refresh after place corrections.
+    init() {
+        NotificationCenter.default.publisher(for: .externalPlaceCorrected)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                Task { await self?.loadInitial() }
+            }
+            .store(in: &cancellables)
+    }
 
     /// Loads the first page of explore videos, replacing any existing data.
     func loadInitial() async {

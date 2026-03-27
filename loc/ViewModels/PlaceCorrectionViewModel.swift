@@ -221,9 +221,15 @@ class PlaceCorrectionViewModel: ObservableObject {
             resolvedPlace = detailPlace
             isUpdating = false
             didComplete = true
+            NotificationCenter.default.post(name: .externalPlaceCorrected, object: nil)
         } catch {
             isUpdating = false
             errorMessage = "Failed to save place: \(error.localizedDescription)"
         }
     }
+}
+
+extension Notification.Name {
+    /// Posted when a user corrects a TikTok/Instagram video's place association.
+    static let externalPlaceCorrected = Notification.Name("externalPlaceCorrected")
 }
