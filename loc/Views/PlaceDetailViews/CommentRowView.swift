@@ -12,6 +12,7 @@ struct CommentRowView: View {
     let isOwnComment: Bool
     let onProfileTapped: () -> Void
     let onDelete: () -> Void
+    let onReply: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -32,6 +33,13 @@ struct CommentRowView: View {
                     Text(comment.commentText)
                         .font(.subheadline)
                         .foregroundColor(.primary)
+
+                    Button(action: onReply) {
+                        Text("Reply")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 Spacer()

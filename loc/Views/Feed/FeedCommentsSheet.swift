@@ -130,22 +130,48 @@ struct FeedCommentsSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
         } else {
-            ForEach(commentsViewModel.comments) { comment in
+            ForEach(commentsViewModel.groupedComments, id: \.comment.id) { group in
                 CommentRowView(
-                    comment: comment,
-                    isOwnComment: comment.userId == currentUserId,
-                    onProfileTapped: { onProfileTapped(comment.userId) },
+                    comment: group.comment,
+                    isOwnComment: group.comment.userId == currentUserId,
+                    onProfileTapped: { onProfileTapped(group.comment.userId) },
                     onDelete: {
                         Task {
                             await commentsViewModel.deleteComment(
-                                commentId: comment.id,
+                                commentId: group.comment.id,
                                 reviewId: item.id,
                                 placeId: item.placeId,
                                 userId: currentUserId
                             )
                         }
+                    },
+                    onReply: {
+                        commentsViewModel.setReplyTarget(group.comment)
                     }
                 )
+
+                // Indented replies
+                ForEach(group.replies) { reply in
+                    CommentRowView(
+                        comment: reply,
+                        isOwnComment: reply.userId == currentUserId,
+                        onProfileTapped: { onProfileTapped(reply.userId) },
+                        onDelete: {
+                            Task {
+                                await commentsViewModel.deleteComment(
+                                    commentId: reply.id,
+                                    reviewId: item.id,
+                                    placeId: item.placeId,
+                                    userId: currentUserId
+                                )
+                            }
+                        },
+                        onReply: {
+                            commentsViewModel.setReplyTarget(group.comment)
+                        }
+                    )
+                    .padding(.leading, 42)
+                }
             }
         }
     }
@@ -167,7 +193,9 @@ struct FeedCommentsSheet: View {
                         profilePhotoUrl: currentUserProfile?.profilePhotoURL?.absoluteString ?? ""
                     )
                 }
-            }
+            },
+            replyingTo: commentsViewModel.replyingTo,
+            onCancelReply: { commentsViewModel.clearReplyTarget() }
         )
     }
 

@@ -14,6 +14,16 @@ class PostCommentsViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var commentText: String = ""
     @Published var isSending: Bool = false
+    @Published var replyingTo: Comment?
+
+    /// Groups comments: top-level comments with their replies nested below.
+    var groupedComments: [(comment: Comment, replies: [Comment])] {
+        let topLevel = comments.filter { $0.parentCommentId == nil }
+        return topLevel.map { parent in
+            let replies = comments.filter { $0.parentCommentId == parent.id }
+            return (comment: parent, replies: replies)
+        }
+    }
 
     // MARK: - Dependencies
     private let postService = ServiceContainer.shared.supabasePostService
@@ -32,6 +42,16 @@ class PostCommentsViewModel: ObservableObject {
         isLoading = false
     }
 
+    /// Sets the comment being replied to.
+    func setReplyTarget(_ comment: Comment) {
+        replyingTo = comment
+    }
+
+    /// Clears the reply target back to top-level comment mode.
+    func clearReplyTarget() {
+        replyingTo = nil
+    }
+
     /// Adds a new comment to the review and appends it to the local array.
     func addComment(reviewId: String, placeId: String, userId: String, userFirstName: String, userLastName: String, profilePhotoUrl: String) async {
         let trimmed = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -46,10 +66,12 @@ class PostCommentsViewModel: ObservableObject {
                 text: trimmed,
                 userFirstName: userFirstName,
                 userLastName: userLastName,
-                profilePhotoUrl: profilePhotoUrl
+                profilePhotoUrl: profilePhotoUrl,
+                parentCommentId: replyingTo?.id
             )
             comments.append(comment)
             commentText = ""
+            replyingTo = nil
             postsCacheService.incrementCommentCount(forPostId: reviewId, inPlaceId: placeId)
         } catch {
             print("Failed to add comment: \(error)")

@@ -137,20 +137,44 @@ struct PostCommentsSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
         } else {
-            ForEach(commentsViewModel.comments) { comment in
+            ForEach(commentsViewModel.groupedComments, id: \.comment.id) { group in
                 CommentRowView(
-                    comment: comment,
-                    isOwnComment: comment.userId == userSession.currentUserId,
+                    comment: group.comment,
+                    isOwnComment: group.comment.userId == userSession.currentUserId,
                     onProfileTapped: {
-                        navigateToProfile(userId: comment.userId)
+                        navigateToProfile(userId: group.comment.userId)
                     },
                     onDelete: {
                         Task {
                             guard let userId = userSession.currentUserId else { return }
-                            await commentsViewModel.deleteComment(commentId: comment.id, reviewId: post.id, placeId: post.placeId, userId: userId)
+                            await commentsViewModel.deleteComment(commentId: group.comment.id, reviewId: post.id, placeId: post.placeId, userId: userId)
                         }
+                    },
+                    onReply: {
+                        commentsViewModel.setReplyTarget(group.comment)
                     }
                 )
+
+                // Indented replies
+                ForEach(group.replies) { reply in
+                    CommentRowView(
+                        comment: reply,
+                        isOwnComment: reply.userId == userSession.currentUserId,
+                        onProfileTapped: {
+                            navigateToProfile(userId: reply.userId)
+                        },
+                        onDelete: {
+                            Task {
+                                guard let userId = userSession.currentUserId else { return }
+                                await commentsViewModel.deleteComment(commentId: reply.id, reviewId: post.id, placeId: post.placeId, userId: userId)
+                            }
+                        },
+                        onReply: {
+                            commentsViewModel.setReplyTarget(group.comment)
+                        }
+                    )
+                    .padding(.leading, 42)
+                }
             }
         }
     }
@@ -177,7 +201,9 @@ struct PostCommentsSheet: View {
                         profilePhotoUrl: photoUrl
                     )
                 }
-            }
+            },
+            replyingTo: commentsViewModel.replyingTo,
+            onCancelReply: { commentsViewModel.clearReplyTarget() }
         )
     }
 
