@@ -18,7 +18,6 @@ struct BottomNavigationBar: View {
 
     @Binding var showSearchPage: Bool
     @Binding var shouldNavigateToProfile: Bool
-    @Binding var shouldNavigateToFeed: Bool
 
     // MARK: - Body
 
@@ -46,7 +45,7 @@ struct BottomNavigationBar: View {
 
     private var feedButton: some View {
         Button {
-            shouldNavigateToFeed = true
+            PresentationService.shared.present(.feed)
         } label: {
             Image("MesaLogo")
                 .resizable()

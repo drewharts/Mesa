@@ -37,9 +37,6 @@ struct MainView: View {
 
     // MARK: - Local UI State
     @State private var shouldNavigateToProfile = false
-    @State private var shouldNavigateToFeed = false
-    @State private var pendingFeedProfileUserId: String?
-    @State private var pendingFeedPlaceId: String?
     @State private var showSearchPage = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
@@ -178,38 +175,6 @@ struct MainView: View {
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
             }
-            .fullScreenCover(isPresented: $shouldNavigateToFeed) {
-                PhotoFeedView(
-                    userId: userSession.currentUserId ?? "",
-                    onNavigateToProfile: { userId in
-                        pendingFeedProfileUserId = userId
-                        shouldNavigateToFeed = false
-                    },
-                    onNavigateToPlace: { placeId in
-                        pendingFeedPlaceId = placeId
-                        shouldNavigateToFeed = false
-                    }
-                )
-            }
-            .onChange(of: shouldNavigateToFeed) { _, newValue in
-                guard !newValue else { return }
-                if let userId = pendingFeedProfileUserId {
-                    pendingFeedProfileUserId = nil
-                    if userId == userSession.currentUserId {
-                        shouldNavigateToProfile = true
-                    } else {
-                        userProfileNavigationViewModel.fetchAndSelectUser(
-                            userId: userId,
-                            currentUserId: userSession.currentUserId ?? ""
-                        )
-                    }
-                }
-                if let placeId = pendingFeedPlaceId {
-                    pendingFeedPlaceId = nil
-                    selectedPlaceVM.navigateToPlace(placeId: placeId)
-                    selectedPlaceVM.isDetailSheetPresented = true
-                }
-            }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
                     deepLinkViewModel.dismissNoLocationAlert()
@@ -307,6 +272,10 @@ struct MainView: View {
             // City Overview
             case .cityOverview(let cityName, let coordinate, let annotation):
                 cityOverviewSheet(cityName: cityName, coordinate: coordinate, annotation: annotation)
+
+            // Feed
+            case .feed:
+                feedSheet
 
             // Trips
             case .tripsList:
@@ -527,6 +496,18 @@ struct MainView: View {
         .presentationDragIndicator(.visible)
     }
 
+    /// Feed sheet content with Feed and Explore tabs.
+    private var feedSheet: some View {
+        PhotoFeedView(userId: userSession.currentUserId ?? "")
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(userSession)
+            .environmentObject(profileViewModel)
+            .environmentObject(userProfileNavigationViewModel)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .large))
+    }
+
     /// Trips list sheet content.
     private var tripsListSheet: some View {
         TripsListView()
@@ -654,8 +635,7 @@ struct MainView: View {
                     Spacer()
                     BottomNavigationBar(
                         showSearchPage: $showSearchPage,
-                        shouldNavigateToProfile: $shouldNavigateToProfile,
-                        shouldNavigateToFeed: $shouldNavigateToFeed
+                        shouldNavigateToProfile: $shouldNavigateToProfile
                     )
                     .environmentObject(profileViewModel)
                 }
