@@ -197,11 +197,14 @@ struct MainView: View {
                let place = selectedPlaceVM.selectedPlace,
                let coordinate = place.coordinate,
                coordinate.isValidForNavigation {
+                // Offset center southward so the pin appears in the visible area above any sheet
+                let span = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                let offsetCenter = CLLocationCoordinate2D(
+                    latitude: coordinate.latitude - span.latitudeDelta * 0.25,
+                    longitude: coordinate.longitude
+                )
                 withAnimation(.easeOut(duration: 0.25)) {
-                    mapPosition = .region(MKCoordinateRegion(
-                        center: coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                    ))
+                    mapPosition = .region(MKCoordinateRegion(center: offsetCenter, span: span))
                 }
                 selectedPlaceVM.shouldAnimateMapToPlace = false
             }

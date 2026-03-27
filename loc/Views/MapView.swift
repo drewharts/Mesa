@@ -32,9 +32,10 @@ struct MapView: View {
     
     var onMapTap: ((CLLocationCoordinate2D) -> Void)?
     
-    // Check when a place is actively selected (detail sheet or any popup)
+    // Check when a place is actively selected (detail sheet, any popup, or feed navigation)
     private var isPlaceSelected: Bool {
         selectedPlaceVM.isDetailSheetPresented ||
+        selectedPlaceVM.selectedPlace != nil ||
         mapViewModel.showingListPopup ||
         mapViewModel.showingExternalPlacesPopup ||
         mapViewModel.showingReviewsPopup ||
