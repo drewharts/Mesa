@@ -503,6 +503,8 @@ struct MainView: View {
             .environmentObject(userSession)
             .environmentObject(profileViewModel)
             .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(locationManager)
+            .environmentObject(detailPlaceViewModel)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationBackgroundInteraction(.enabled(upThrough: .large))
