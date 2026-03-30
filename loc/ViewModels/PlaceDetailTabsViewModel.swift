@@ -441,6 +441,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
         isCustomPlace = place?.isCustom == true
         isDroppedPin = place?.isDroppedPin == true
 
+        // Immediately clear stale savers data from previous place
+        showSaversIndicator = false
+        saverCount = 0
+
         if let place = place {
             // Prefer user-corrected category over auto-derived
             if let corrected = place.userCorrectedCategory {
