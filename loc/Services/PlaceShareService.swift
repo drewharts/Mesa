@@ -54,7 +54,7 @@ class PlaceShareService: ObservableObject {
         guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else { return }
 
         let shareImage = renderPlaceShareImage(
-            placeName: nearbyPlace.name,
+            placeName: nearbyPlace.properties.name,
             subtitle: subtitle,
             backgroundImage: nil
         )
