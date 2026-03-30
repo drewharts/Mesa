@@ -53,7 +53,7 @@ struct ExploreFeedView: View {
         VStack(spacing: 8) {
             citySearchBar
             if let selected = viewModel.selectedCity {
-                activeFilterChip(selected)
+                ExploreCityChip(city: selected, onClear: { viewModel.selectCity(nil) })
             }
             if showCitySuggestions && !filteredCities.isEmpty {
                 citySuggestionsList
@@ -129,35 +129,6 @@ struct ExploreFeedView: View {
         .background(Color(.systemBackground))
         .cornerRadius(10)
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
-    }
-
-    /// Chip showing the active city filter with dismiss button.
-    @ViewBuilder
-    private var activeFilterChip: (String) -> some View {
-        { city in
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.caption)
-                    Text(city)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                    Button {
-                        viewModel.selectCity(nil)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.caption)
-                    }
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color(red: 0.8, green: 0.4, blue: 0.1))
-                .clipShape(Capsule())
-
-                Spacer()
-            }
-        }
     }
 
     // MARK: - Video Grid
