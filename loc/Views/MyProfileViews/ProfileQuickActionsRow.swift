@@ -16,7 +16,7 @@ struct ProfileQuickActionsRow: View {
             HStack(spacing: 12) {
                 Image(systemName: "photo.on.rectangle.angled")
                     .font(.system(size: 22))
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color(red: 0.8, green: 0.4, blue: 0.1))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Import Photos to Discover Places")
@@ -37,7 +37,7 @@ struct ProfileQuickActionsRow: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.blue.opacity(0.08))
+            .background(Color(red: 0.8, green: 0.4, blue: 0.1).opacity(0.08))
             .cornerRadius(12)
         }
         .buttonStyle(.plain)
