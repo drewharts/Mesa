@@ -53,7 +53,7 @@ struct ExploreFeedView: View {
         VStack(spacing: 8) {
             citySearchBar
             if let selected = viewModel.selectedCity {
-                activeFilterChip(city: selected)
+                activeFilterChip(selected)
             }
             if showCitySuggestions && !filteredCities.isEmpty {
                 citySuggestionsList
@@ -132,6 +132,7 @@ struct ExploreFeedView: View {
     }
 
     /// Chip showing the active city filter with dismiss button.
+    @ViewBuilder
     private var activeFilterChip: (String) -> some View {
         { city in
             HStack {
