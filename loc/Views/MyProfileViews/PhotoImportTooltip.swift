@@ -17,7 +17,9 @@ struct PhotoImportTooltip: View {
             tooltipBody
         }
         .onTapGesture { onDismiss() }
-        .onAppear { scheduleDismiss() }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) { onDismiss() }
+        }
     }
 
     private var tooltipArrow: some View {
@@ -52,14 +54,6 @@ struct PhotoImportTooltip: View {
         .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
     }
 
-    /// Auto-dismiss after 6 seconds.
-    private var scheduleDismiss: () -> Void {
-        {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-                onDismiss()
-            }
-        }
-    }
 }
 
 /// Simple triangle shape for the tooltip arrow.

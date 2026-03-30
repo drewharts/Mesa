@@ -49,6 +49,7 @@ struct ExploreFeedView: View {
 
     // MARK: - City Search
 
+    /// City search bar, active filter chip, and suggestions dropdown.
     private var citySearchSection: some View {
         VStack(spacing: 8) {
             citySearchBar
@@ -63,6 +64,7 @@ struct ExploreFeedView: View {
         .padding(.vertical, 8)
     }
 
+    /// Text field with magnifying glass icon for filtering by city name.
     private var citySearchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -100,6 +102,7 @@ struct ExploreFeedView: View {
         return viewModel.availableCities.filter { $0.lowercased().contains(query) }
     }
 
+    /// Dropdown list of cities matching the search text.
     private var citySuggestionsList: some View {
         VStack(spacing: 0) {
             ForEach(filteredCities.prefix(6), id: \.self) { city in

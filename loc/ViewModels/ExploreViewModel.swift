@@ -22,7 +22,7 @@ class ExploreViewModel: ObservableObject {
     private(set) var hasMorePages: Bool = true
     private var cancellables = Set<AnyCancellable>()
 
-    /// Sets up subscription to refresh after place corrections.
+    /// Initializes and subscribes to place correction notifications for auto-refresh.
     init() {
         NotificationCenter.default.publisher(for: .externalPlaceCorrected)
             .receive(on: RunLoop.main)
