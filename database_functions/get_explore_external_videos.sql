@@ -38,14 +38,14 @@ SELECT
         p.categories[1],
         'Place'
     ) AS place_type,
-    p.city,
+    normalize_city_name(p.city) AS city,
     ep.added_at
 FROM external_places ep
 JOIN places p ON UPPER(ep.place_id) = UPPER(p.id::text)
 JOIN users u ON ep.user_id = u.id
 WHERE ep.url IS NOT NULL
   AND ep.url != ''
-  AND (p_city IS NULL OR p.city = p_city)
+  AND (p_city IS NULL OR normalize_city_name(p.city) = p_city)
 ORDER BY ep.added_at DESC NULLS LAST, ep.id DESC
 LIMIT p_limit
 OFFSET p_offset;

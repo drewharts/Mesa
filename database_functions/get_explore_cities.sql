@@ -17,7 +17,7 @@ STABLE
 SECURITY DEFINER
 AS $function$
 SELECT
-    p.city,
+    normalize_city_name(p.city) AS city,
     COUNT(*) AS video_count
 FROM external_places ep
 JOIN places p ON UPPER(ep.place_id) = UPPER(p.id::text)
@@ -25,7 +25,7 @@ WHERE ep.url IS NOT NULL
   AND ep.url != ''
   AND p.city IS NOT NULL
   AND p.city != ''
-GROUP BY p.city
+GROUP BY normalize_city_name(p.city)
 ORDER BY video_count DESC
 LIMIT p_limit;
 $function$;
