@@ -500,6 +500,28 @@ class SupabaseUserService: ObservableObject {
         return !response.isEmpty
     }
     
+    /// Matches device contacts against Mesa users and auto-follows any matches.
+    func autoFollowContactMatches(userId: String) async {
+        let contactsService = ContactsService()
+        let granted = await contactsService.requestAccess()
+        guard granted else { return }
+
+        let numbers = await contactsService.fetchNormalizedPhoneNumbers()
+        guard !numbers.isEmpty else { return }
+
+        do {
+            let matches = try await contactsService.matchContacts(phoneNumbers: numbers, requestingUserId: userId)
+            for match in matches where match.id != userId {
+                try? await followUser(followerId: userId, followingId: match.id)
+            }
+            if !matches.isEmpty {
+                print("✅ Auto-followed \(matches.count) contact matches")
+            }
+        } catch {
+            print("⚠️ Failed to match contacts: \(error)")
+        }
+    }
+
     /// Auto-follows all curated accounts for a user. Safe to call multiple times (uses upsert).
     func autoFollowCuratedAccounts(userId: String) async {
         let curatedAccountIds = [
