@@ -266,8 +266,8 @@ struct ToolbarModifier: ViewModifier {
             Button {
                 photoImportVM.handleImportButtonTap()
             } label: {
-                Image(systemName: "camera.fill")
-                    .foregroundColor(.black)
+                Image(systemName: "photo.on.rectangle.angled")
+                    .foregroundColor(.blue)
                     .font(.body)
             }
 
