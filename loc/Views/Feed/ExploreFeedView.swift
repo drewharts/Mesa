@@ -22,9 +22,10 @@ struct ExploreFeedView: View {
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                citySearchSection
+        VStack(spacing: 0) {
+            citySearchSection
+
+            ScrollView {
                 if viewModel.isLoading && viewModel.videos.isEmpty {
                     loadingView
                 } else if viewModel.videos.isEmpty && !viewModel.isLoading {
@@ -33,9 +34,9 @@ struct ExploreFeedView: View {
                     videoGrid
                 }
             }
-        }
-        .refreshable {
-            await viewModel.loadInitial()
+            .refreshable {
+                await viewModel.loadInitial()
+            }
         }
         .task {
             if viewModel.availableCities.isEmpty {
