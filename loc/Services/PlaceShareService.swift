@@ -16,56 +16,24 @@ class PlaceShareService: ObservableObject {
     
     // MARK: - Share Place Methods
     
-    /// Shares a place as a rendered image card with the place name overlaid, plus a universal link.
+    /// Shares a place with text and universal link.
     @MainActor
     func sharePlace(_ detailPlace: DetailPlace) {
         let shareablePlace = ShareablePlace(from: detailPlace)
-        Task {
-            let backgroundImage = await downloadFirstPhoto(from: detailPlace)
-            let subtitle = buildSubtitle(address: shareablePlace.address, city: shareablePlace.city)
-            let shareImage = renderPlaceShareImage(
-                placeName: detailPlace.name,
-                subtitle: subtitle,
-                backgroundImage: backgroundImage
-            )
-
-            guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else { return }
-
-            let linkString = universalLink.absoluteString
-            if let image = shareImage {
-                presentShareSheet(with: [image, linkString])
-            } else {
-                presentShareSheet(with: [linkString])
-            }
-        }
+        sharePlace(shareablePlace)
     }
 
-    /// Shares a place as a rendered image card (variant accepting unused imageURL for backward compatibility).
+    /// Shares a place (variant accepting unused imageURL for backward compatibility).
     @MainActor
     func sharePlace(_ detailPlace: DetailPlace, withImage imageURL: String?) {
         sharePlace(detailPlace)
     }
-    
-    /// Shares a nearby place as a rendered image card.
+
+    /// Shares a nearby place with text and universal link.
     @MainActor
     func sharePlace(_ nearbyPlace: NearbyPlaceFeature) {
         let shareablePlace = ShareablePlace(from: nearbyPlace)
-        let subtitle = buildSubtitle(address: shareablePlace.address, city: shareablePlace.city)
-
-        guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else { return }
-
-        let shareImage = renderPlaceShareImage(
-            placeName: nearbyPlace.properties.name,
-            subtitle: subtitle,
-            backgroundImage: nil
-        )
-
-        let linkString = universalLink.absoluteString
-        if let image = shareImage {
-            presentShareSheet(with: [image, linkString])
-        } else {
-            presentShareSheet(with: [linkString])
-        }
+        sharePlace(shareablePlace)
     }
 
     /// Shares a nearby place (variant accepting unused imageURL for backward compatibility).
@@ -163,41 +131,6 @@ class PlaceShareService: ObservableObject {
         return shareText
     }
     
-    // MARK: - Share Image Generation
-
-    /// Downloads the first available photo for a place.
-    private func downloadFirstPhoto(from place: DetailPlace) async -> UIImage? {
-        guard let urlString = place.photoUrls?.first, let url = URL(string: urlString) else {
-            return nil
-        }
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            return UIImage(data: data)
-        } catch {
-            return nil
-        }
-    }
-
-    /// Renders a PlaceShareImageView to a UIImage for sharing.
-    @MainActor
-    private func renderPlaceShareImage(placeName: String, subtitle: String, backgroundImage: UIImage?) -> UIImage? {
-        let view = PlaceShareImageView(
-            placeName: placeName,
-            subtitle: subtitle,
-            backgroundImage: backgroundImage
-        )
-        let renderer = ImageRenderer(content: view)
-        renderer.scale = 3.0
-        return renderer.uiImage
-    }
-
-    /// Builds a subtitle string from address and city.
-    private func buildSubtitle(address: String?, city: String?) -> String {
-        if let address = address, !address.isEmpty { return address }
-        if let city = city, !city.isEmpty { return city }
-        return ""
-    }
-
     private func createShareText(for list: ShareableList) -> String {
         var shareText = "Check out my list \"\(list.name)\""
         
