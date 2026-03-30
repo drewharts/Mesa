@@ -16,7 +16,8 @@ class PlaceShareService: ObservableObject {
     
     // MARK: - Share Place Methods
     
-    /// Shares a place as a rendered image card with the place name overlaid, plus a universal link.
+    /// Shares a place as a rendered image card with the place name overlaid.
+    /// Copies the universal link to clipboard so the user can paste it separately.
     @MainActor
     func sharePlace(_ detailPlace: DetailPlace) {
         let shareablePlace = ShareablePlace(from: detailPlace)
@@ -29,13 +30,13 @@ class PlaceShareService: ObservableObject {
                 backgroundImage: backgroundImage
             )
 
-            guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else { return }
+            // Copy link to clipboard for pasting
+            if let universalLink = generateUniversalLinkURL(for: shareablePlace) {
+                UIPasteboard.general.string = universalLink.absoluteString
+            }
 
-            let linkString = universalLink.absoluteString
             if let image = shareImage {
-                presentShareSheet(with: [image, linkString])
-            } else {
-                presentShareSheet(with: [linkString])
+                presentShareSheet(with: [image])
             }
         }
     }
@@ -52,19 +53,18 @@ class PlaceShareService: ObservableObject {
         let shareablePlace = ShareablePlace(from: nearbyPlace)
         let subtitle = buildSubtitle(address: shareablePlace.address, city: shareablePlace.city)
 
-        guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else { return }
-
         let shareImage = renderPlaceShareImage(
             placeName: nearbyPlace.properties.name,
             subtitle: subtitle,
             backgroundImage: nil
         )
 
-        let linkString = universalLink.absoluteString
+        if let universalLink = generateUniversalLinkURL(for: shareablePlace) {
+            UIPasteboard.general.string = universalLink.absoluteString
+        }
+
         if let image = shareImage {
-            presentShareSheet(with: [image, linkString])
-        } else {
-            presentShareSheet(with: [linkString])
+            presentShareSheet(with: [image])
         }
     }
 
