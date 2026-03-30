@@ -22,6 +22,7 @@ struct ProfileContentView: View {
     @State private var showEditProfileForSocials = false
     @State private var showImportTooltip = !UserDefaults.standard.bool(forKey: "hasSeenPhotoImportTooltip")
     @State private var showTasteProfile = false
+    @State private var showRecap = false
 
     var body: some View {
         ZStack {
@@ -70,7 +71,7 @@ struct ProfileContentView: View {
                         .padding(.horizontal, 20)
 
                     // Quick actions row — visible for all profiles
-                    ProfileQuickActionsRow(onImportTap: { photoImportVM.handleImportButtonTap() }, onTasteTap: { showTasteProfile = true })
+                    ProfileQuickActionsRow(onImportTap: { photoImportVM.handleImportButtonTap() }, onTasteTap: { showTasteProfile = true }, onRecapTap: { showRecap = true })
                         .overlay(alignment: .top) {
                             if showImportTooltip {
                                 PhotoImportTooltip(onDismiss: {
@@ -111,6 +112,9 @@ struct ProfileContentView: View {
         }
         .sheet(isPresented: $showTasteProfile) {
             TasteProfileSheet()
+        }
+        .sheet(isPresented: $showRecap) {
+            YearInReviewSheet()
         }
         .alert("No Location Data", isPresented: $photoImportVM.noLocationDataError) {
             Button("OK") { photoImportVM.clearSelection() }

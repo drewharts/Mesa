@@ -7,10 +7,11 @@
 
 import SwiftUI
 
-/// Action card displayed below the profile header to encourage photo import and taste profile.
+/// Action card displayed below the profile header to encourage photo import, taste profile, and recap.
 struct ProfileQuickActionsRow: View {
     let onImportTap: () -> Void
     let onTasteTap: () -> Void
+    let onRecapTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -50,6 +51,23 @@ struct ProfileQuickActionsRow: View {
                         .font(.system(size: 16))
                         .foregroundColor(Color(red: 0.8, green: 0.4, blue: 0.1))
                     Text("My Taste")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color(red: 0.8, green: 0.4, blue: 0.1).opacity(0.08))
+                .cornerRadius(10)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onRecapTap) {
+                HStack(spacing: 8) {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 0.8, green: 0.4, blue: 0.1))
+                    Text("Recap")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
