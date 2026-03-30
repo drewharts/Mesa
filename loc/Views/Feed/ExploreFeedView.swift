@@ -3,6 +3,7 @@
 //  loc
 //
 //  2-column grid of globally imported TikTok/Instagram content for discovery.
+//  Includes city filter pills for filtering by location.
 //
 
 import SwiftUI
@@ -18,25 +19,50 @@ struct ExploreFeedView: View {
 
     var body: some View {
         ScrollView {
-            if viewModel.isLoading && viewModel.videos.isEmpty {
-                loadingView
-            } else if viewModel.videos.isEmpty {
-                emptyState
-            } else {
-                videoGrid
+            VStack(spacing: 0) {
+                cityFilterPills
+                if viewModel.isLoading && viewModel.videos.isEmpty {
+                    loadingView
+                } else if viewModel.videos.isEmpty && !viewModel.isLoading {
+                    emptyState
+                } else {
+                    videoGrid
+                }
             }
         }
         .refreshable {
             await viewModel.loadInitial()
         }
         .task {
+            if viewModel.availableCities.isEmpty {
+                await viewModel.loadCities()
+            }
             if viewModel.videos.isEmpty {
                 await viewModel.loadInitial()
             }
         }
     }
 
-    // MARK: - Subviews
+    // MARK: - City Filter
+
+    private var cityFilterPills: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ExploreCityPill(title: "All", isSelected: viewModel.selectedCity == nil) {
+                    viewModel.selectCity(nil)
+                }
+                ForEach(viewModel.availableCities, id: \.self) { city in
+                    ExploreCityPill(title: city, isSelected: viewModel.selectedCity == city) {
+                        viewModel.selectCity(city)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+        }
+    }
+
+    // MARK: - Video Grid
 
     private var videoGrid: some View {
         LazyVGrid(columns: columns, spacing: 10) {
@@ -50,7 +76,6 @@ struct ExploreFeedView: View {
             }
         }
         .padding(.horizontal)
-        .padding(.top, 8)
     }
 
     private var loadingView: some View {
@@ -63,7 +88,7 @@ struct ExploreFeedView: View {
             Image(systemName: "play.rectangle.on.rectangle")
                 .font(.system(size: 40))
                 .foregroundStyle(.secondary)
-            Text("No videos yet")
+            Text("No videos in this city yet")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -80,5 +105,4 @@ struct ExploreFeedView: View {
             Task { await viewModel.loadMore() }
         }
     }
-
 }

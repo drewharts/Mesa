@@ -7,7 +7,8 @@
 
 CREATE OR REPLACE FUNCTION public.get_explore_external_videos(
     p_limit int DEFAULT 20,
-    p_offset int DEFAULT 0
+    p_offset int DEFAULT 0,
+    p_city text DEFAULT NULL
 )
 RETURNS TABLE(
     external_place_id text,
@@ -44,6 +45,7 @@ JOIN places p ON UPPER(ep.place_id) = UPPER(p.id::text)
 JOIN users u ON ep.user_id = u.id
 WHERE ep.url IS NOT NULL
   AND ep.url != ''
+  AND (p_city IS NULL OR p.city = p_city)
 ORDER BY ep.added_at DESC NULLS LAST, ep.id DESC
 LIMIT p_limit
 OFFSET p_offset;

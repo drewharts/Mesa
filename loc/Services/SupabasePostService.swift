@@ -414,14 +414,15 @@ class SupabasePostService: ObservableObject {
 
     // MARK: - Explore Feed
 
-    /// Fetches paginated global external videos for the Explore feed.
-    func fetchExploreVideos(limit: Int = 20, offset: Int = 0) async throws -> [ExploreVideoItem] {
+    /// Fetches paginated global external videos for the Explore feed, optionally filtered by city.
+    func fetchExploreVideos(limit: Int = 20, offset: Int = 0, city: String? = nil) async throws -> [ExploreVideoItem] {
         struct Params: Encodable {
             let p_limit: Int
             let p_offset: Int
+            let p_city: String?
         }
 
-        let params = Params(p_limit: limit, p_offset: offset)
+        let params = Params(p_limit: limit, p_offset: offset, p_city: city)
 
         let items: [ExploreVideoItem] = try await supabase.client
             .rpc("get_explore_external_videos", params: params)
@@ -429,6 +430,20 @@ class SupabasePostService: ObservableObject {
             .value
 
         return items
+    }
+
+    /// Fetches cities that have external videos for the Explore feed filter.
+    func fetchExploreCities() async throws -> [String] {
+        struct CityRecord: Decodable {
+            let city: String
+        }
+
+        let records: [CityRecord] = try await supabase.client
+            .rpc("get_explore_cities", params: ["p_limit": 20])
+            .execute()
+            .value
+
+        return records.map(\.city)
     }
 
     // MARK: - Helper Methods
