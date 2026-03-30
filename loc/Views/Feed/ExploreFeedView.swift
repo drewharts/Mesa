@@ -3,7 +3,7 @@
 //  loc
 //
 //  2-column grid of globally imported TikTok/Instagram content for discovery.
-//  Includes city filter pills for filtering by location.
+//  Includes city search bar for filtering by location.
 //
 
 import SwiftUI
@@ -11,6 +11,10 @@ import SwiftUI
 struct ExploreFeedView: View {
     @ObservedObject var viewModel: ExploreViewModel
     let onPlaceTap: (String) -> Void
+
+    @State private var citySearchText: String = ""
+    @State private var showCitySuggestions: Bool = false
+    @FocusState private var isSearchFocused: Bool
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -20,7 +24,7 @@ struct ExploreFeedView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                cityFilterPills
+                citySearchSection
                 if viewModel.isLoading && viewModel.videos.isEmpty {
                     loadingView
                 } else if viewModel.videos.isEmpty && !viewModel.isLoading {
@@ -43,22 +47,115 @@ struct ExploreFeedView: View {
         }
     }
 
-    // MARK: - City Filter
+    // MARK: - City Search
 
-    private var cityFilterPills: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ExploreCityPill(title: "All", isSelected: viewModel.selectedCity == nil) {
-                    viewModel.selectCity(nil)
+    private var citySearchSection: some View {
+        VStack(spacing: 8) {
+            citySearchBar
+            if let selected = viewModel.selectedCity {
+                activeFilterChip(city: selected)
+            }
+            if showCitySuggestions && !filteredCities.isEmpty {
+                citySuggestionsList
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
+    private var citySearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            TextField("Filter by city...", text: $citySearchText)
+                .font(.subheadline)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .focused($isSearchFocused)
+                .onChange(of: citySearchText) { _, newValue in
+                    showCitySuggestions = !newValue.isEmpty
                 }
-                ForEach(viewModel.availableCities, id: \.self) { city in
-                    ExploreCityPill(title: city, isSelected: viewModel.selectedCity == city) {
-                        viewModel.selectCity(city)
-                    }
+            if !citySearchText.isEmpty {
+                Button {
+                    citySearchText = ""
+                    showCitySuggestions = false
+                    isSearchFocused = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+    }
+
+    /// Cities matching the current search text.
+    private var filteredCities: [String] {
+        let query = citySearchText.lowercased()
+        return viewModel.availableCities.filter { $0.lowercased().contains(query) }
+    }
+
+    private var citySuggestionsList: some View {
+        VStack(spacing: 0) {
+            ForEach(filteredCities.prefix(6), id: \.self) { city in
+                Button {
+                    viewModel.selectCity(city)
+                    citySearchText = ""
+                    showCitySuggestions = false
+                    isSearchFocused = false
+                } label: {
+                    HStack {
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundColor(Color(red: 0.8, green: 0.4, blue: 0.1))
+                        Text(city)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+                if city != filteredCities.prefix(6).last {
+                    Divider().padding(.leading, 40)
+                }
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(10)
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+    }
+
+    /// Chip showing the active city filter with dismiss button.
+    private var activeFilterChip: (String) -> some View {
+        { city in
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.caption)
+                    Text(city)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Button {
+                        viewModel.selectCity(nil)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                    }
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color(red: 0.8, green: 0.4, blue: 0.1))
+                .clipShape(Capsule())
+
+                Spacer()
+            }
         }
     }
 
