@@ -500,6 +500,22 @@ class SupabaseUserService: ObservableObject {
         return !response.isEmpty
     }
     
+    /// Auto-follows all curated accounts for a user. Safe to call multiple times (uses upsert).
+    func autoFollowCuratedAccounts(userId: String) async {
+        let curatedAccountIds = [
+            "36997cbb-bd25-4275-849d-8e9ea06fca94",  // Michelin Guide
+            "658abee3-ae63-4e57-8085-65a7faed9988",  // Design Hotels
+            "eb3a2527-24ab-4a0d-8327-c4938bf05adc"   // Ernest Hemingway
+        ]
+        for accountId in curatedAccountIds {
+            do {
+                try await followUser(followerId: userId, followingId: accountId)
+            } catch {
+                print("⚠️ Failed to auto-follow curated account \(accountId): \(error)")
+            }
+        }
+    }
+
     /// Follow a user
     func followUser(followerId: String, followingId: String) async throws {
         struct FollowRecord: Codable {

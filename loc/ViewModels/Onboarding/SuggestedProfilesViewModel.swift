@@ -14,9 +14,10 @@ class SuggestedProfilesViewModel: ObservableObject {
     // MARK: - Hardcoded Suggested Profile IDs
 
     static let suggestedProfileIds = [
+        "36997cbb-bd25-4275-849d-8e9ea06fca94",  // Michelin Guide (curated)
+        "658abee3-ae63-4e57-8085-65a7faed9988",  // Design Hotels (curated)
+        "eb3a2527-24ab-4a0d-8327-c4938bf05adc",  // Ernest Hemingway (curated)
         "C9DFA19E-B1B0-4EF1-8697-E448BC606CC7",  // Drew Hartsfield
-        "Ms3LWC96WeNljv2PzQaW0w8xPq12",           // Grace Graviet
-        "1QLQ0ZwkBAeLVl6nLZVznEDhLCw2",           // Grant Balls
         "60dccc59-1c4d-4454-99f8-2a73f420a13b",  // Anthony Bourdain
         "12e271fc-6fb3-48e8-adff-dfd162523008"   // Action Bronson
     ]
