@@ -455,6 +455,15 @@ class SupabasePostService: ObservableObject {
         return items
     }
 
+    /// Fetches the user's taste profile — place type distribution across all saved places.
+    func fetchTasteProfile(userId: String) async throws -> [TasteProfileEntry] {
+        let items: [TasteProfileEntry] = try await supabase.client
+            .rpc("get_user_taste_profile", params: ["p_user_id": userId])
+            .execute()
+            .value
+        return items
+    }
+
     // MARK: - Helper Methods
     
     private func parseTimestamp(_ timestampString: String) -> Date {
