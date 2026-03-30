@@ -1,41 +1,44 @@
 -- ============================================================================
 -- Function: get_trending_places
 -- ============================================================================
--- This file contains the current state of the function in the database.
+-- Returns places ranked by crown (like) count for the trending section.
+-- Includes place photo for visual display.
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION public.get_trending_places(p_user_lat double precision DEFAULT NULL::double precision, p_user_lng double precision DEFAULT NULL::double precision, p_radius_meters double precision DEFAULT 50000, p_limit integer DEFAULT 20)
- RETURNS TABLE(place_id uuid, place_name text, address text, city text, latitude double precision, longitude double precision, recent_favorites bigint, recent_reviews bigint, trending_score double precision)
- LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.get_trending_places(
+    p_limit int DEFAULT 10
+)
+RETURNS TABLE(
+    place_id text,
+    place_name text,
+    city text,
+    place_type text,
+    crown_count bigint,
+    photo_url text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
 AS $function$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        p.id AS place_id,
-        p.name AS place_name,
-        p.address,
-        p.city,
-        ST_Y(p.location::geometry) AS latitude,
-        ST_X(p.location::geometry) AS longitude,
-        COUNT(DISTINCT f.id) FILTER (WHERE f."timestamp" > NOW() - INTERVAL '7 days') AS recent_favorites,
-        COUNT(DISTINCT r.id) FILTER (WHERE r."timestamp" > NOW() - INTERVAL '7 days') AS recent_reviews,
-        (COUNT(DISTINCT f.id) FILTER (WHERE f."timestamp" > NOW() - INTERVAL '7 days') * 2 + 
-         COUNT(DISTINCT r.id) FILTER (WHERE r."timestamp" > NOW() - INTERVAL '7 days')) AS trending_score
-    FROM places p
-    LEFT JOIN favorites f ON p.id = f.place_id
-    LEFT JOIN reviews r ON p.id = r.place_id
-    WHERE 
-        -- Optional location filter
-        (p_user_lat IS NULL OR p_user_lng IS NULL) OR
-        ST_DWithin(
-            p.location::geography,
-            ST_SetSRID(ST_MakePoint(p_user_lng, p_user_lat), 4326)::geography,
-            p_radius_meters
-        )
-    GROUP BY p.id, p.name, p.address, p.city, p.location
-    HAVING (COUNT(DISTINCT f.id) FILTER (WHERE f."timestamp" > NOW() - INTERVAL '7 days') + 
-            COUNT(DISTINCT r.id) FILTER (WHERE r."timestamp" > NOW() - INTERVAL '7 days')) > 0
-    ORDER BY trending_score DESC
-    LIMIT p_limit;
-END;
-$function$
+SELECT
+    r.place_id::text AS place_id,
+    p.name AS place_name,
+    normalize_city_name(p.city) AS city,
+    COALESCE(
+        p.user_corrected_category,
+        (SELECT cat FROM unnest(p.categories) AS cat
+         WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
+         LIMIT 1),
+        p.categories[1],
+        'Place'
+    ) AS place_type,
+    COUNT(*) AS crown_count,
+    p.photo_urls[1] AS photo_url
+FROM review_likes rl
+JOIN reviews r ON rl.review_id = r.id
+JOIN places p ON r.place_id::text = p.id::text
+WHERE p.name IS NOT NULL
+GROUP BY r.place_id, p.name, p.city, p.categories, p.user_corrected_category, p.photo_urls
+ORDER BY crown_count DESC, p.name
+LIMIT p_limit;
+$function$;

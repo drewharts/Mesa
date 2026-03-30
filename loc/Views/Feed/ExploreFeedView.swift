@@ -25,6 +25,10 @@ struct ExploreFeedView: View {
         VStack(spacing: 0) {
             citySearchSection
 
+            if !viewModel.trendingPlaces.isEmpty {
+                trendingSection
+            }
+
             ScrollView {
                 if viewModel.isLoading && viewModel.videos.isEmpty {
                     loadingView
@@ -45,6 +49,7 @@ struct ExploreFeedView: View {
             if viewModel.videos.isEmpty {
                 await viewModel.loadInitial()
             }
+            await viewModel.loadTrending()
         }
     }
 
@@ -133,6 +138,28 @@ struct ExploreFeedView: View {
         .background(Color(.systemBackground))
         .cornerRadius(10)
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+    }
+
+    /// Horizontal scroll of trending (most crowned) places.
+    private var trendingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Trending")
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(viewModel.trendingPlaces) { place in
+                        TrendingPlaceCard(place: place) {
+                            onPlaceTap(place.placeId)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.bottom, 8)
     }
 
     // MARK: - Video Grid

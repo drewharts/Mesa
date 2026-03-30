@@ -15,6 +15,7 @@ class ExploreViewModel: ObservableObject {
     @Published var isLoadingMore: Bool = false
     @Published var selectedCity: String?
     @Published var availableCities: [String] = []
+    @Published var trendingPlaces: [TrendingPlace] = []
 
     private let postService = SupabasePostService.shared
     private var currentOffset: Int = 0
@@ -72,6 +73,15 @@ class ExploreViewModel: ObservableObject {
     func selectCity(_ city: String?) {
         selectedCity = city
         Task { await loadInitial() }
+    }
+
+    /// Fetches trending places for the horizontal scroll section.
+    func loadTrending() async {
+        do {
+            trendingPlaces = try await postService.fetchTrendingPlaces(limit: 10)
+        } catch {
+            print("❌ [ExploreViewModel] Failed to load trending: \(error)")
+        }
     }
 
     /// Fetches the list of cities that have explore content.

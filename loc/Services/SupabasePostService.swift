@@ -446,6 +446,15 @@ class SupabasePostService: ObservableObject {
         return records.map(\.city)
     }
 
+    /// Fetches trending places ranked by crown count.
+    func fetchTrendingPlaces(limit: Int = 10) async throws -> [TrendingPlace] {
+        let items: [TrendingPlace] = try await supabase.client
+            .rpc("get_trending_places", params: ["p_limit": limit])
+            .execute()
+            .value
+        return items
+    }
+
     // MARK: - Helper Methods
     
     private func parseTimestamp(_ timestampString: String) -> Date {
