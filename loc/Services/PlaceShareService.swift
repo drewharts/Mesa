@@ -31,10 +31,11 @@ class PlaceShareService: ObservableObject {
 
             guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else { return }
 
+            let linkString = universalLink.absoluteString
             if let image = shareImage {
-                presentShareSheet(with: [image, universalLink])
+                presentShareSheet(with: [image, linkString])
             } else {
-                presentShareSheet(with: [universalLink])
+                presentShareSheet(with: [linkString])
             }
         }
     }
@@ -59,10 +60,11 @@ class PlaceShareService: ObservableObject {
             backgroundImage: nil
         )
 
+        let linkString = universalLink.absoluteString
         if let image = shareImage {
-            presentShareSheet(with: [image, universalLink])
+            presentShareSheet(with: [image, linkString])
         } else {
-            presentShareSheet(with: [universalLink])
+            presentShareSheet(with: [linkString])
         }
     }
 
