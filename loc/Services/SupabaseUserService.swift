@@ -527,7 +527,7 @@ class SupabaseUserService: ObservableObject {
         let curatedAccountIds = [
             "36997cbb-bd25-4275-849d-8e9ea06fca94",  // Michelin Guide
             "658abee3-ae63-4e57-8085-65a7faed9988",  // Design Hotels
-            "eb3a2527-24ab-4a0d-8327-c4938bf05adc"   // Ernest Hemingway
+            "60dccc59-1c4d-4454-99f8-2a73f420a13b"   // Anthony Bourdain
         ]
         for accountId in curatedAccountIds {
             do {
