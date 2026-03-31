@@ -18,7 +18,8 @@ RETURNS TABLE(
     place_name text,
     place_type text,
     city text,
-    added_at timestamp without time zone
+    added_at timestamp without time zone,
+    thumbnail_url text
 )
 LANGUAGE sql
 STABLE
@@ -39,7 +40,8 @@ SELECT
         'Place'
     ) AS place_type,
     normalize_city_name(p.city) AS city,
-    ep.added_at
+    ep.added_at,
+    ep.thumbnail_url
 FROM external_places ep
 JOIN places p ON UPPER(ep.place_id) = UPPER(p.id::text)
 JOIN users u ON ep.user_id = u.id

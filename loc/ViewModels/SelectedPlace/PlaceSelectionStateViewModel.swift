@@ -51,9 +51,11 @@ class PlaceSelectionStateViewModel: ObservableObject {
     func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
         // Set selectedPlace FIRST so coordinate is available when onChange observer fires
         selectedPlace = place
-        // Only animate if we have valid coordinates (not 0,0)
-        let hasValidCoordinates = place.coordinate?.isValidForNavigation == true
-        shouldAnimateMapToPlace = shouldAnimateMap && hasValidCoordinates
+        // Only set animation flag to true, never reset to false (avoids race conditions with concurrent callers)
+        if shouldAnimateMap {
+            let hasValidCoordinates = place.coordinate?.isValidForNavigation == true
+            if hasValidCoordinates { shouldAnimateMapToPlace = true }
+        }
         onPlaceSelected?(place)
     }
 
@@ -63,9 +65,11 @@ class PlaceSelectionStateViewModel: ObservableObject {
         // Set selectedPlace FIRST so coordinate is available when onChange observer fires
         selectedPlace = place
         isFetchingFreshDetails = true
-        // Only animate if we have valid coordinates; otherwise wait for fresh details
-        let hasValidCoordinates = place.coordinate?.isValidForNavigation == true
-        shouldAnimateMapToPlace = shouldAnimateMap && hasValidCoordinates
+        // Only set animation flag to true, never reset to false (avoids race conditions with concurrent callers)
+        if shouldAnimateMap {
+            let hasValidCoordinates = place.coordinate?.isValidForNavigation == true
+            if hasValidCoordinates { shouldAnimateMapToPlace = true }
+        }
         onPlaceSelected?(place)
         onFetchFreshDetails?(place)
     }

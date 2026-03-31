@@ -11,7 +11,7 @@ struct ExploreCityChip: View {
     let city: String
     let onClear: () -> Void
 
-    private let burntOrange = Color(red: 0.8, green: 0.4, blue: 0.1)
+
 
     var body: some View {
         HStack {
@@ -29,7 +29,7 @@ struct ExploreCityChip: View {
             .foregroundColor(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(burntOrange)
+            .background(Color.mesaAccent)
             .clipShape(Capsule())
 
             Spacer()

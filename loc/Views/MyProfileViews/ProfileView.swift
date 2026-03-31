@@ -267,7 +267,7 @@ struct ToolbarModifier: ViewModifier {
                 photoImportVM.handleImportButtonTap()
             } label: {
                 Image(systemName: "photo.on.rectangle.angled")
-                    .foregroundColor(Color(red: 0.8, green: 0.4, blue: 0.1))
+                    .foregroundColor(.mesaAccent)
                     .font(.body)
             }
 

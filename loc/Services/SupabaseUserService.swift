@@ -1297,7 +1297,7 @@ extension SupabaseUserService {
     func updateExternalPlaceAssociation(externalPlaceId: String, newPlaceId: String, userId: String) async throws {
         try await supabase.client
             .from("external_places")
-            .update(["place_id": newPlaceId])
+            .update(["place_id": newPlaceId, "added_at": ISO8601DateFormatter().string(from: Date())])
             .eq("id", value: externalPlaceId)
             .eq("user_id", value: userId)
             .execute()

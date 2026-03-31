@@ -117,7 +117,7 @@ struct ExploreFeedView: View {
                 } label: {
                     HStack {
                         Image(systemName: "mappin.circle.fill")
-                            .foregroundColor(Color(red: 0.8, green: 0.4, blue: 0.1))
+                            .foregroundColor(.mesaAccent)
                         Text(city)
                             .font(.subheadline)
                             .foregroundColor(.primary)

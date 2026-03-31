@@ -196,20 +196,32 @@ class ListStoryCardViewModel: ObservableObject {
         let universalLink = generateUniversalLink(for: list, userId: userId)
         let qrCodeImage = includeQRCode ? generateQRCode(from: universalLink) : nil
 
-        let placeIds = places.map { $0.place_id }
-        let coordinates = try await placeService.fetchPlaceCoordinates(placeIds: placeIds)
-        let coordArray = Array(coordinates.values)
-
-        let mapSize = CGSize(width: storyWidth - 56, height: 200 * 3)
-        let mapImage = await mapSnapshotService.generateSnapshot(
-            coordinates: coordArray,
-            size: mapSize
-        )
-
+        let mapImage = await generateMapSnapshot(placeIds: places.map { $0.place_id })
         let placePhotos = await loadPlacePhotos(from: places, overrideURL: overridePhotoURL)
         let ownerPhoto = await loadOwnerPhoto(url: list.owner_photo_url)
 
-        let cardData = ListStoryCardData(
+        let cardData = buildCardData(list: list, userId: userId, universalLink: universalLink)
+
+        guard let image = renderCard(
+            data: cardData, placePhotos: placePhotos,
+            mapImage: mapImage, qrCodeImage: qrCodeImage, ownerPhoto: ownerPhoto
+        ) else {
+            throw StoryCardError.renderFailed
+        }
+
+        return image
+    }
+
+    /// Generates a map snapshot image from place coordinates.
+    private func generateMapSnapshot(placeIds: [String]) async -> UIImage? {
+        let coordinates = (try? await placeService.fetchPlaceCoordinates(placeIds: placeIds)) ?? [:]
+        let mapSize = CGSize(width: storyWidth - 56, height: 200 * 3)
+        return await mapSnapshotService.generateSnapshot(coordinates: Array(coordinates.values), size: mapSize)
+    }
+
+    /// Builds the card data model from a list and user info.
+    private func buildCardData(list: LightweightPlaceList, userId: String, universalLink: URL?) -> ListStoryCardData {
+        ListStoryCardData(
             listName: list.name,
             placeCount: list.place_count,
             ownerName: list.owner_name ?? "Mesa User",
@@ -218,18 +230,6 @@ class ListStoryCardViewModel: ObservableObject {
             backgroundImageURL: nil,
             listUniversalLink: universalLink
         )
-
-        guard let image = renderCard(
-            data: cardData,
-            placePhotos: placePhotos,
-            mapImage: mapImage,
-            qrCodeImage: qrCodeImage,
-            ownerPhoto: ownerPhoto
-        ) else {
-            throw StoryCardError.renderFailed
-        }
-
-        return image
     }
 
     /// Loads up to 4 place photos for the collage.

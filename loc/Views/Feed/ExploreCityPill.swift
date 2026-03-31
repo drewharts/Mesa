@@ -12,7 +12,7 @@ struct ExploreCityPill: View {
     let isSelected: Bool
     let onTap: () -> Void
 
-    private let burntOrange = Color(red: 0.8, green: 0.4, blue: 0.1)
+
 
     var body: some View {
         Button(action: onTap) {
@@ -22,7 +22,7 @@ struct ExploreCityPill: View {
                 .foregroundColor(isSelected ? .white : .primary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(isSelected ? burntOrange : Color(.systemGray6))
+                .background(isSelected ? Color.mesaAccent : Color(.systemGray6))
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

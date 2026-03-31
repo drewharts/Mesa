@@ -33,7 +33,7 @@ struct PhotoImportTooltip: View {
         HStack(spacing: 10) {
             Image(systemName: "sparkles")
                 .font(.system(size: 16))
-                .foregroundColor(Color(red: 0.8, green: 0.4, blue: 0.1))
+                .foregroundColor(.mesaAccent)
 
             Text("Import your photos and we'll find the places you've been!")
                 .font(.caption)

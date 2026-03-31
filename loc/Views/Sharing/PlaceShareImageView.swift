@@ -40,8 +40,8 @@ struct PlaceShareImageView: View {
         } else {
             LinearGradient(
                 colors: [
-                    Color(red: 0.8, green: 0.4, blue: 0.1),
-                    Color(red: 0.6, green: 0.25, blue: 0.05)
+                    Color.mesaAccent,
+                    Color.mesaAccentDark
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

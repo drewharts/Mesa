@@ -11,7 +11,7 @@ struct TrendingPlaceCard: View {
     let place: TrendingPlace
     let onTap: () -> Void
 
-    private let burntOrange = Color(red: 0.8, green: 0.4, blue: 0.1)
+
 
     var body: some View {
         Button(action: onTap) {
@@ -56,7 +56,7 @@ struct TrendingPlaceCard: View {
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(burntOrange)
+            .background(Color.mesaAccent)
             .clipShape(Capsule())
             .padding(6)
         }
