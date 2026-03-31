@@ -456,7 +456,7 @@ class SupabasePostService: ObservableObject {
     }
 
     // MARK: - Helper Methods
-    
+     
     private func parseTimestamp(_ timestampString: String) -> Date {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")

@@ -41,6 +41,7 @@ struct ProfileViewListsView: View {
     @State private var selectedListIndex: Int? = nil
     @State private var pendingMapListId: String? = nil
     @State private var showingGoogleMapsImport = false
+    @StateObject private var shareCardVM = ListStoryCardViewModel()
 
     // MARK: - Body
 
@@ -198,6 +199,18 @@ struct ProfileViewListsView: View {
                     onTap: { selectedListIndex = index }
                 )
                 .contextMenu {
+                    Button {
+                        Task {
+                            await shareCardVM.quickShare(
+                                list: list,
+                                places: listsVM.lightweightPlaceListPlaces[list.list_id] ?? [],
+                                userId: profile.user?.id ?? "",
+                                shareService: ServiceContainer.shared.placeShareService
+                            )
+                        }
+                    } label: {
+                        Label("Share List", systemImage: "square.and.arrow.up")
+                    }
                     Button(role: .destructive) {
                         listToDelete = list
                         showDeleteConfirmation = true

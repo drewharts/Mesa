@@ -156,6 +156,10 @@ struct ProfileFavoritesPopupView: View {
                     preferExternalThumbnail: false,
                     onNavigate: { placeId in
                         navigationPath.append(placeId)
+                        Task {
+                            guard let place = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
+                            selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+                        }
                     }
                 )
             }

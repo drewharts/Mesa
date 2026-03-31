@@ -43,13 +43,10 @@ struct ExploreFeedView: View {
             }
         }
         .task {
-            if viewModel.availableCities.isEmpty {
-                await viewModel.loadCities()
-            }
-            if viewModel.videos.isEmpty {
-                await viewModel.loadInitial()
-            }
-            await viewModel.loadTrending()
+            async let cities: () = viewModel.availableCities.isEmpty ? viewModel.loadCities() : ()
+            async let videos: () = viewModel.videos.isEmpty ? viewModel.loadInitial() : ()
+            async let trending: () = viewModel.loadTrending()
+            _ = await (cities, videos, trending)
         }
     }
 
