@@ -32,7 +32,7 @@ struct ExploreFeedView: View {
             ScrollView {
                 if viewModel.isLoading && viewModel.videos.isEmpty {
                     loadingView
-                } else if viewModel.videos.isEmpty && !viewModel.isLoading {
+                } else if viewModel.hasLoaded && viewModel.videos.isEmpty {
                     emptyState
                 } else {
                     videoGrid

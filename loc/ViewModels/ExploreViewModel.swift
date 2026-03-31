@@ -12,6 +12,7 @@ import Combine
 class ExploreViewModel: ObservableObject {
     @Published var videos: [ExploreVideoItem] = []
     @Published var isLoading: Bool = false
+    @Published var hasLoaded: Bool = false
     @Published var isLoadingMore: Bool = false
     @Published var selectedCity: String?
     @Published var availableCities: [String] = []
@@ -49,6 +50,7 @@ class ExploreViewModel: ObservableObject {
             print("❌ [ExploreViewModel] Failed to load explore videos: \(error)")
         }
 
+        hasLoaded = true
         isLoading = false
     }
 
