@@ -19,7 +19,8 @@ RETURNS TABLE(
     place_type text,
     city text,
     added_at timestamp without time zone,
-    thumbnail_url text
+    thumbnail_url text,
+    place_photo_url text
 )
 LANGUAGE sql
 STABLE
@@ -41,7 +42,26 @@ SELECT
     ) AS place_type,
     normalize_city_name(p.city) AS city,
     ep.added_at,
-    ep.thumbnail_url
+    ep.thumbnail_url,
+    COALESCE(
+        -- User review photo (highest quality, uploaded by users)
+        (SELECT r.images[1]
+         FROM reviews r
+         WHERE r.place_id::text = ep.place_id
+           AND r.images[1] IS NOT NULL
+         ORDER BY r.timestamp DESC LIMIT 1),
+        -- External review photo (Google/Serper photos)
+        (SELECT (media_item->>'imageUrl')::text
+         FROM external_reviews er
+         CROSS JOIN LATERAL jsonb_array_elements(er.media) AS media_item
+         WHERE er.place_id::text = ep.place_id
+           AND (media_item->>'type')::text = 'image'
+           AND (media_item->>'imageUrl') IS NOT NULL
+         ORDER BY er.review_iso_date DESC LIMIT 1),
+        -- Place thumbnail or photo array
+        p.thumbnail_url,
+        p.photo_urls[1]
+    ) AS place_photo_url
 FROM external_places ep
 JOIN places p ON UPPER(ep.place_id) = UPPER(p.id::text)
 JOIN users u ON ep.user_id = u.id
