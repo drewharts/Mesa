@@ -2,37 +2,33 @@
 //  ListStoryShareButton.swift
 //  loc
 //
-//  Created by Claude on 1/30/25.
+//  Button component that triggers list share card generation.
 //
 
 import SwiftUI
 
-/// Button component that triggers the story card share flow with photo selection.
+/// Prominent share button for lists — supports quick share and advanced photo selection.
 struct ListStoryShareButton: View {
     let list: LightweightPlaceList
     let places: [LightweightPlace]
     let userId: String
+    let style: ButtonStyle
 
     @StateObject private var viewModel = ListStoryCardViewModel()
     @EnvironmentObject private var serviceContainer: ServiceContainer
     @State private var showPhotoSelector = false
 
+    /// Controls whether the button shows as an icon or a full labeled button.
+    enum ButtonStyle {
+        case icon
+        case prominent
+    }
+
     var body: some View {
         Button {
-            prepareAndShowSelector()
+            handleTap()
         } label: {
-            Group {
-                if viewModel.isGenerating {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .primary))
-                } else {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(.primary)
-                }
-            }
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
+            buttonLabel
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(viewModel.isGenerating)
@@ -51,22 +47,61 @@ struct ListStoryShareButton: View {
         }
     }
 
-    /// Prepares photo options and shows the selector sheet.
-    private func prepareAndShowSelector() {
+    /// Renders the appropriate button label based on style.
+    @ViewBuilder
+    private var buttonLabel: some View {
+        switch style {
+        case .icon:
+            Group {
+                if viewModel.isGenerating {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .primary))
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.primary)
+                }
+            }
+            .frame(width: 36, height: 36)
+            .contentShape(Rectangle())
+
+        case .prominent:
+            HStack(spacing: 8) {
+                if viewModel.isGenerating {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Share")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.mesaAccent)
+            .clipShape(Capsule())
+        }
+    }
+
+    /// Triggers quick share for icon style, photo selector for prominent style.
+    private func handleTap() {
         Task {
-            await viewModel.preparePhotoOptions(places: places)
-            showPhotoSelector = true
+            await viewModel.quickShare(
+                list: list,
+                places: places,
+                userId: userId,
+                shareService: serviceContainer.placeShareService
+            )
         }
     }
 
     /// Shares to Instagram Stories with link back to the app.
     private func shareToInstagram() {
         Task {
-            await viewModel.shareToInstagram(
-                list: list,
-                places: places,
-                userId: userId
-            )
+            await viewModel.shareToInstagram(list: list, places: places, userId: userId)
         }
     }
 

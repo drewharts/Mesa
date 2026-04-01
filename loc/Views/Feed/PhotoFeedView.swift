@@ -85,7 +85,7 @@ struct PhotoFeedView: View {
         if viewModel.isLoading {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if viewModel.feedItems.isEmpty {
+        } else if viewModel.hasLoaded && viewModel.feedItems.isEmpty {
             emptyFeedContent
         } else {
             feedList

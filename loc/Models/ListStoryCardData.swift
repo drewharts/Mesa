@@ -13,6 +13,7 @@ struct ListStoryCardData {
     let placeCount: Int
     let ownerName: String
     let ownerPhotoURL: URL?
+    let city: String?
     let backgroundImageURL: URL?
     let listUniversalLink: URL?
 }

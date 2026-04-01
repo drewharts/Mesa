@@ -20,7 +20,7 @@ struct ProfileContentView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(\.presentationMode) var presentationMode
     @State private var showEditProfileForSocials = false
-
+    @State private var showImportTooltip = !UserDefaults.standard.bool(forKey: "hasSeenPhotoImportTooltip")
     var body: some View {
         ZStack {
             ScrollView {
@@ -69,6 +69,16 @@ struct ProfileContentView: View {
 
                     // Quick actions row — visible for all profiles
                     ProfileQuickActionsRow(onImportTap: { photoImportVM.handleImportButtonTap() })
+                        .overlay(alignment: .top) {
+                            if showImportTooltip {
+                                PhotoImportTooltip(onDismiss: {
+                                    withAnimation { showImportTooltip = false }
+                                    UserDefaults.standard.set(true, forKey: "hasSeenPhotoImportTooltip")
+                                })
+                                .offset(y: -52)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+                        }
 
                     // Favorites/Videos (tabbed) & Lists — hidden for curated profiles
                     if !profile.isCuratedProfile {

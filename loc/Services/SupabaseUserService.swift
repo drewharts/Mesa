@@ -500,6 +500,44 @@ class SupabaseUserService: ObservableObject {
         return !response.isEmpty
     }
     
+    /// Matches device contacts against Mesa users and auto-follows any matches.
+    func autoFollowContactMatches(userId: String) async {
+        let contactsService = ContactsService()
+        let granted = await contactsService.requestAccess()
+        guard granted else { return }
+
+        let numbers = await contactsService.fetchNormalizedPhoneNumbers()
+        guard !numbers.isEmpty else { return }
+
+        do {
+            let matches = try await contactsService.matchContacts(phoneNumbers: numbers, requestingUserId: userId)
+            for match in matches where match.id != userId {
+                try? await followUser(followerId: userId, followingId: match.id)
+            }
+            if !matches.isEmpty {
+                print("✅ Auto-followed \(matches.count) contact matches")
+            }
+        } catch {
+            print("⚠️ Failed to match contacts: \(error)")
+        }
+    }
+
+    /// Auto-follows all curated accounts for a user. Safe to call multiple times (uses upsert).
+    func autoFollowCuratedAccounts(userId: String) async {
+        let curatedAccountIds = [
+            "36997cbb-bd25-4275-849d-8e9ea06fca94",  // Michelin Guide
+            "658abee3-ae63-4e57-8085-65a7faed9988",  // Design Hotels
+            "60dccc59-1c4d-4454-99f8-2a73f420a13b"   // Anthony Bourdain
+        ]
+        for accountId in curatedAccountIds {
+            do {
+                try await followUser(followerId: userId, followingId: accountId)
+            } catch {
+                print("⚠️ Failed to auto-follow curated account \(accountId): \(error)")
+            }
+        }
+    }
+
     /// Follow a user
     func followUser(followerId: String, followingId: String) async throws {
         struct FollowRecord: Codable {
@@ -1259,7 +1297,7 @@ extension SupabaseUserService {
     func updateExternalPlaceAssociation(externalPlaceId: String, newPlaceId: String, userId: String) async throws {
         try await supabase.client
             .from("external_places")
-            .update(["place_id": newPlaceId])
+            .update(["place_id": newPlaceId, "added_at": ISO8601DateFormatter().string(from: Date())])
             .eq("id", value: externalPlaceId)
             .eq("user_id", value: userId)
             .execute()

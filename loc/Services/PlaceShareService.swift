@@ -16,28 +16,30 @@ class PlaceShareService: ObservableObject {
     
     // MARK: - Share Place Methods
     
+    /// Shares a place with text and universal link.
     @MainActor
     func sharePlace(_ detailPlace: DetailPlace) {
         let shareablePlace = ShareablePlace(from: detailPlace)
         sharePlace(shareablePlace)
     }
-    
+
+    /// Shares a place (variant accepting unused imageURL for backward compatibility).
     @MainActor
     func sharePlace(_ detailPlace: DetailPlace, withImage imageURL: String?) {
-        let shareablePlace = ShareablePlace(from: detailPlace)
-        sharePlace(shareablePlace)
+        sharePlace(detailPlace)
     }
-    
+
+    /// Shares a nearby place with text and universal link.
     @MainActor
     func sharePlace(_ nearbyPlace: NearbyPlaceFeature) {
         let shareablePlace = ShareablePlace(from: nearbyPlace)
         sharePlace(shareablePlace)
     }
-    
+
+    /// Shares a nearby place (variant accepting unused imageURL for backward compatibility).
     @MainActor
     func sharePlace(_ nearbyPlace: NearbyPlaceFeature, withImage imageURL: String?) {
-        let shareablePlace = ShareablePlace(from: nearbyPlace)
-        sharePlace(shareablePlace)
+        sharePlace(nearbyPlace)
     }
     
     @MainActor
