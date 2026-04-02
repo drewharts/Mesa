@@ -16,6 +16,8 @@ struct ExploreVideoItem: Identifiable, Codable {
     let placeType: String?
     let city: String?
     let addedAt: String?
+    let thumbnailUrl: String?
+    let placePhotoUrl: String?
 
     var id: String { externalPlaceId }
 
@@ -33,5 +35,7 @@ struct ExploreVideoItem: Identifiable, Codable {
         case placeType = "place_type"
         case city
         case addedAt = "added_at"
+        case thumbnailUrl = "thumbnail_url"
+        case placePhotoUrl = "place_photo_url"
     }
 }

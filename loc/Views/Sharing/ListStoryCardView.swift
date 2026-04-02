@@ -182,6 +182,7 @@ struct ListStoryCardView: View {
             placeCount: 12,
             ownerName: "",
             ownerPhotoURL: nil,
+            city: "San Francisco",
             backgroundImageURL: nil,
             listUniversalLink: URL(string: "https://mesa.app/list/123")
         ),

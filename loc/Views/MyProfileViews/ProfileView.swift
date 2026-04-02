@@ -266,8 +266,8 @@ struct ToolbarModifier: ViewModifier {
             Button {
                 photoImportVM.handleImportButtonTap()
             } label: {
-                Image(systemName: "camera.fill")
-                    .foregroundColor(.black)
+                Image(systemName: "photo.on.rectangle.angled")
+                    .foregroundColor(.mesaAccent)
                     .font(.body)
             }
 
@@ -385,7 +385,6 @@ struct SheetsModifier: ViewModifier {
     private func handlePostSubmission(place: DetailPlace) {
         postWasSubmitted = true
 
-        // Use resolvedPlace which has the correct backend UUID
         guard let resolvedPlace = photoImportVM.resolvedPlace else {
             print("❌ No resolved place for navigation")
             return
@@ -394,18 +393,21 @@ struct SheetsModifier: ViewModifier {
         Task {
             await photoImportVM.saveSelectedPlaceAfterReview()
 
-            // End the photo import flow before navigating
             await MainActor.run {
                 photoImportVM.isInPhotoImportFlow = false
                 showCreatePost = false
+
+                // Dismiss ProfileView first so place detail opens from MainView level
+                presentationMode.wrappedValue.dismiss()
             }
 
-            // Allow time for the sheet to dismiss before navigating
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            // Allow time for ProfileView to dismiss before presenting place detail
+            try? await Task.sleep(nanoseconds: 500_000_000)
 
             await MainActor.run {
                 selectedPlaceVM.allowAutoPresent = true
-                photoImportVM.navigateToPlaceDetail(place: resolvedPlace)
+                selectedPlaceVM.selectPlaceAndFetchDetails(resolvedPlace, shouldAnimateMap: true)
+                selectedPlaceVM.isDetailSheetPresented = true
             }
         }
     }

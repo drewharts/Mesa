@@ -311,6 +311,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
         // Setting currentPlace triggers the reactive subscription automatically
         handlePlaceChanged(place)
 
+        // Immediately clear stale savers from previous place (before child VM fetches new data)
+        showSaversIndicator = false
+        saverCount = 0
+
         // Update all child ViewModels with new place
         travelTimeViewModel.setPlace(place)
         openStatusViewModel.setPlace(place)

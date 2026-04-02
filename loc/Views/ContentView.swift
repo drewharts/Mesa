@@ -104,6 +104,8 @@ struct ContentView: View {
                 if let userId = userSession.currentUserId {
                     Task {
                         await dataManager.loadProfileData(userId: userId)
+                        await SupabaseUserService.shared.autoFollowCuratedAccounts(userId: userId)
+                        await SupabaseUserService.shared.autoFollowContactMatches(userId: userId)
                     }
                 }
                 if SuggestedProfilesViewModel.shouldShowPopup {

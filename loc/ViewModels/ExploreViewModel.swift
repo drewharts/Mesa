@@ -2,7 +2,7 @@
 //  ExploreViewModel.swift
 //  loc
 //
-//  Manages pagination and loading state for the global Explore video feed.
+//  Manages pagination, city filtering, and loading state for the global Explore video feed.
 //
 
 import Foundation
@@ -12,7 +12,11 @@ import Combine
 class ExploreViewModel: ObservableObject {
     @Published var videos: [ExploreVideoItem] = []
     @Published var isLoading: Bool = false
+    @Published var hasLoaded: Bool = false
     @Published var isLoadingMore: Bool = false
+    @Published var selectedCity: String?
+    @Published var availableCities: [String] = []
+    @Published var trendingPlaces: [TrendingPlace] = []
 
     private let postService = SupabasePostService.shared
     private var currentOffset: Int = 0
@@ -20,7 +24,7 @@ class ExploreViewModel: ObservableObject {
     private(set) var hasMorePages: Bool = true
     private var cancellables = Set<AnyCancellable>()
 
-    /// Sets up subscription to refresh after place corrections.
+    /// Initializes and subscribes to place correction notifications for auto-refresh.
     init() {
         NotificationCenter.default.publisher(for: .externalPlaceCorrected)
             .receive(on: RunLoop.main)
@@ -38,7 +42,7 @@ class ExploreViewModel: ObservableObject {
         hasMorePages = true
 
         do {
-            let items = try await postService.fetchExploreVideos(limit: pageSize, offset: 0)
+            let items = try await postService.fetchExploreVideos(limit: pageSize, offset: 0, city: selectedCity)
             videos = items
             currentOffset = items.count
             hasMorePages = items.count == pageSize
@@ -46,6 +50,7 @@ class ExploreViewModel: ObservableObject {
             print("❌ [ExploreViewModel] Failed to load explore videos: \(error)")
         }
 
+        hasLoaded = true
         isLoading = false
     }
 
@@ -55,7 +60,7 @@ class ExploreViewModel: ObservableObject {
         isLoadingMore = true
 
         do {
-            let items = try await postService.fetchExploreVideos(limit: pageSize, offset: currentOffset)
+            let items = try await postService.fetchExploreVideos(limit: pageSize, offset: currentOffset, city: selectedCity)
             videos.append(contentsOf: items)
             currentOffset += items.count
             hasMorePages = items.count == pageSize
@@ -64,5 +69,29 @@ class ExploreViewModel: ObservableObject {
         }
 
         isLoadingMore = false
+    }
+
+    /// Selects a city filter and reloads the feed.
+    func selectCity(_ city: String?) {
+        selectedCity = city
+        Task { await loadInitial() }
+    }
+
+    /// Fetches trending places for the horizontal scroll section.
+    func loadTrending() async {
+        do {
+            trendingPlaces = try await postService.fetchTrendingPlaces(limit: 10)
+        } catch {
+            print("❌ [ExploreViewModel] Failed to load trending: \(error)")
+        }
+    }
+
+    /// Fetches the list of cities that have explore content.
+    func loadCities() async {
+        do {
+            availableCities = try await postService.fetchExploreCities()
+        } catch {
+            print("❌ [ExploreViewModel] Failed to load cities: \(error)")
+        }
     }
 }

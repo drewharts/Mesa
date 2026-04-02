@@ -2,7 +2,7 @@
 //  ListStoryCardViewModel.swift
 //  loc
 //
-//  Created by Claude on 1/30/25.
+//  ViewModel for generating shareable list story cards with photo collage and map.
 //
 
 import SwiftUI
@@ -12,8 +12,8 @@ import CoreLocation
 
 /// Sharing destination options for story cards.
 enum StoryShareDestination {
-    case instagram  // Direct to Instagram Stories with link sticker
-    case general    // System share sheet with QR code
+    case instagram
+    case general
 }
 
 /// ViewModel for generating shareable Instagram Story-style list cards.
@@ -25,7 +25,7 @@ class ListStoryCardViewModel: ObservableObject {
     @Published var showShareOptions: Bool = false
     @Published var showLinkCopiedInstruction: Bool = false
 
-    // Photo selection
+    // Photo selection (for advanced flow)
     @Published var availablePhotos: [PhotoOption] = []
     @Published var selectedPhotoIndex: Int = 0
     @Published var showPhotoSelector: Bool = false
@@ -37,10 +37,8 @@ class ListStoryCardViewModel: ObservableObject {
     private let mapSnapshotService = MapSnapshotService()
     private let placeService = SupabasePlaceService.shared
 
-    // Universal link host for QR code generation
     private let universalLinkHost = MesaBackendConfig.universalLinkHost
 
-    // Instagram Story dimensions (9:16 aspect ratio)
     private let storyWidth: CGFloat = 1080
     private let storyHeight: CGFloat = 1920
 
@@ -49,35 +47,129 @@ class ListStoryCardViewModel: ObservableObject {
         instagramService.isInstagramInstalled
     }
 
+    // MARK: - Quick Share (auto-picks best photos, no selector)
+
+    /// Generates a share card automatically and presents the system share sheet.
+    func quickShare(
+        list: LightweightPlaceList,
+        places: [LightweightPlace],
+        userId: String,
+        shareService: PlaceShareService
+    ) async {
+        isGenerating = true
+        error = nil
+
+        do {
+            let cardImage = try await generateCard(
+                list: list,
+                places: places,
+                userId: userId,
+                includeQRCode: true
+            )
+
+            generatedImage = cardImage
+            let shareText = "Check out my list \"\(list.name)\" on Mesa!"
+            shareService.shareImage(cardImage, with: shareText)
+            uploadListCover(listId: list.list_id, image: cardImage)
+        } catch {
+            self.error = error.localizedDescription
+        }
+
+        isGenerating = false
+    }
+
+    // MARK: - Instagram Share
+
+    /// Generates and shares a story card to Instagram Stories with link.
+    func shareToInstagram(
+        list: LightweightPlaceList,
+        places: [LightweightPlace],
+        userId: String
+    ) async {
+        isGenerating = true
+        error = nil
+
+        do {
+            let cardImage = try await generateCard(
+                list: list,
+                places: places,
+                userId: userId,
+                includeQRCode: false,
+                overridePhotoURL: selectedPhotoURL
+            )
+
+            let universalLink = generateUniversalLink(for: list, userId: userId)
+            if let link = universalLink {
+                UIPasteboard.general.string = link.absoluteString
+            }
+
+            let success = instagramService.shareToInstagramStories(
+                backgroundImage: cardImage,
+                contentURL: universalLink
+            )
+
+            if !success {
+                throw StoryCardError.instagramNotAvailable
+            }
+
+            showLinkCopiedInstruction = true
+            uploadListCover(listId: list.list_id, image: cardImage)
+        } catch {
+            self.error = error.localizedDescription
+        }
+
+        isGenerating = false
+    }
+
+    // MARK: - General Share (with photo selector)
+
+    /// Generates and shares a story card via system share sheet with QR code.
+    func shareGeneral(
+        list: LightweightPlaceList,
+        places: [LightweightPlace],
+        userId: String,
+        shareService: PlaceShareService
+    ) async {
+        isGenerating = true
+        error = nil
+
+        do {
+            let cardImage = try await generateCard(
+                list: list,
+                places: places,
+                userId: userId,
+                includeQRCode: true,
+                overridePhotoURL: selectedPhotoURL
+            )
+
+            generatedImage = cardImage
+            let shareText = "Check out my list \"\(list.name)\" on Mesa!"
+            shareService.shareImage(cardImage, with: shareText)
+            uploadListCover(listId: list.list_id, image: cardImage)
+        } catch {
+            self.error = error.localizedDescription
+        }
+
+        isGenerating = false
+    }
+
+    // MARK: - Photo Selection
+
     /// Prepares photo options for the user to choose from.
     func preparePhotoOptions(places: [LightweightPlace]) async {
         var photos: [PhotoOption] = []
 
         for place in places {
-            // Check external video thumbnails
             if let contentUrl = place.content_url {
                 if let thumbnailUrl = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) {
-                    photos.append(PhotoOption(
-                        url: thumbnailUrl,
-                        placeName: place.name,
-                        source: .externalVideo
-                    ))
+                    photos.append(PhotoOption(url: thumbnailUrl, placeName: place.name, source: .externalVideo))
                 } else if let thumbnailUrl = await externalMetadataCache.getThumbnailUrl(for: contentUrl) {
-                    photos.append(PhotoOption(
-                        url: thumbnailUrl,
-                        placeName: place.name,
-                        source: .externalVideo
-                    ))
+                    photos.append(PhotoOption(url: thumbnailUrl, placeName: place.name, source: .externalVideo))
                 }
             }
 
-            // Check review photos
             if let reviewPhoto = place.latest_review_photo {
-                photos.append(PhotoOption(
-                    url: reviewPhoto,
-                    placeName: place.name,
-                    source: .review
-                ))
+                photos.append(PhotoOption(url: reviewPhoto, placeName: place.name, source: .review))
             }
         }
 
@@ -91,161 +183,106 @@ class ListStoryCardViewModel: ObservableObject {
         return URL(string: availablePhotos[selectedPhotoIndex].url)
     }
 
-    /// Generates and shares a story card to Instagram Stories with link.
-    func shareToInstagram(
-        list: LightweightPlaceList,
-        places: [LightweightPlace],
-        userId: String
-    ) async {
-        isGenerating = true
-        error = nil
+    // MARK: - Card Generation (Core)
 
-        do {
-            // 1. Get selected background photo URL
-            let backgroundURL: URL?
-            if let selected = selectedPhotoURL {
-                backgroundURL = selected
-            } else {
-                backgroundURL = await findBackgroundPhotoURL(from: places)
-            }
-
-            // 2. Generate universal link for the list
-            let universalLink = generateUniversalLink(for: list, userId: userId)
-
-            // 3. Fetch place coordinates and generate map snapshot
-            let placeIds = places.map { $0.place_id }
-            let coordinates = try await placeService.fetchPlaceCoordinates(placeIds: placeIds)
-            let coordArray = Array(coordinates.values)
-
-            let mapSize = CGSize(width: storyWidth, height: storyHeight / 2)
-            let mapImage = await mapSnapshotService.generateSnapshot(
-                coordinates: coordArray,
-                size: mapSize
-            )
-
-            // 4. Load background image
-            let backgroundImage = await loadBackgroundImage(url: backgroundURL)
-
-            // 5. Generate the story card image
-            let cardData = ListStoryCardData(
-                listName: list.name,
-                placeCount: list.place_count,
-                ownerName: "",
-                ownerPhotoURL: nil,
-                backgroundImageURL: backgroundURL,
-                listUniversalLink: universalLink
-            )
-
-            guard let storyImage = renderStoryCard(
-                data: cardData,
-                backgroundImage: backgroundImage,
-                mapImage: mapImage,
-                qrCodeImage: nil
-            ) else {
-                throw StoryCardError.renderFailed
-            }
-
-            // 6. Copy link to clipboard so user can paste it as a link sticker
-            if let link = universalLink {
-                UIPasteboard.general.string = link.absoluteString
-            }
-
-            // 7. Share to Instagram Stories
-            let success = instagramService.shareToInstagramStories(
-                backgroundImage: storyImage,
-                contentURL: universalLink
-            )
-
-            if !success {
-                throw StoryCardError.instagramNotAvailable
-            }
-
-            // 8. Show instruction to add link sticker
-            showLinkCopiedInstruction = true
-
-            // 9. Fire-and-forget: upload story card as list cover for rich link previews
-            uploadListCover(listId: list.list_id, image: storyImage)
-
-        } catch {
-            self.error = error.localizedDescription
-        }
-
-        isGenerating = false
-    }
-
-    /// Generates and shares a story card via system share sheet (with QR code).
-    func shareGeneral(
+    /// Generates the complete card image with photo collage, map, and branding.
+    private func generateCard(
         list: LightweightPlaceList,
         places: [LightweightPlace],
         userId: String,
-        shareService: PlaceShareService
-    ) async {
-        isGenerating = true
-        error = nil
+        includeQRCode: Bool,
+        overridePhotoURL: URL? = nil
+    ) async throws -> UIImage {
+        let universalLink = generateUniversalLink(for: list, userId: userId)
+        let qrCodeImage = includeQRCode ? generateQRCode(from: universalLink) : nil
 
-        do {
-            // 1. Get selected background photo URL
-            let backgroundURL: URL?
-            if let selected = selectedPhotoURL {
-                backgroundURL = selected
-            } else {
-                backgroundURL = await findBackgroundPhotoURL(from: places)
-            }
+        let mapImage = await generateMapSnapshot(placeIds: places.map { $0.place_id })
+        let placePhotos = await loadPlacePhotos(from: places, overrideURL: overridePhotoURL)
+        let ownerPhoto = await loadOwnerPhoto(url: list.owner_photo_url)
 
-            // 2. Generate universal link for the list
-            let universalLink = generateUniversalLink(for: list, userId: userId)
+        let cardData = buildCardData(list: list, userId: userId, universalLink: universalLink)
 
-            // 3. Generate QR code image
-            let qrCodeImage = generateQRCode(from: universalLink)
-
-            // 4. Fetch place coordinates and generate map snapshot
-            let placeIds = places.map { $0.place_id }
-            let coordinates = try await placeService.fetchPlaceCoordinates(placeIds: placeIds)
-            let coordArray = Array(coordinates.values)
-
-            let mapSize = CGSize(width: storyWidth, height: storyHeight / 2)
-            let mapImage = await mapSnapshotService.generateSnapshot(
-                coordinates: coordArray,
-                size: mapSize
-            )
-
-            // 5. Load background image
-            let backgroundImage = await loadBackgroundImage(url: backgroundURL)
-
-            // 6. Generate the story card image with QR code
-            let cardData = ListStoryCardData(
-                listName: list.name,
-                placeCount: list.place_count,
-                ownerName: "",
-                ownerPhotoURL: nil,
-                backgroundImageURL: backgroundURL,
-                listUniversalLink: universalLink
-            )
-
-            guard let storyImage = renderStoryCard(
-                data: cardData,
-                backgroundImage: backgroundImage,
-                mapImage: mapImage,
-                qrCodeImage: qrCodeImage
-            ) else {
-                throw StoryCardError.renderFailed
-            }
-
-            generatedImage = storyImage
-
-            // 7. Share the image with the universal link
-            let shareText = "Check out my list \"\(list.name)\" on Mesa!"
-            shareService.shareImage(storyImage, with: shareText)
-
-            // 8. Fire-and-forget: upload story card as list cover for rich link previews
-            uploadListCover(listId: list.list_id, image: storyImage)
-
-        } catch {
-            self.error = error.localizedDescription
+        guard let image = renderCard(
+            data: cardData, placePhotos: placePhotos,
+            mapImage: mapImage, qrCodeImage: qrCodeImage, ownerPhoto: ownerPhoto
+        ) else {
+            throw StoryCardError.renderFailed
         }
 
-        isGenerating = false
+        return image
     }
+
+    /// Generates a map snapshot image from place coordinates.
+    private func generateMapSnapshot(placeIds: [String]) async -> UIImage? {
+        let coordinates = (try? await placeService.fetchPlaceCoordinates(placeIds: placeIds)) ?? [:]
+        let mapSize = CGSize(width: storyWidth - 56, height: 200 * 3)
+        return await mapSnapshotService.generateSnapshot(coordinates: Array(coordinates.values), size: mapSize)
+    }
+
+    /// Builds the card data model from a list and user info.
+    private func buildCardData(list: LightweightPlaceList, userId: String, universalLink: URL?) -> ListStoryCardData {
+        ListStoryCardData(
+            listName: list.name,
+            placeCount: list.place_count,
+            ownerName: list.owner_name ?? "Mesa User",
+            ownerPhotoURL: list.owner_photo_url != nil ? URL(string: list.owner_photo_url!) : nil,
+            city: list.city,
+            backgroundImageURL: nil,
+            listUniversalLink: universalLink
+        )
+    }
+
+    /// Loads up to 4 place photos for the collage.
+    private func loadPlacePhotos(from places: [LightweightPlace], overrideURL: URL?) async -> [UIImage] {
+        var photoURLs: [String] = []
+
+        if let override = overrideURL {
+            photoURLs.append(override.absoluteString)
+        }
+
+        for place in places {
+            if photoURLs.count >= 4 { break }
+            if let photo = place.latest_review_photo, !photoURLs.contains(photo) {
+                photoURLs.append(photo)
+            } else if let thumb = place.thumbnail_url, !photoURLs.contains(thumb) {
+                photoURLs.append(thumb)
+            }
+        }
+
+        let loaded = await imageCacheService.loadImages(from: Array(photoURLs.prefix(4)))
+        return photoURLs.prefix(4).compactMap { loaded[$0] }
+    }
+
+    /// Loads the list owner's profile photo.
+    private func loadOwnerPhoto(url: String?) async -> UIImage? {
+        guard let urlStr = url, let url = URL(string: urlStr) else { return nil }
+        let loaded = await imageCacheService.loadImages(from: [url.absoluteString])
+        return loaded[url.absoluteString]
+    }
+
+    /// Renders the card view to a UIImage using ImageRenderer.
+    private func renderCard(
+        data: ListStoryCardData,
+        placePhotos: [UIImage],
+        mapImage: UIImage?,
+        qrCodeImage: UIImage?,
+        ownerPhoto: UIImage?
+    ) -> UIImage? {
+        let cardView = ListShareCardView(
+            data: data,
+            placePhotos: placePhotos,
+            mapImage: mapImage,
+            qrCodeImage: qrCodeImage,
+            ownerPhoto: ownerPhoto
+        )
+        .frame(width: storyWidth, height: storyHeight)
+
+        let renderer = ImageRenderer(content: cardView)
+        renderer.scale = 3.0
+        return renderer.uiImage
+    }
+
+    // MARK: - Helpers
 
     /// Generates a universal link URL for the list.
     private func generateUniversalLink(for list: LightweightPlaceList, userId: String) -> URL? {
@@ -253,80 +290,31 @@ class ListStoryCardViewModel: ObservableObject {
         components.scheme = "https"
         components.host = universalLinkHost
         components.path = "/list/\(list.list_id)"
-
-        var queryItems: [URLQueryItem] = []
-        queryItems.append(URLQueryItem(name: "name", value: list.name))
-        queryItems.append(URLQueryItem(name: "city", value: list.city ?? ""))
-        queryItems.append(URLQueryItem(name: "userId", value: userId))
-
-        components.queryItems = queryItems
+        components.queryItems = [
+            URLQueryItem(name: "name", value: list.name),
+            URLQueryItem(name: "city", value: list.city ?? ""),
+            URLQueryItem(name: "userId", value: userId)
+        ]
         return components.url
     }
 
     /// Generates a QR code image from a URL.
     private func generateQRCode(from url: URL?) -> UIImage? {
         guard let url = url else { return nil }
-
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
-
         filter.message = Data(url.absoluteString.utf8)
         filter.correctionLevel = "M"
 
         guard let outputImage = filter.outputImage else { return nil }
-
-        // Scale up the QR code for better resolution
-        let scale = 10.0
-        let transform = CGAffineTransform(scaleX: scale, y: scale)
+        let transform = CGAffineTransform(scaleX: 10, y: 10)
         let scaledImage = outputImage.transformed(by: transform)
 
-        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else {
-            return nil
-        }
-
+        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
         return UIImage(cgImage: cgImage)
     }
 
-    /// Finds the best background photo URL from the list's places.
-    private func findBackgroundPhotoURL(from places: [LightweightPlace]) async -> URL? {
-        // Priority 1: External video thumbnail (cached)
-        for place in places {
-            if let contentUrl = place.content_url {
-                // Try cached thumbnail first (synchronous)
-                if let thumbnailUrl = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl),
-                   let url = URL(string: thumbnailUrl) {
-                    return url
-                }
-
-                // Fetch if not cached
-                if let thumbnailUrl = await externalMetadataCache.getThumbnailUrl(for: contentUrl),
-                   let url = URL(string: thumbnailUrl) {
-                    return url
-                }
-            }
-        }
-
-        // Priority 2: Review photo
-        for place in places {
-            if let reviewPhoto = place.latest_review_photo,
-               let url = URL(string: reviewPhoto) {
-                return url
-            }
-        }
-
-        // No photo found - will use fallback gradient
-        return nil
-    }
-
-    /// Loads the background image from URL.
-    private func loadBackgroundImage(url: URL?) async -> UIImage? {
-        guard let url = url else { return nil }
-
-        let loadedImages = await imageCacheService.loadImages(from: [url.absoluteString])
-        return loadedImages[url.absoluteString]
-    }
-
-    /// Uploads the story card image as a list cover for rich link previews (fire-and-forget).
+    /// Uploads the card image as a list cover for rich link previews.
     private func uploadListCover(listId: String, image: UIImage) {
         Task {
             do {
@@ -335,33 +323,6 @@ class ListStoryCardViewModel: ObservableObject {
                 print("⚠️ [ListStoryCardViewModel] Failed to upload list cover: \(error.localizedDescription)")
             }
         }
-    }
-
-    /// Renders the story card view to a UIImage using ImageRenderer.
-    private func renderStoryCard(
-        data: ListStoryCardData,
-        backgroundImage: UIImage?,
-        mapImage: UIImage?,
-        qrCodeImage: UIImage?
-    ) -> UIImage? {
-        // Pre-load asset catalog images as UIImage for ImageRenderer compatibility
-        let discoverOnMesaImage = UIImage(named: "DiscoverOnMesa")
-        let mesaAppIconImage = UIImage(named: "MesaAppIcon")
-
-        let cardView = ListStoryCardView(
-            data: data,
-            backgroundImage: backgroundImage,
-            mapImage: mapImage,
-            qrCodeImage: qrCodeImage,
-            discoverOnMesaImage: discoverOnMesaImage,
-            mesaAppIconImage: mesaAppIconImage
-        )
-        .frame(width: storyWidth, height: storyHeight)
-
-        let renderer = ImageRenderer(content: cardView)
-        renderer.scale = 3.0 // @3x for crisp output
-
-        return renderer.uiImage
     }
 }
 
@@ -386,10 +347,8 @@ enum StoryCardError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .renderFailed:
-            return "Failed to render story card image"
-        case .instagramNotAvailable:
-            return "Instagram is not installed"
+        case .renderFailed: return "Failed to render story card image"
+        case .instagramNotAvailable: return "Instagram is not installed"
         }
     }
 }

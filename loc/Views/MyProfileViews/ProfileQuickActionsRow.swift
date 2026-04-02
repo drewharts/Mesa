@@ -2,38 +2,45 @@
 //  ProfileQuickActionsRow.swift
 //  loc
 //
-//  Created by Claude on 3/25/26.
+//  Prominent call-to-action for importing photos to discover places.
 //
 
 import SwiftUI
 
-/// Compact quick-action row displayed below the profile header divider.
+/// Action card displayed below the profile header to encourage photo import.
 struct ProfileQuickActionsRow: View {
     let onImportTap: () -> Void
 
-    private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
-
     var body: some View {
-        HStack {
-            Button(action: onImportTap) {
-                HStack(spacing: 5) {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 11))
-                    Text("Review Places from Photos")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .foregroundColor(mesaCharcoal.opacity(0.7))
-                .overlay(
-                    Capsule()
-                        .stroke(mesaCharcoal.opacity(0.3), lineWidth: 1)
-                )
-            }
+        Button(action: onImportTap) {
+            HStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 22))
+                    .foregroundColor(.mesaAccent)
 
-            Spacer()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Import Photos to Discover Places")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+
+                    Text("We'll find the places you visited")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.mesaAccent.opacity(0.08))
+            .cornerRadius(12)
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 20)
     }
 }

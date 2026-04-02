@@ -49,13 +49,19 @@ struct ExploreFeedTile: View {
 
     // MARK: - Thumbnail Resolution
 
-    /// Resolved thumbnail URL from the external metadata cache.
+    /// Resolved thumbnail URL — prefers stored permanent URL, falls back to oEmbed cache, then place photo.
     private var thumbnailURL: URL? {
-        guard let thumb = metadataCache.getCachedThumbnailUrl(for: video.url),
-              let url = URL(string: thumb) else {
-            return nil
+        if let stored = video.thumbnailUrl, !stored.isEmpty, let url = URL(string: stored) {
+            return url
         }
-        return url
+        if let cached = metadataCache.getCachedThumbnailUrl(for: video.url),
+           let url = URL(string: cached) {
+            return url
+        }
+        if let placePhoto = video.placePhotoUrl, !placePhoto.isEmpty, let url = URL(string: placePhoto) {
+            return url
+        }
+        return nil
     }
 
     /// Triggers on-demand oEmbed fetch for this video's thumbnail.

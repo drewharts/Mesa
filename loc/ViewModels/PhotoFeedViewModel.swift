@@ -15,6 +15,7 @@ class PhotoFeedViewModel: ObservableObject {
 
     @Published var feedItems: [FeedItem] = []
     @Published var isLoading = false
+    @Published var hasLoaded = false
     @Published var isLoadingMore = false
     @Published var hasMorePages = true
     @Published var currentUserProfile: ProfileData?
@@ -75,6 +76,7 @@ class PhotoFeedViewModel: ObservableObject {
         }
 
         await profileFetch
+        hasLoaded = true
         isLoading = false
         Task { await loadCrownStates() }
     }
