@@ -82,7 +82,8 @@ struct ProfileView: View {
                 placeVM: placeVM,
                 externalContentVM: profile.externalContentViewModel,
                 showCreatePost: $showCreatePost,
-                postWasSubmitted: $postWasSubmitted
+                postWasSubmitted: $postWasSubmitted,
+                presentationMode: presentationMode
             ))
             .modifier(StateChangesModifier(
                 photoImportVM: photoImportVM,
@@ -286,6 +287,7 @@ struct SheetsModifier: ViewModifier {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var dataManager: DataManager
     @Binding var postWasSubmitted: Bool
+    @Binding var presentationMode: PresentationMode
 
     func body(content: Content) -> some View {
         content
