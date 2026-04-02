@@ -400,7 +400,7 @@ struct SheetsModifier: ViewModifier {
                 showCreatePost = false
 
                 // Dismiss ProfileView first so place detail opens from MainView level
-                presentationMode.wrappedValue.dismiss()
+                presentationMode.dismiss()
             }
 
             // Allow time for ProfileView to dismiss before presenting place detail
