@@ -257,7 +257,7 @@ struct ExternalUserListPopupView: View {
             }
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { placeId in
-                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
             }
         }
         .onAppear {

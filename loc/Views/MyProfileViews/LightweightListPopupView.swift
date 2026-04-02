@@ -104,7 +104,7 @@ struct LightweightListPopupView: View {
                 // Navigate to place detail when place ID is pushed onto path
                 // .id(placeId) forces full view re-creation when the path is replaced
                 // with a different placeId, ensuring @StateObject re-initializes
-                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
                     .id(placeId)
             }
         }

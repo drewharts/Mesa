@@ -56,7 +56,7 @@ struct TripDayDetailView: View {
             }
         }
         .navigationDestination(item: $selectedPlaceId) { placeId in
-            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
         }
         .sheet(isPresented: $showAddPlaceSheet, onDismiss: {
             Task { await viewModel.loadTrip() }

@@ -42,7 +42,7 @@ struct TripDetailView: View {
             TripDayDetailView(viewModel: viewModel, dayIndex: dayIndex)
         }
         .navigationDestination(item: $viewModel.selectedPlaceIdForDetail) { placeId in
-            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
         }
         .onChange(of: mapDisplayCoordinatorVM.tappedTripPlaceId) { _, placeId in
             viewModel.handleMapPlaceTap(placeId)

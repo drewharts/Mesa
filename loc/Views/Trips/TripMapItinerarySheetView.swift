@@ -21,7 +21,7 @@ struct TripMapItinerarySheetView: View {
             .navigationTitle(viewModel.trip.name)
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $viewModel.selectedPlaceIdForDetail) { placeId in
-                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
             }
         }
     }
