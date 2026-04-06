@@ -8,6 +8,7 @@
 
 import SwiftUI
 import MapKit
+import CoreLocation
 
 struct MainView: View {
     // MARK: - Global Dependencies (Only 3!)
@@ -190,6 +191,9 @@ struct MainView: View {
         }
         .onAppear {
             locationManager.requestLocationPermission()
+        }
+        .onChange(of: locationManager.currentLocation) { _, newLocation in
+            presentDiscoverySheetIfNeeded(location: newLocation)
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
             if newValue,
@@ -549,6 +553,33 @@ struct MainView: View {
         profileViewModel.pendingMapFilter = nil
         profileViewModel.externalContentViewModel.disableNearbyFilter()
         // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
+    }
+
+    // MARK: - First-Open Discovery
+
+    /// Presents the city discovery sheet on the user's first visit to the map.
+    private func presentDiscoverySheetIfNeeded(location: CLLocation?) {
+        guard !UserDefaults.standard.bool(forKey: "hasSeenDiscoverySheet"),
+              let location = location,
+              presentationService.activeSheet == nil else { return }
+
+        UserDefaults.standard.set(true, forKey: "hasSeenDiscoverySheet")
+
+        let geocoder = CLGeocoder()
+        geocoder.reverseGeocodeLocation(location) { placemarks, _ in
+            let cityName = placemarks?.first?.locality ?? "Your Area"
+            let coordinate = location.coordinate
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                if presentationService.activeSheet == nil {
+                    presentationService.present(.cityOverview(
+                        cityName: cityName,
+                        coordinate: coordinate,
+                        annotation: nil
+                    ))
+                }
+            }
+        }
     }
 
     // MARK: - UI Overlay Layer
