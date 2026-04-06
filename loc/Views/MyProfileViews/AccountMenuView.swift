@@ -7,16 +7,17 @@
 
 import SwiftUI
 
-/// A toolbar menu component for account actions (edit profile, logout, delete account)
-/// Single Responsibility: Manages account action UI presentation
-/// MVVM: All state and logic managed by ProfileViewModel
+/// A toolbar menu component for account actions (edit profile, feedback, logout, delete account).
 struct AccountMenuView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var showEditProfile = false
+    @State private var showFeedback = false
 
     var body: some View {
         Menu {
             editProfileButton
+            feedbackButton
             logoutButton
             deleteAccountButton
         } label: {
@@ -29,10 +30,14 @@ struct AccountMenuView: View {
                 }
             }
         }
+        .sheet(isPresented: $showFeedback) {
+            FeedbackSheet(userId: userSession.currentUserId ?? "")
+        }
     }
 
     // MARK: - Menu Items
 
+    /// Opens the edit profile sheet.
     private var editProfileButton: some View {
         Button {
             showEditProfile = true
@@ -41,6 +46,16 @@ struct AccountMenuView: View {
         }
     }
 
+    /// Opens the feedback submission sheet.
+    private var feedbackButton: some View {
+        Button {
+            showFeedback = true
+        } label: {
+            Label("Send Feedback", systemImage: "envelope")
+        }
+    }
+
+    /// Logs the user out.
     private var logoutButton: some View {
         Button(role: .destructive) {
             profile.logout()
@@ -49,6 +64,7 @@ struct AccountMenuView: View {
         }
     }
 
+    /// Shows the delete account confirmation.
     private var deleteAccountButton: some View {
         Button(role: .destructive) {
             profile.accountViewModel.showDeleteWarning()
@@ -57,6 +73,7 @@ struct AccountMenuView: View {
         }
     }
 
+    /// Gear icon for the menu trigger.
     private var menuIcon: some View {
         Image(systemName: "gearshape")
             .foregroundColor(.black)

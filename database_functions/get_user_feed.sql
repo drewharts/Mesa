@@ -32,9 +32,11 @@ BEGIN
     FROM reviews r
     JOIN places p ON r.place_id = p.id
     WHERE (r.user_id IN (
-        SELECT following_id
-        FROM following
-        WHERE follower_id = p_user_id
+        SELECT f.following_id
+        FROM following f
+        JOIN users u ON f.following_id = u.id
+        WHERE f.follower_id = p_user_id
+        AND (u.account_type IS NULL OR u.account_type != 'curated')
     )
     OR r.user_id = p_user_id)
     AND r.images IS NOT NULL AND array_length(r.images, 1) > 0

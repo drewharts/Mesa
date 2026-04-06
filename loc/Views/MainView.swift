@@ -190,12 +190,6 @@ struct MainView: View {
         }
         .onAppear {
             locationManager.requestLocationPermission()
-            // Auto-open feed sheet so users see content immediately on launch
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                if PresentationService.shared.activeSheet == nil {
-                    PresentationService.shared.present(.feed)
-                }
-            }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
             if newValue,
