@@ -158,10 +158,11 @@ class CityDetailViewModel: ObservableObject {
         navigationPath.append(CityDetailDestination.placeDetail(placeId: placeId))
     }
 
-    /// Routes a user tap by pushing user profile within the sheet's NavigationStack.
-    func handleUserTap(userId: String, currentUserId: String?) {
-        guard userId != currentUserId else { return }
-        navigationPath.append(CityDetailDestination.userProfile(userId: userId))
+    /// Dismisses the city sheet and navigates to a user profile in the main hierarchy.
+    func handleUserTap(userId: String, currentUserId: String?, userProfileNavigationViewModel: UserProfileNavigationViewModel) {
+        guard let currentUserId, userId != currentUserId else { return }
+        PresentationService.shared.dismiss()
+        userProfileNavigationViewModel.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
     }
 
     // MARK: - Pagination

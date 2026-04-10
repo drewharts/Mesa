@@ -63,6 +63,9 @@ struct CityDetailSheet: View {
                         placeColors: $viewModel.placeColors,
                         onListTap: { list in
                             viewModel.handleListTap(list)
+                        },
+                        onCreatorTap: { userId in
+                            viewModel.handleUserTap(userId: userId, currentUserId: userSession.currentUserId, userProfileNavigationViewModel: userProfileNavigationViewModel)
                         }
                     )
                 case .allPlaces:
@@ -97,10 +100,7 @@ struct CityDetailSheet: View {
                             viewModel.handlePlaceTap(placeId: placeId)
                         },
                         onCreatorTap: { userId in
-                            viewModel.handleUserTap(
-                                userId: userId,
-                                currentUserId: userSession.currentUserId
-                            )
+                            viewModel.handleUserTap(userId: userId, currentUserId: userSession.currentUserId, userProfileNavigationViewModel: userProfileNavigationViewModel)
                         }
                     )
                 case .placeDetail(let placeId):
@@ -206,6 +206,9 @@ struct CityDetailSheet: View {
                                 placeColors: $viewModel.placeColors,
                                 onTap: {
                                     viewModel.handleListTap(list)
+                                },
+                                onCreatorTap: { userId in
+                                    viewModel.handleUserTap(userId: userId, currentUserId: userSession.currentUserId, userProfileNavigationViewModel: userProfileNavigationViewModel)
                                 }
                             )
                             .frame(width: 160)
@@ -311,10 +314,7 @@ struct CityDetailSheet: View {
                                 isFollowing: user.isFollowing,
                                 isCurrentUser: user.id == userSession.currentUserId,
                                 onTap: {
-                                    viewModel.handleUserTap(
-                                        userId: user.id,
-                                        currentUserId: userSession.currentUserId
-                                    )
+                                    viewModel.handleUserTap(userId: user.id, currentUserId: userSession.currentUserId, userProfileNavigationViewModel: userProfileNavigationViewModel)
                                 },
                                 onFollow: {
                                     viewModel.toggleFollow(userId: user.id)

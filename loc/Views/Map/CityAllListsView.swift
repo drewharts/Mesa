@@ -12,6 +12,7 @@ struct CityAllListsView: View {
     let lists: [CityDetailListRecord]
     @Binding var placeColors: [UUID: Color]
     let onListTap: (CityDetailListRecord) -> Void
+    var onCreatorTap: ((String) -> Void)? = nil
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -26,7 +27,8 @@ struct CityAllListsView: View {
                         list: list,
                         places: list.places,
                         placeColors: $placeColors,
-                        onTap: { onListTap(list) }
+                        onTap: { onListTap(list) },
+                        onCreatorTap: onCreatorTap
                     )
                     .frame(maxWidth: .infinity)
                 }

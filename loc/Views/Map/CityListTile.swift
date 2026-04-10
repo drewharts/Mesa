@@ -13,6 +13,7 @@ struct CityListTile: View {
     let places: [LightweightPlace]
     @Binding var placeColors: [UUID: Color]
     let onTap: () -> Void
+    var onCreatorTap: ((String) -> Void)? = nil
 
     var body: some View {
         Button {
@@ -52,19 +53,29 @@ struct CityListTile: View {
 
     // MARK: - Creator Avatar
 
-    /// Small circular profile photo of the list creator.
+    /// Small circular profile photo of the list creator, tappable to view their profile.
     @ViewBuilder
     private var creatorAvatar: some View {
         if let photoUrl = list.creator_photo_url, let url = URL(string: photoUrl) {
-            CachedAsyncImage(url: url, targetSize: CGSize(width: 24, height: 24)) {
+            Button {
+                onCreatorTap?(list.user_id)
+            } label: {
+                CachedAsyncImage(url: url, targetSize: CGSize(width: 24, height: 24)) {
+                    creatorInitialsCircle
+                }
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 24, height: 24)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.6), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        } else if list.creator_name != nil {
+            Button {
+                onCreatorTap?(list.user_id)
+            } label: {
                 creatorInitialsCircle
             }
-            .aspectRatio(contentMode: .fill)
-            .frame(width: 24, height: 24)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.white.opacity(0.6), lineWidth: 1))
-        } else if list.creator_name != nil {
-            creatorInitialsCircle
+            .buttonStyle(.plain)
         }
     }
 
