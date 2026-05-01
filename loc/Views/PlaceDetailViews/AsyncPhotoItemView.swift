@@ -16,13 +16,16 @@ struct AsyncPhotoItemView: View {
     let cornerRadius: CGFloat
     var onLoadFailed: ((String) -> Void)? = nil
 
+    /// Tracks whether the size-optimized Google CDN URLs failed, triggering a raw-URL fallback.
+    @State private var progressiveLoadFailed = false
+
     private var isGoogleCDN: Bool {
         item.url.contains("lh3.googleusercontent.com")
     }
 
     var body: some View {
         Group {
-            if isGoogleCDN {
+            if isGoogleCDN && !progressiveLoadFailed {
                 progressiveGoogleImage
             } else {
                 standardImage
@@ -46,8 +49,8 @@ struct AsyncPhotoItemView: View {
                 case .success(let image):
                     image.resizable().scaledToFill()
                 case .failure:
-                    failedView
-                        .onAppear { onLoadFailed?(item.url) }
+                    Color.clear
+                        .onAppear { progressiveLoadFailed = true }
                 default:
                     ShimmerView()
                 }
@@ -60,7 +63,6 @@ struct AsyncPhotoItemView: View {
                         .transition(.opacity.animation(.easeIn(duration: 0.3)))
                 case .failure:
                     Color.clear
-                        .onAppear { onLoadFailed?(item.url) }
                 default:
                     Color.clear
                 }
@@ -85,6 +87,7 @@ struct AsyncPhotoItemView: View {
 
             case .failure:
                 failedView
+                    .onAppear { onLoadFailed?(item.url) }
 
             @unknown default:
                 ShimmerView()
