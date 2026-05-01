@@ -36,6 +36,11 @@ class ProfileListsViewModel: ObservableObject {
     /// Pagination of places within individual lists.
     let placePaginationViewModel: ListsPlacePaginationViewModel
 
+    // MARK: - Save Counts
+
+    /// Number of saves per list (keyed by list_id).
+    @Published var saveCounts: [String: Int] = [:]
+
     // MARK: - Combine Subscriptions
 
     /// Stores subscriptions to child ViewModels for change propagation.
@@ -554,6 +559,15 @@ class ProfileListsViewModel: ObservableObject {
         await searchViewModel.reloadListsAfterSearch()
     }
 
+    // MARK: - Save Count
+
+    /// Fetches the save count for a list and caches the result.
+    func fetchSaveCount(listId: String) async {
+        guard saveCounts[listId] == nil else { return }
+        let count = (try? await SavedListService.shared.getSaveCount(listId: listId)) ?? 0
+        saveCounts[listId] = count
+    }
+
     // MARK: - Reset
 
     /// Resets all lists data (used during logout).
@@ -564,5 +578,6 @@ class ProfileListsViewModel: ObservableObject {
         distanceSortingViewModel.resetSortingState()
         legacyLoadingViewModel.resetLegacyLoadingState()
         placePaginationViewModel.resetPaginationState()
+        saveCounts = [:]
     }
 }

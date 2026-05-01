@@ -54,6 +54,9 @@ BEGIN
         UNION ALL
         SELECT ann.id, ann.name, ann.coordinate, ann.user_ids, ann.place_type
         FROM get_reviewed_places_annotations(v_user_friends, v_bbox) ann
+        UNION ALL
+        SELECT ann.id, ann.name, ann.coordinate, ann.user_ids, ann.place_type
+        FROM get_saved_list_places_annotations(p_user_id, v_bbox) ann
     ),
     aggregated AS (
         SELECT 

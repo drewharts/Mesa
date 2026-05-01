@@ -136,6 +136,11 @@ struct LightweightListPopupView: View {
             Task {
                 await paginationVM.onListChanged(to: currentList.list_id)
             }
+
+            // Fetch save count for this list
+            Task {
+                await listsVM.fetchSaveCount(listId: currentList.list_id)
+            }
         }
         .onChange(of: allPlaces) { oldValue, newValue in
             // Reload reviewed IDs when places change via ViewModel
@@ -334,10 +339,18 @@ struct LightweightListPopupView: View {
                     }
                 }
 
-                Text("\(displayedPlaceCount) place\(displayedPlaceCount == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .padding(.top, -8)
+                HStack(spacing: 8) {
+                    Text("\(displayedPlaceCount) place\(displayedPlaceCount == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+
+                    if let count = listsVM.saveCounts[currentList.list_id], count > 0 {
+                        Text("\(count) save\(count == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding(.top, -8)
 
                 if let description = currentList.description, !description.isEmpty {
                     Text(description)

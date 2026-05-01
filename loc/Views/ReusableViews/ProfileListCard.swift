@@ -97,7 +97,12 @@ struct ProfileListCard: View {
 
     @ViewBuilder
     private var sharedIndicator: some View {
-        if list.isSharedWithMe, let ownerName = list.owner_name {
+        if list.isSavedList, let ownerName = list.owner_name {
+            SavedFromIndicator(
+                ownerName: ownerName,
+                ownerPhotoUrl: list.owner_photo_url
+            )
+        } else if list.isSharedWithMe, let ownerName = list.owner_name {
             SharedByIndicator(
                 ownerName: ownerName,
                 ownerPhotoUrl: list.owner_photo_url,

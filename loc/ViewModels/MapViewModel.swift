@@ -254,6 +254,11 @@ class MapViewModel: ObservableObject {
         }
     }
 
+    /// Forces the viewport to reload annotations on the next camera settle.
+    func invalidateAnnotations() {
+        viewportViewModel.resetLastLoadedRegion()
+    }
+
     /// Clears all special filters (list, external places, reviews, favorites, my places, external).
     func clearAllFilters() {
         filteringViewModel.clearAllFilters()

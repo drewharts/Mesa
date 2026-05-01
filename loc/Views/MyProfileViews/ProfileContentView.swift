@@ -90,6 +90,7 @@ struct ProfileContentView: View {
                         )
                     }
                     ProfileViewListsView(listsVM: listsVM)
+                    ProfileSavedListsView(viewModel: profile.savedListsViewModel)
 
                     // Account actions (logout/delete) moved to toolbar AccountMenuView
                 }

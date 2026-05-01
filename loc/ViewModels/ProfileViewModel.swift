@@ -62,6 +62,9 @@ class ProfileViewModel: ObservableObject {
     /// Child ViewModel for place notes management
     let notesViewModel: ProfileNotesViewModel
 
+    /// Child ViewModel for saved lists from other users
+    let savedListsViewModel: SavedListsViewModel
+
     private let userService: UserService
     private let imageService: ImageService
     private let placeService: PlaceService
@@ -97,6 +100,7 @@ class ProfileViewModel: ObservableObject {
         self.externalContentViewModel = ProfileExternalContentViewModel(userService: userService, userSession: userSession)
         self.listsViewModel = ProfileListsViewModel(userService: userService, placeService: placeService, userSession: userSession, locationManager: locationManager)
         self.notesViewModel = ProfileNotesViewModel(userService: userService, userSession: userSession)
+        self.savedListsViewModel = SavedListsViewModel(userSession: userSession, locationManager: locationManager)
 
         self.userService = userService
         self.detailPlaceViewModel = detailPlaceViewModel
@@ -114,6 +118,7 @@ class ProfileViewModel: ObservableObject {
         setupReviewsCallbacks()
         setupListsCallbacks()
         setupExternalContentCallbacks()
+        setupSavedListsCallbacks()
 
         // Observe location changes using Combine
         setupLocationObserver()
@@ -278,6 +283,13 @@ class ProfileViewModel: ObservableObject {
 
         externalContentViewModel.onAnnotationPlacesRecalculate = { [weak self] in
             self?.detailPlaceViewModel.calculateAnnotationPlaces()
+        }
+    }
+
+    /// Wires up callback from savedListsViewModel to trigger map annotation reload.
+    private func setupSavedListsCallbacks() {
+        savedListsViewModel.onSavedListsChanged = { [weak self] in
+            self?.mapViewModel?.invalidateAnnotations()
         }
     }
 
@@ -637,6 +649,9 @@ class ProfileViewModel: ObservableObject {
         // Clear place notes (delegated to child ViewModel)
         notesViewModel.resetAllData()
 
+        // Clear saved lists (delegated to child ViewModel)
+        savedListsViewModel.clearAllData()
+
         // Clear other state
         totalUniquePlacesCount = 0
 
@@ -703,6 +718,10 @@ class ProfileViewModel: ObservableObject {
         Task.detached(priority: .userInitiated) { [weak self] in
             await self?.listsViewModel.loadInitialLists()
         }
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.savedListsViewModel.loadInitialLists()
+        }
     }
 
     /// Captures current count values as fallbacks so cancelled queries preserve existing data.
@@ -750,8 +769,9 @@ class ProfileViewModel: ObservableObject {
             async let reviews: Void = reviewsViewModel.refreshReviewedPlaces()
             async let externalPlaces: Void = externalContentViewModel.reloadLightweightExternalPlaces()
             async let myPlaces: Void = myPlacesViewModel.refreshMyPlaces()
+            async let savedLists: Void = savedListsViewModel.refresh()
 
-            _ = await (reviews, externalPlaces, myPlaces)
+            _ = await (reviews, externalPlaces, myPlaces, savedLists)
         }
     }
 

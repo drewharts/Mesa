@@ -74,19 +74,33 @@ struct ExternalUserLightweightListPopupView: View {
             .padding(.horizontal, 20)
             .padding(.top, 20)
 
-            VStack(spacing: 4) {
-                Text(viewModel.currentList.name)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+            HStack {
+                VStack(spacing: 4) {
+                    Text(viewModel.currentList.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
 
-                Text("\(viewModel.currentList.place_count) place\(viewModel.currentList.place_count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    Text("\(viewModel.currentList.place_count) place\(viewModel.currentList.place_count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+
+                Spacer()
+
+                saveListButton
             }
             .padding(.horizontal, 20)
         }
         .padding(.bottom, 10)
+    }
+
+    /// Button that saves or unsaves the current list.
+    private var saveListButton: some View {
+        SaveListButton(
+            listId: viewModel.currentList.list_id,
+            savedListsViewModel: profile.savedListsViewModel
+        )
     }
 
     private var backToProfileButton: some View {

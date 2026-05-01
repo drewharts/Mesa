@@ -280,6 +280,7 @@ struct ExternalUserListPopupView: View {
                     Spacer()
 
                     HStack(alignment: .center, spacing: 12) {
+                        saveListButton
                         viewOnMapButton
                         dismissButton
                     }
@@ -294,6 +295,14 @@ struct ExternalUserListPopupView: View {
             .padding(.top, 12)
         }
         .padding(.bottom, 28)
+    }
+
+    /// Button that saves or unsaves the current list.
+    private var saveListButton: some View {
+        SaveListButton(
+            listId: currentList.list_id,
+            savedListsViewModel: profile.savedListsViewModel
+        )
     }
 
     /// Button that dismisses the list popup sheet.

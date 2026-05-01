@@ -34,6 +34,9 @@ struct LightweightPlaceList: Identifiable {
     var user_role: String?
     var collaborator_photos: [String]?
 
+    /// Whether this list was saved from another user (not owned by current user)
+    var is_saved: Bool?
+
     var id: String { list_id }
 
     /// Whether this list requires purchase to access full content
@@ -59,6 +62,11 @@ struct LightweightPlaceList: Identifiable {
     /// True if: shared with you OR you own it but shared with others
     var isCollaborative: Bool {
         isSharedWithMe || hasCollaborators
+    }
+
+    /// Convenience: Check if this is a saved list from another user
+    var isSavedList: Bool {
+        is_saved ?? false
     }
 
     // MARK: - Geometry Parsing
@@ -97,7 +105,8 @@ struct LightweightPlaceList: Identifiable {
         owner_name: String? = nil,
         owner_photo_url: String? = nil,
         user_role: String? = nil,
-        collaborator_photos: [String]? = nil
+        collaborator_photos: [String]? = nil,
+        is_saved: Bool? = nil
     ) {
         self.list_id = list_id
         self.name = name
@@ -117,6 +126,7 @@ struct LightweightPlaceList: Identifiable {
         self.owner_photo_url = owner_photo_url
         self.user_role = user_role
         self.collaborator_photos = collaborator_photos
+        self.is_saved = is_saved
     }
 }
 
@@ -142,6 +152,7 @@ extension LightweightPlaceList: Codable {
         case owner_photo_url
         case user_role
         case collaborator_photos
+        case is_saved
     }
 
     init(from decoder: Decoder) throws {
@@ -183,6 +194,7 @@ extension LightweightPlaceList: Codable {
         owner_photo_url = try container.decodeIfPresent(String.self, forKey: .owner_photo_url)
         user_role = try container.decodeIfPresent(String.self, forKey: .user_role)
         collaborator_photos = try container.decodeIfPresent([String].self, forKey: .collaborator_photos)
+        is_saved = try container.decodeIfPresent(Bool.self, forKey: .is_saved)
     }
 
     /// Small Decodable for parsing PostGIS GeoJSON format: {"type":"Point","coordinates":[lon,lat]}
@@ -214,5 +226,6 @@ extension LightweightPlaceList: Codable {
         try container.encodeIfPresent(owner_photo_url, forKey: .owner_photo_url)
         try container.encodeIfPresent(user_role, forKey: .user_role)
         try container.encodeIfPresent(collaborator_photos, forKey: .collaborator_photos)
+        try container.encodeIfPresent(is_saved, forKey: .is_saved)
     }
 }
