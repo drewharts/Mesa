@@ -165,6 +165,11 @@ struct MapContainerView: View {
                 handleMyPlacesOnMap(newValue)
             }
             .onChange(of: presentationService.activeSheet) { oldSheet, newSheet in
+                // Clear selection state when place detail sheet is dismissed
+                if newSheet == nil, oldSheet == .placeDetail {
+                    selectedPlaceViewModel.selectedPlace = nil
+                }
+
                 // Clear trip annotations when the trips sheet is dismissed
                 if newSheet == nil, oldSheet == .tripsList {
                     mapDisplayCoordinatorViewModel.clearTripAnnotations()

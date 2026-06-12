@@ -14,6 +14,21 @@ class MapViewportViewModel: ObservableObject {
     @Published var communityMarkers: [CommunityPlaceMarker] = []
     @Published var isLoadingViewportPlaces: Bool = false
 
+    /// Accumulated annotation cache keyed by place ID for deduplication.
+    private var annotationCache: [String: PlaceAnnotation] = [:]
+
+    /// Accumulated community marker cache keyed by place ID.
+    private var communityMarkerCache: [String: CommunityPlaceMarker] = [:]
+
+    /// Regions already fetched — used to skip redundant server calls.
+    private var loadedRegions: [MKCoordinateRegion] = []
+
+    /// Timestamp of last full cache refresh.
+    private var lastRefreshTime: Date = .distantPast
+
+    /// Interval between full cache refreshes (5 minutes).
+    private let refreshInterval: TimeInterval = 300
+
     private var debounceTimer: Timer?
     private var lastLoadedRegion: MKCoordinateRegion?
     private var placeDetailsCache: [String: DetailPlace] = [:]
@@ -39,20 +54,40 @@ class MapViewportViewModel: ObservableObject {
         userId: String,
         filterState: MapFilterState
     ) async {
+        // Check if data is stale and needs a full refresh
+        if Date().timeIntervalSince(lastRefreshTime) > refreshInterval {
+            clearAnnotations()
+            lastLoadedRegion = nil
+        }
+
         if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
+            return
+        }
+
+        // Skip if this region is already fully covered by previously loaded regions
+        if isRegionCovered(newRegion) {
+            lastLoadedRegion = newRegion
             return
         }
 
         await loadPlacesForViewport(newRegion, userId: userId, filterState: filterState)
     }
 
-    /// Resets the last loaded region to force a reload on next camera settle.
+    /// Resets the last loaded region and clears cached data to force a full reload.
     func resetLastLoadedRegion() {
         lastLoadedRegion = nil
+        annotationCache.removeAll()
+        communityMarkerCache.removeAll()
+        loadedRegions.removeAll()
+        viewportAnnotations = []
+        communityMarkers = []
     }
 
-    /// Clears all annotations and markers.
+    /// Clears all cached annotations, markers, and loaded regions (used on filter changes).
     func clearAnnotations() {
+        annotationCache.removeAll()
+        communityMarkerCache.removeAll()
+        loadedRegions.removeAll()
         viewportAnnotations = []
         communityMarkers = []
     }
@@ -170,17 +205,27 @@ class MapViewportViewModel: ObservableObject {
                     return
                 }
 
-                self.viewportAnnotations = annotations
+                // Merge new annotations into cache (accumulate, don't replace)
+                for annotation in annotations {
+                    annotationCache[annotation.id] = annotation
+                }
 
-                // Filter out community markers that overlap with friends annotations
-                let friendsPlaceIds = Set(annotations.map { $0.id })
-                let filteredCommunity = community.filter { !friendsPlaceIds.contains($0.id) }
+                // Merge community markers, excluding those that overlap with friend annotations
+                let friendsPlaceIds = Set(annotationCache.keys)
+                for marker in community where !friendsPlaceIds.contains(marker.id) {
+                    communityMarkerCache[marker.id] = marker
+                }
 
-                self.communityMarkers = filteredCommunity
                 self.lastLoadedRegion = region
+                self.loadedRegions.append(region)
+                if loadedRegions.count == 1 { self.lastRefreshTime = Date() }
+
+                // Publish updated arrays from cache
+                self.viewportAnnotations = Array(annotationCache.values)
+                self.communityMarkers = Array(communityMarkerCache.values)
 
                 // Notify parent to regenerate annotation images
-                onAnnotationsLoaded?(annotations)
+                onAnnotationsLoaded?(self.viewportAnnotations)
 
             } catch {
                 let isCancelled = Task.isCancelled || error is CancellationError || (error as NSError).code == NSURLErrorCancelled
@@ -319,6 +364,19 @@ class MapViewportViewModel: ObservableObject {
             eastLng: centerLng + (lngDelta / 2),
             westLng: centerLng - (lngDelta / 2)
         )
+    }
+
+    /// Checks if the new region is fully contained within any previously loaded region.
+    private func isRegionCovered(_ region: MKCoordinateRegion) -> Bool {
+        let newBounds = getViewportBounds(from: region)
+
+        return loadedRegions.contains { loaded in
+            let b = getViewportBounds(from: loaded)
+            return newBounds.northLat <= b.northLat &&
+                   newBounds.southLat >= b.southLat &&
+                   newBounds.eastLng <= b.eastLng &&
+                   newBounds.westLng >= b.westLng
+        }
     }
 
     /// Checks if region change is significant enough to reload.
