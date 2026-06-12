@@ -89,6 +89,22 @@ class PlaceListService {
         return lists
     }
     
+    // MARK: - All List Metadata
+
+    /// Fetches lightweight metadata for all lists owned by a user (for instant local search).
+    func fetchAllListMetadata(userId: String) async throws -> [LightweightPlaceList] {
+        struct Params: Encodable {
+            let p_user_id: String
+        }
+
+        let lists: [LightweightPlaceList] = try await supabase.client
+            .rpc("get_all_user_list_metadata", params: Params(p_user_id: userId))
+            .execute()
+            .value
+
+        return lists
+    }
+
     // MARK: - Fetch Places in List
     
     /// Fetch places within a specific place list with pagination

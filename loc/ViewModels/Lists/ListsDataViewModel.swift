@@ -24,6 +24,9 @@ class ListsDataViewModel: ObservableObject {
 
     // MARK: - Published Properties - Lightweight Format
 
+    /// All list metadata for instant local search.
+    @Published var allListsCache: [LightweightPlaceList] = []
+
     /// Lightweight place lists sorted by proximity.
     @Published var lightweightPlaceLists: [LightweightPlaceList] = []
 
@@ -107,6 +110,7 @@ class ListsDataViewModel: ObservableObject {
                 city: nil
             )
             lightweightPlaceLists.insert(lightweightList, at: 0)
+            allListsCache.insert(lightweightList, at: 0)
 
             // Refresh lightweight place lists to include the new list with proper sorting
             if let location = locationManager?.currentLocation?.coordinate {
@@ -143,6 +147,9 @@ class ListsDataViewModel: ObservableObject {
             if let index = lightweightPlaceLists.firstIndex(where: { $0.list_id == list.list_id }) {
                 lightweightPlaceLists[index].name = newName
             }
+            if let index = allListsCache.firstIndex(where: { $0.list_id == list.list_id }) {
+                allListsCache[index].name = newName
+            }
 
             return .success(())
         } catch {
@@ -173,6 +180,7 @@ class ListsDataViewModel: ObservableObject {
 
             // Remove from local state
             lightweightPlaceLists.removeAll { $0.list_id == list.list_id }
+            allListsCache.removeAll { $0.list_id == list.list_id }
             lightweightPlaceListPlaces.removeValue(forKey: list.list_id)
             lightweightPlaceListCounts.removeValue(forKey: list.list_id)
 
@@ -301,6 +309,7 @@ class ListsDataViewModel: ObservableObject {
         userLists.removeAll()
         userListsPlaces.removeAll()
         placeListCounts.removeAll()
+        allListsCache.removeAll()
         lightweightPlaceLists.removeAll()
         lightweightPlaceListPlaces.removeAll()
         lightweightPlaceListCounts.removeAll()

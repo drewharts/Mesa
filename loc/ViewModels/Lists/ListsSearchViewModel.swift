@@ -74,53 +74,31 @@ class ListsSearchViewModel: ObservableObject {
 
     // MARK: - Search
 
-    /// Performs server-side search across all user lists.
+    /// Filters lists locally against the pre-fetched metadata cache for instant results.
     func performListSearch() async {
-        guard let userId = userSession?.currentUserId,
-              let dataVM = dataViewModel else { return }
+        guard let dataVM = dataViewModel,
+              let loadingVM = loadingViewModel else { return }
 
         let searchTerm = listSearchText.trimmingCharacters(in: .whitespaces)
         guard !searchTerm.isEmpty else { return }
 
-        do {
-            let searchResults = try await PlaceListService.shared.searchListsByName(
-                userId: userId,
-                searchTerm: listSearchText
-            )
+        // Local filtering — instant, no network call
+        let results = dataVM.allListsCache.filter {
+            $0.name.localizedCaseInsensitiveContains(searchTerm)
+        }
 
-            dataVM.lightweightPlaceLists = searchResults
+        dataVM.lightweightPlaceLists = results
 
-            for list in searchResults {
-                if dataVM.lightweightPlaceListCounts[list.list_id] == nil {
-                    dataVM.lightweightPlaceListCounts[list.list_id] = list.place_count
-                }
+        for list in results {
+            if dataVM.lightweightPlaceListCounts[list.list_id] == nil {
+                dataVM.lightweightPlaceListCounts[list.list_id] = list.place_count
             }
+        }
 
-            // Load places for search results
-            await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
-                for list in searchResults {
-                    group.addTask {
-                        do {
-                            let places = try await self.userService.fetchPlacesForPlaceList(
-                                listId: list.list_id,
-                                page: 1,
-                                pageSize: 6
-                            )
-                            return (list.list_id, places)
-                        } catch {
-                            return (list.list_id, nil)
-                        }
-                    }
-                }
-
-                for await (listId, places) in group {
-                    if let places = places {
-                        dataVM.setPlacesForList(listId: listId, places: places)
-                    }
-                }
-            }
-        } catch {
-            print("❌ [ListsSearchViewModel] Error searching lists: \(error)")
+        // Load places for results that don't already have cached places
+        let uncachedResults = results.filter { dataVM.lightweightPlaceListPlaces[$0.list_id] == nil }
+        if !uncachedResults.isEmpty {
+            await loadingVM.loadPlacesForLists(uncachedResults)
         }
     }
 

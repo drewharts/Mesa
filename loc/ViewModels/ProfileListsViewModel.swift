@@ -255,6 +255,7 @@ class ProfileListsViewModel: ObservableObject {
         mutationsVM.setDistanceSortingViewModel(distanceSortingVM)
         mutationsVM.setPlacePaginationViewModel(placePaginationVM)
         legacyLoadingVM.setPlacePaginationViewModel(placePaginationVM)
+        loadingVM.setSearchViewModel(searchVM)
 
         // Wire up data ViewModel callback
         dataVM.onSortListsByDistance = { [weak distanceSortingVM] in

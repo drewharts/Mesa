@@ -299,7 +299,7 @@ class ProfileViewModel: ObservableObject {
     private func setupListSearchObserver() {
         listSearchCancellable = listsViewModel.searchViewModel.$listSearchText
             .dropFirst()
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] (text: String) in
                 Task { @MainActor [weak self] in

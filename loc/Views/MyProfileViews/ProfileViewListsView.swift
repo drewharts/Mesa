@@ -156,10 +156,13 @@ struct ProfileViewListsView: View {
     
     @ViewBuilder
     private var listContent: some View {
-        if listsVM.isLoadingInitialLists {
+        let hasSearchText = !listsVM.listSearchText.trimmingCharacters(in: .whitespaces).isEmpty
+        if listsVM.isLoadingInitialLists && !hasSearchText {
             initialLoadingView
         } else if !listsVM.filteredPlaceLists.isEmpty {
             listView
+        } else if hasSearchText {
+            noSearchResultsView
         } else {
             emptyStateView
         }
@@ -254,6 +257,16 @@ struct ProfileViewListsView: View {
         }
     }
     
+    private var noSearchResultsView: some View {
+        VStack(spacing: 8) {
+            Text("No matching lists")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 30)
+    }
+
     private var noSharedListsView: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.2")
