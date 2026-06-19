@@ -44,8 +44,10 @@ struct ProfileListCard: View {
     // MARK: - List Card Image
 
     private var listCardImage: some View {
-        Group {
-            if !places.isEmpty {
+        ZStack {
+            if let previewPhotos = list.preview_photos, !previewPhotos.isEmpty {
+                PreviewPhotoCollage(photoURLs: previewPhotos)
+            } else if !places.isEmpty {
                 ListPhotoCollage(
                     places: Array(places.prefix(3)),
                     placeColors: $placeColors
@@ -54,8 +56,9 @@ struct ProfileListCard: View {
                 emptyListCard
             }
         }
-        .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .aspectRatio(3.0/4.0, contentMode: .fit)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
     }
 

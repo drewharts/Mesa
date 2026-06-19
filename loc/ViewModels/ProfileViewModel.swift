@@ -299,7 +299,7 @@ class ProfileViewModel: ObservableObject {
     private func setupListSearchObserver() {
         listSearchCancellable = listsViewModel.searchViewModel.$listSearchText
             .dropFirst()
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] (text: String) in
                 Task { @MainActor [weak self] in
@@ -745,6 +745,9 @@ class ProfileViewModel: ObservableObject {
     func refreshProfile() async {
         invalidateProfileCounts()
         await loadProfileCounts()
+
+        // Invalidate map annotation cache so next camera settle picks up any new data
+        mapViewModel?.invalidateAnnotations()
 
         if !isCuratedProfile {
             async let reviews: Void = reviewsViewModel.refreshReviewedPlaces()

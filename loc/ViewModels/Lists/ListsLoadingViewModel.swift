@@ -25,9 +25,10 @@ class ListsLoadingViewModel: ObservableObject {
     private weak var userSession: UserSession?
     private weak var locationManager: LocationManager?
 
-    // MARK: - Data ViewModel Reference
+    // MARK: - ViewModel References
 
     private weak var dataViewModel: ListsDataViewModel?
+    private weak var searchViewModel: ListsSearchViewModel?
 
     // MARK: - Callbacks
 
@@ -44,6 +45,11 @@ class ListsLoadingViewModel: ObservableObject {
         self.dataViewModel = dataViewModel
     }
 
+    /// Sets the search view model reference (called after init to avoid circular dependency).
+    func setSearchViewModel(_ searchVM: ListsSearchViewModel) {
+        self.searchViewModel = searchVM
+    }
+
     // MARK: - List Loading (Primary Data Flow)
 
     /// Loads the initial page of lists with proximity sorting and shared lists.
@@ -54,8 +60,11 @@ class ListsLoadingViewModel: ObservableObject {
         isLoadingInitialLists = true
         defer { isLoadingInitialLists = false }
 
-        let pageSize = 6
+        let pageSize = 12 // Covers full screen in 2-column grid without immediate pagination
         let userLocation = locationManager?.currentLocation?.coordinate
+
+        // Fetch all list metadata (for instant search) in parallel with paginated lists
+        async let allMetaTask: [LightweightPlaceList] = fetchAllListMetadata(userId: userId)
 
         // Fetch owned lists - use proximity sorting if location available
         var ownedLists: [LightweightPlaceList] = []
@@ -77,6 +86,10 @@ class ListsLoadingViewModel: ObservableObject {
             print("⚠️ [ListsLoadingViewModel] No user location available - loading lists without proximity sorting")
             ownedLists = await fetchListsWithoutLocation(userId: userId, pageSize: pageSize)
         }
+
+        // Store all metadata cache (for instant search)
+        let allMeta = await allMetaTask
+        dataVM.allListsCache = allMeta
 
         // Fetch shared and collaborative lists in parallel
         var sharedLists: [SharedListInfo] = []
@@ -109,15 +122,21 @@ class ListsLoadingViewModel: ObservableObject {
         // Merge: owned (paginated) + collaborative owned (not in page 1) + shared with me
         let allLists = ownedLists + additionalCollaborativeLists + sharedAsLightweight
 
-        // Update state
-        dataVM.lightweightPlaceLists = allLists
+        // Only overwrite displayed lists if user hasn't started searching
+        let isSearchActive = !(searchViewModel?.listSearchText.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+        if !isSearchActive {
+            dataVM.lightweightPlaceLists = allLists
+        }
+
         dataVM.placeListsCurrentPage = 1
         dataVM.hasMorePlaceLists = ownedLists.count >= pageSize
         dataVM.initializePlaceCountsFromMetadata(for: allLists)
 
-        // Load places for each list
-        if !allLists.isEmpty {
-            await loadPlacesForLists(allLists)
+        // Load places only for lists without preview photos (shared/collaborative lists)
+        // Owned lists already have preview_photos embedded in the RPC response
+        let listsNeedingPlaces = allLists.filter { ($0.preview_photos ?? []).isEmpty && $0.place_count > 0 }
+        if !listsNeedingPlaces.isEmpty {
+            await loadPlacesForLists(listsNeedingPlaces)
         }
     }
 
@@ -133,7 +152,7 @@ class ListsLoadingViewModel: ObservableObject {
         defer { isLoadingMorePlaceLists = false }
 
         let nextPage = dataVM.placeListsCurrentPage + 1
-        let pageSize = 6
+        let pageSize = 12
 
         do {
             let moreLists = try await userService.fetchPlaceListsByProximity(
@@ -146,10 +165,6 @@ class ListsLoadingViewModel: ObservableObject {
 
             dataVM.appendPlaceLists(moreLists, nextPage: nextPage, pageSize: pageSize)
             dataVM.initializePlaceCountsFromMetadata(for: moreLists)
-
-            if !moreLists.isEmpty {
-                await loadPlacesForLists(moreLists)
-            }
         } catch {
             print("❌ [ListsLoadingViewModel] Error loading more place lists: \(error.localizedDescription)")
         }
@@ -182,6 +197,16 @@ class ListsLoadingViewModel: ObservableObject {
             await loadPlacesForLists(lists)
         } catch {
             print("❌ [ListsLoadingViewModel] Error loading place lists by coordinates: \(error.localizedDescription)")
+        }
+    }
+
+    /// Fetches lightweight metadata for all user lists (powers instant local search).
+    private func fetchAllListMetadata(userId: String) async -> [LightweightPlaceList] {
+        do {
+            return try await PlaceListService.shared.fetchAllListMetadata(userId: userId)
+        } catch {
+            print("❌ [ListsLoadingViewModel] Error fetching all list metadata: \(error)")
+            return []
         }
     }
 

@@ -16,6 +16,8 @@ struct MapView: View {
     @EnvironmentObject var mapViewModel: MapViewModel
     @EnvironmentObject var appCoordinator: AppCoordinator
     @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @EnvironmentObject var userSession: UserSession
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
@@ -27,7 +29,6 @@ struct MapView: View {
     @State private var mapRefreshToggle = false
     @State private var showVisiblePlacesPopup = false
     @State private var currentMapRegion: MKCoordinateRegion?
-    @State private var hasLoadedInitialViewport = false
     @State private var hasCenteredOnUserLocation = false
     
     var onMapTap: ((CLLocationCoordinate2D) -> Void)?
@@ -75,6 +76,13 @@ struct MapView: View {
         }
     }
 
+    // Community markers filtered to exclude the currently selected place
+    private var filteredCommunityMarkers: [CommunityPlaceMarker] {
+        let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString
+        guard let selectedId else { return mapViewModel.communityMarkers }
+        return mapViewModel.communityMarkers.filter { $0.id != selectedId }
+    }
+
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
@@ -99,9 +107,7 @@ struct MapView: View {
                     // Hidden in "My Places" mode since community markers are not user-specific
                     // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
                     if !mapViewModel.showMyPlacesOnly {
-                        ForEach(mapViewModel.communityMarkers.filter { marker in
-                            selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
-                        }) { marker in
+                        ForEach(filteredCommunityMarkers) { marker in
                             Annotation(
                                 "",
                                 coordinate: marker.coordinate,
@@ -236,6 +242,9 @@ struct MapView: View {
             return
         }
 
+        // Immediate haptic feedback on tap
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
         let place = mapViewModel.resolveAnnotationForNavigation(annotation)
         mapViewModel.setPreservedAnnotation(for: place)
         navigateToPlace(place)
@@ -334,15 +343,15 @@ struct MapView: View {
                     withAnimation(.easeInOut(duration: 0.5)) {
                         mapPosition = .camera(MapCamera(centerCoordinate: userLocation, distance: 1500))
                     }
-                    
-                    // Also load viewport places for this new location
-                    if !hasLoadedInitialViewport, let userId = profile.user?.id {
+
+                    // Pre-fetch annotations while camera animates — isRegionCovered prevents
+                    // duplicate fetch when onMapCameraChange(.onEnd) fires after animation
+                    if let userId = profile.user?.id {
                         let region = MKCoordinateRegion(
                             center: userLocation,
                             span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
                         )
-                        hasLoadedInitialViewport = true
-                        Task.detached(priority: .background) {
+                        Task.detached(priority: .userInitiated) {
                             await mapViewModel.onMapCameraSettled(region, userId: userId)
                         }
                     }
@@ -414,14 +423,7 @@ struct MapView: View {
 
             // Setup notification observers
             setupNotificationObservers()
-            
-            // 🚀 Load initial viewport places (only if profile is ready)
-            if !hasLoadedInitialViewport, let region = currentMapRegion, let userId = profile.user?.id {
-                Task.detached(priority: .background) {
-                    await mapViewModel.onMapCameraSettled(region, userId: userId)
-                }
-                hasLoadedInitialViewport = true
-            }
+            // Viewport annotations load automatically via onMapCameraChange(.onEnd)
         }
          .onDisappear {
              // Remove notification observers
@@ -437,31 +439,9 @@ struct MapView: View {
             }
         }
         .task {
-            // 🚀 CRITICAL: Load viewport places FIRST (instant map rendering)
-            // Only proceed if user profile is available
+            // Load profile photos for annotation rendering
+            // Viewport annotations load via onMapCameraChange(.onEnd) — no need to duplicate here
             guard let userId = profile.user?.id else { return }
-            
-            if !hasLoadedInitialViewport {
-                // Give the map a moment to settle and provide a region
-                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-                
-                if let region = currentMapRegion {
-                    await mapViewModel.onMapCameraSettled(region, userId: userId)
-                    hasLoadedInitialViewport = true
-                } else if let userLocation = locationManager.currentLocation?.coordinate {
-                    // Create a region from the user's current location
-                    let region = MKCoordinateRegion(
-                        center: userLocation,
-                        span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
-                    )
-                    await mapViewModel.onMapCameraSettled(region, userId: userId)
-                    hasLoadedInitialViewport = true
-                }
-                // Note: If no location yet, we'll load viewport when location becomes available
-                // via the onChange handler
-            }
-            
-            // ✅ Load profile photos for annotations
             if !mapViewModel.hasLoadedPhotos {
                 await mapViewModel.loadFollowedUsersPhotos(
                     userId: userId,
@@ -470,35 +450,24 @@ struct MapView: View {
             }
         }
         .onChange(of: profile.user?.id) { oldValue, newValue in
-            // When user profile becomes available (nil → value), trigger initial loads
+            // When user profile becomes available (nil → value), load annotation photos
+            // Viewport annotations load via onMapCameraChange(.onEnd)
             guard let userId = newValue, oldValue == nil else { return }
-            
             Task {
-                // Load photos
                 await mapViewModel.loadFollowedUsersPhotos(
                     userId: userId,
                     currentUserPhotoUrl: profile.user?.profilePhotoURL
                 )
-                
-                // Load viewport if we have a region
-                if !hasLoadedInitialViewport {
-                    if let region = currentMapRegion {
-                        await mapViewModel.onMapCameraSettled(region, userId: userId)
-                        hasLoadedInitialViewport = true
-                    } else if let userLocation = locationManager.currentLocation?.coordinate {
-                        let region = MKCoordinateRegion(
-                            center: userLocation,
-                            span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
-                        )
-                        await mapViewModel.onMapCameraSettled(region, userId: userId)
-                        hasLoadedInitialViewport = true
-                    }
-                }
             }
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(profile)
+                .environmentObject(locationManager)
+                .environmentObject(detailPlaceVM)
+                .environmentObject(userProfileNavigationVM)
+                .environmentObject(userSession)
                 .presentationDragIndicator(.visible)
         }
         .onChange(of: selectedPlaceVM.selectedPlace?.id) { oldValue, newValue in

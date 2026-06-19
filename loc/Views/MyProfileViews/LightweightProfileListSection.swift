@@ -26,7 +26,7 @@ struct LightweightProfileListSection: View {
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 8) {
-                ListCardImage(places: places, placeColors: $placeColors)
+                ListCardImage(list: list, places: places, placeColors: $placeColors)
 
                 ListCardInfo(
                     list: list,
@@ -42,12 +42,15 @@ struct LightweightProfileListSection: View {
 /// Square image card for list preview - NO GeometryReader needed!
 /// Uses aspectRatio(1, ...) for stable sizing in LazyVGrid.
 private struct ListCardImage: View {
+    let list: LightweightPlaceList
     let places: [LightweightPlace]
     @Binding var placeColors: [UUID: Color]
-    
+
     var body: some View {
-        Group {
-            if !places.isEmpty {
+        ZStack {
+            if let previewPhotos = list.preview_photos, !previewPhotos.isEmpty {
+                PreviewPhotoCollage(photoURLs: previewPhotos)
+            } else if !places.isEmpty {
                 ListPhotoCollage(
                     places: Array(places.prefix(3)),
                     placeColors: $placeColors
@@ -56,8 +59,9 @@ private struct ListCardImage: View {
                 EmptyListCard()
             }
         }
-        .aspectRatio(1, contentMode: .fit) // This makes it square - no measurement needed!
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .aspectRatio(3.0/4.0, contentMode: .fit)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
     }
 }

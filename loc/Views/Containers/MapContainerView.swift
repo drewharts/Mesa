@@ -149,6 +149,8 @@ struct MapContainerView: View {
             .environmentObject(detailPlaceViewModel)
             .environmentObject(profileViewModel)
             .environmentObject(mapDisplayCoordinatorViewModel)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(userSession)
             .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
                 handleListSelectionChange(newValue)
             }
@@ -165,6 +167,11 @@ struct MapContainerView: View {
                 handleMyPlacesOnMap(newValue)
             }
             .onChange(of: presentationService.activeSheet) { oldSheet, newSheet in
+                // Clear selection state when place detail sheet is dismissed
+                if newSheet == nil, oldSheet == .placeDetail {
+                    selectedPlaceViewModel.selectedPlace = nil
+                }
+
                 // Clear trip annotations when the trips sheet is dismissed
                 if newSheet == nil, oldSheet == .tripsList {
                     mapDisplayCoordinatorViewModel.clearTripAnnotations()
