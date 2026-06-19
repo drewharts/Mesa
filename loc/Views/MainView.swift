@@ -313,6 +313,7 @@ struct MainView: View {
             .presentationBackground(Color.clear)
             .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
             .interactiveDismissDisabled(false)
+            .transaction { $0.animation = .spring(response: 0.25, dampingFraction: 0.9) }
     }
 
     /// External place selection sheet content.

@@ -301,28 +301,42 @@ class PlaceDetailTabsViewModel: ObservableObject {
         // If photos weren't loaded yet (placeholder UUID was skipped), load now with the real UUID
         if let place = place, placePhotosViewModel.externalPhotoItems.isEmpty,
            !place.hasPlaceholderID {
+            // Clear stale state before loading with real UUID to prevent flash of old data
+            hasPosts = false
+            postCount = 0
+            showSaversIndicator = false
+            saverCount = 0
+
             placePhotosViewModel.setPlace(place)
             placeSaversViewModel.setPlace(place.id.uuidString)
+            postsViewModel.setPlace(place)
         }
     }
 
     /// Called by View when selected place changes.
     func setPlace(_ place: DetailPlace?) {
-        // Setting currentPlace triggers the reactive subscription automatically
-        handlePlaceChanged(place)
-
-        // Immediately clear stale savers from previous place (before child VM fetches new data)
+        // Clear all stale display state BEFORE updating currentPlace
+        // This prevents the reactive CombineLatest subscription from briefly
+        // showing cached data from a previous visit to the same place
+        hasPosts = false
+        postCount = 0
         showSaversIndicator = false
         saverCount = 0
+        placeRating = 0
 
-        // Update all child ViewModels with new place
+        // Reset child VMs before setting currentPlace (prevents stale data flash)
+        postsViewModel.setPlace(place)
+        placePhotosViewModel.setPlace(place)
+        placeSaversViewModel.setPlace(place?.id.uuidString)
+
+        // Now update currentPlace — triggers reactive subscription with clean state
+        handlePlaceChanged(place)
+
+        // Update remaining child ViewModels
         travelTimeViewModel.setPlace(place)
         openStatusViewModel.setPlace(place)
-        placeSaversViewModel.setPlace(place?.id.uuidString)
         notesTabViewModel.setPlace(place)
-        placePhotosViewModel.setPlace(place)
         aboutTabViewModel.setPlace(place)
-        postsViewModel.setPlace(place)
 
         // Check place list membership
         Task {
