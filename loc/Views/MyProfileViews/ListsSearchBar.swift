@@ -19,6 +19,7 @@ struct ListsSearchBar: View {
     var isFilterEnabled: Bool
     var onToggleFilter: () -> Void
     var onAddList: () -> Void
+    var onCreateTrip: () -> Void
     var onImportGoogleMapsList: () -> Void
 
     // MARK: - Body
@@ -111,6 +112,11 @@ struct ListsSearchBar: View {
                 onAddList()
             } label: {
                 Label("New List", systemImage: "plus")
+            }
+            Button {
+                onCreateTrip()
+            } label: {
+                Label("New Trip", systemImage: "airplane")
             }
             Button {
                 onImportGoogleMapsList()

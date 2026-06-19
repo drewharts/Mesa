@@ -28,6 +28,7 @@ struct ProfileViewListsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var deepLinkManager: DeepLinkManager
+    @EnvironmentObject var userSession: UserSession
     @ObservedObject var listsVM: ProfileListsViewModel
     @Environment(\.presentationMode) private var presentationMode
 
@@ -41,6 +42,7 @@ struct ProfileViewListsView: View {
     @State private var selectedListIndex: Int? = nil
     @State private var pendingMapListId: String? = nil
     @State private var showingGoogleMapsImport = false
+    @State private var showingCreateTrip = false
     @StateObject private var shareCardVM = ListStoryCardViewModel()
 
     // MARK: - Body
@@ -73,6 +75,12 @@ struct ProfileViewListsView: View {
                     }
                 }
             )
+        }
+        .fullScreenCover(isPresented: $showingCreateTrip) {
+            CreateTripView { _ in
+                showingCreateTrip = false
+            }
+            .environmentObject(userSession)
         }
         .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
             deepLinkManager.clearPendingList()
@@ -145,6 +153,9 @@ struct ProfileViewListsView: View {
             },
             onAddList: {
                 showingNewListSheet = true
+            },
+            onCreateTrip: {
+                showingCreateTrip = true
             },
             onImportGoogleMapsList: {
                 showingGoogleMapsImport = true
