@@ -16,7 +16,8 @@ RETURNS TABLE(
     city text,
     place_count bigint,
     created_at text,
-    updated_at text
+    updated_at text,
+    preview_photos text[]
 )
 LANGUAGE plpgsql
 STABLE
@@ -36,8 +37,19 @@ BEGIN
         pl.city,
         (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
         pl.created_at::text,
-        pl.updated_at::text
+        pl.updated_at::text,
+        pp.photos AS preview_photos
     FROM place_lists pl
+    LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(photo) AS photos FROM (
+            SELECT get_latest_review_photo(pli.place_id) AS photo
+            FROM place_list_items pli
+            WHERE pli.list_id = pl.id
+            ORDER BY pli.sort_order ASC NULLS LAST
+            LIMIT 3
+        ) sub
+        WHERE sub.photo IS NOT NULL
+    ) pp ON true
     WHERE pl.user_id = p_user_id
     ORDER BY pl.updated_at DESC NULLS LAST;
 END;

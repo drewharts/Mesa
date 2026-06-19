@@ -746,6 +746,9 @@ class ProfileViewModel: ObservableObject {
         invalidateProfileCounts()
         await loadProfileCounts()
 
+        // Invalidate map annotation cache so next camera settle picks up any new data
+        mapViewModel?.invalidateAnnotations()
+
         if !isCuratedProfile {
             async let reviews: Void = reviewsViewModel.refreshReviewedPlaces()
             async let externalPlaces: Void = externalContentViewModel.reloadLightweightExternalPlaces()

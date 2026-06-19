@@ -254,6 +254,12 @@ class MapViewModel: ObservableObject {
         }
     }
 
+    /// Invalidates the annotation cache so the next camera settle triggers a fresh fetch.
+    /// Call this after user actions that create new annotation data (add place, favorite, review, etc.).
+    func invalidateAnnotations() {
+        viewportViewModel.resetLastLoadedRegion()
+    }
+
     /// Clears all special filters (list, external places, reviews, favorites, my places, external).
     func clearAllFilters() {
         filteringViewModel.clearAllFilters()

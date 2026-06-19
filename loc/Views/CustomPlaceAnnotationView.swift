@@ -22,20 +22,18 @@ struct CustomPlaceAnnotationView: View {
         VStack(spacing: 2) {
             if let annotationImage = annotationImage {
                 Image(uiImage: annotationImage)
+                    .interpolation(.medium)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 60, height: 30)
-                    .shadow(color: isSelected ? Color.blue.opacity(0.8) : .clear, radius: 15)
-                    .shadow(color: isSelected ? Color.blue.opacity(0.5) : .clear, radius: 25)
-                    .shadow(color: isSelected ? Color.blue.opacity(0.3) : .clear, radius: 35)
+                    .compositingGroup()
                     .shadow(
-                        color: Color.black.opacity(isSelected ? 0.5 : 0.3),
-                        radius: isSelected ? 8 : 4,
+                        color: isSelected ? Color.blue.opacity(0.6) : Color.black.opacity(0.3),
+                        radius: isSelected ? 12 : 4,
                         x: 0,
                         y: isSelected ? 4 : 2
                     )
                     .scaleEffect(isSelected ? 1.2 : 1.0)
-                    .zIndex(isSelected ? 100 : 0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             } else {
                 // Fallback: show category emoji in a Google-style filled circle
@@ -43,10 +41,6 @@ struct CustomPlaceAnnotationView: View {
                     Circle()
                         .fill(.white)
                         .frame(width: isSelected ? 46 : 38, height: isSelected ? 46 : 38)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(.white, lineWidth: 2)
-                        )
                         .shadow(
                             color: Color.black.opacity(0.25),
                             radius: isSelected ? 6 : 4,

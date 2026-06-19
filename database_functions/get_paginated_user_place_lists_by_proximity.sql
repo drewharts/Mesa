@@ -27,7 +27,7 @@ RETURNS TABLE(
     collaborator_photos TEXT[],
     description TEXT,
     city TEXT,
-    price_tier TEXT
+    preview_photos TEXT[]
 )
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -49,18 +49,18 @@ BEGIN
         combined.collaborator_photos,
         combined.description,
         combined.city,
-        combined.price_tier
+        combined.preview_photos
     FROM (
         -- Lists WITH average_location (sorted by proximity)
-    SELECT
-        pl.id::TEXT AS list_id,
-        pl.name,
-        ST_AsText(pl.average_location) AS average_location,
-        pl.is_public,
-        pl.image,
-        pl.created_at,
-        pl.updated_at,
-        ST_Distance(pl.average_location, p_user_location) AS distance_meters,
+        SELECT
+            pl.id::TEXT AS list_id,
+            pl.name,
+            ST_AsText(pl.average_location) AS average_location,
+            pl.is_public,
+            pl.image,
+            pl.created_at,
+            pl.updated_at,
+            ST_Distance(pl.average_location, p_user_location) AS distance_meters,
             (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
             (SELECT COUNT(*) FROM place_list_collaborators plc WHERE plc.list_id = pl.id) AS collaborator_count,
             (
@@ -75,11 +75,21 @@ BEGIN
             ) AS collaborator_photos,
             pl.description,
             pl.city,
-            pl.price_tier,
-            0 AS sort_order  -- Lists with location come first
-    FROM place_lists pl
-    WHERE pl.user_id = p_user_id
-        AND pl.average_location IS NOT NULL
+            pp.photos AS preview_photos,
+            0 AS sort_order
+        FROM place_lists pl
+        LEFT JOIN LATERAL (
+            SELECT ARRAY_AGG(photo) AS photos FROM (
+                SELECT get_latest_review_photo(pli.place_id) AS photo
+                FROM place_list_items pli
+                WHERE pli.list_id = pl.id
+                ORDER BY pli.sort_order ASC NULLS LAST
+                LIMIT 3
+            ) sub
+            WHERE sub.photo IS NOT NULL
+        ) pp ON true
+        WHERE pl.user_id = p_user_id
+            AND pl.average_location IS NOT NULL
 
         UNION ALL
 
@@ -92,7 +102,7 @@ BEGIN
             pl.image,
             pl.created_at,
             pl.updated_at,
-            NULL::DOUBLE PRECISION AS distance_meters,  -- No distance for lists without location
+            NULL::DOUBLE PRECISION AS distance_meters,
             (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
             (SELECT COUNT(*) FROM place_list_collaborators plc WHERE plc.list_id = pl.id) AS collaborator_count,
             (
@@ -107,9 +117,19 @@ BEGIN
             ) AS collaborator_photos,
             pl.description,
             pl.city,
-            pl.price_tier,
-            1 AS sort_order  -- Lists without location come after
+            pp.photos AS preview_photos,
+            1 AS sort_order
         FROM place_lists pl
+        LEFT JOIN LATERAL (
+            SELECT ARRAY_AGG(photo) AS photos FROM (
+                SELECT get_latest_review_photo(pli.place_id) AS photo
+                FROM place_list_items pli
+                WHERE pli.list_id = pl.id
+                ORDER BY pli.sort_order ASC NULLS LAST
+                LIMIT 3
+            ) sub
+            WHERE sub.photo IS NOT NULL
+        ) pp ON true
         WHERE pl.user_id = p_user_id
             AND pl.average_location IS NULL
     ) combined

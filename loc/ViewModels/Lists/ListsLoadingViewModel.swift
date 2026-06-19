@@ -60,7 +60,7 @@ class ListsLoadingViewModel: ObservableObject {
         isLoadingInitialLists = true
         defer { isLoadingInitialLists = false }
 
-        let pageSize = 6
+        let pageSize = 12 // Covers full screen in 2-column grid without immediate pagination
         let userLocation = locationManager?.currentLocation?.coordinate
 
         // Fetch all list metadata (for instant search) in parallel with paginated lists
@@ -132,9 +132,11 @@ class ListsLoadingViewModel: ObservableObject {
         dataVM.hasMorePlaceLists = ownedLists.count >= pageSize
         dataVM.initializePlaceCountsFromMetadata(for: allLists)
 
-        // Load places for each list
-        if !allLists.isEmpty {
-            await loadPlacesForLists(allLists)
+        // Load places only for lists without preview photos (shared/collaborative lists)
+        // Owned lists already have preview_photos embedded in the RPC response
+        let listsNeedingPlaces = allLists.filter { ($0.preview_photos ?? []).isEmpty && $0.place_count > 0 }
+        if !listsNeedingPlaces.isEmpty {
+            await loadPlacesForLists(listsNeedingPlaces)
         }
     }
 
@@ -150,7 +152,7 @@ class ListsLoadingViewModel: ObservableObject {
         defer { isLoadingMorePlaceLists = false }
 
         let nextPage = dataVM.placeListsCurrentPage + 1
-        let pageSize = 6
+        let pageSize = 12
 
         do {
             let moreLists = try await userService.fetchPlaceListsByProximity(
@@ -163,10 +165,6 @@ class ListsLoadingViewModel: ObservableObject {
 
             dataVM.appendPlaceLists(moreLists, nextPage: nextPage, pageSize: pageSize)
             dataVM.initializePlaceCountsFromMetadata(for: moreLists)
-
-            if !moreLists.isEmpty {
-                await loadPlacesForLists(moreLists)
-            }
         } catch {
             print("❌ [ListsLoadingViewModel] Error loading more place lists: \(error.localizedDescription)")
         }

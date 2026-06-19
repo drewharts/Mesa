@@ -98,15 +98,21 @@ class MapPhotoViewModel: ObservableObject {
 
     // MARK: - Annotation Image Generation
 
-    /// Generates combined annotation images off the main thread, cancelling any in-flight generation.
+    /// Generates combined annotation images off the main thread, merging into the existing cache.
     func generateAnnotationImages(for annotations: [PlaceAnnotation]) {
         currentGenerationTask?.cancel()
         let pictures = self.userProfilePictures
+        let existingKeys = Set(annotationImages.keys)
+        // Only render images for annotations that don't already have a cached image
+        let newAnnotations = annotations.filter { !existingKeys.contains($0.id) }
+        guard !newAnnotations.isEmpty else { return }
+
         currentGenerationTask = Task.detached(priority: .userInitiated) {
-            let images = Self.renderAnnotationImages(for: annotations, profilePictures: pictures)
+            let images = Self.renderAnnotationImages(for: newAnnotations, profilePictures: pictures)
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
-                self?.annotationImages = images
+                guard let self else { return }
+                self.annotationImages.merge(images) { _, new in new }
             }
         }
     }
