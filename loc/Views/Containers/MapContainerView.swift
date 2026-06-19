@@ -149,6 +149,8 @@ struct MapContainerView: View {
             .environmentObject(detailPlaceViewModel)
             .environmentObject(profileViewModel)
             .environmentObject(mapDisplayCoordinatorViewModel)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(userSession)
             .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
                 handleListSelectionChange(newValue)
             }

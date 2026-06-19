@@ -16,6 +16,8 @@ struct MapView: View {
     @EnvironmentObject var mapViewModel: MapViewModel
     @EnvironmentObject var appCoordinator: AppCoordinator
     @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @EnvironmentObject var userSession: UserSession
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
@@ -461,6 +463,11 @@ struct MapView: View {
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(profile)
+                .environmentObject(locationManager)
+                .environmentObject(detailPlaceVM)
+                .environmentObject(userProfileNavigationVM)
+                .environmentObject(userSession)
                 .presentationDragIndicator(.visible)
         }
         .onChange(of: selectedPlaceVM.selectedPlace?.id) { oldValue, newValue in

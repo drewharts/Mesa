@@ -31,26 +31,31 @@ struct VisiblePlacesPopupView: View {
     @EnvironmentObject private var profile: ProfileViewModel
     
     // MARK: - ViewModel (owned by this View)
-    
+
     @StateObject private var viewModel = VisiblePlacesPopupViewModel()
-    
+    @State private var navigationPath = NavigationPath()
+
     // MARK: - Layout
-    
+
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
-    
+
     // MARK: - Body
-    
+
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 headerSection
                 filterPicker
                 contentSection
             }
             .navigationBarHidden(true)
+            .navigationDestination(for: String.self) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
+                    .id(placeId)
+            }
         }
         .onAppear(perform: configureViewModel)
         .onChange(of: viewModel.selectedFilter) {
@@ -183,20 +188,8 @@ struct VisiblePlacesPopupView: View {
     
     // MARK: - Actions
     
-    /// Handle place tap - loads full details and navigates
+    /// Handle place tap — navigates to place detail within this sheet's navigation stack.
     private func handlePlaceTap(_ item: VisiblePlaceItem) {
-        Task {
-            do {
-                let fullPlace = try await viewModel.loadPlaceDetails(for: item)
-                
-            await MainActor.run {
-                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
-                selectedPlaceVM.isDetailSheetPresented = true
-                    dismiss()
-                }
-            } catch {
-                print("❌ [VisiblePlacesPopup] Error loading place details: \(error)")
-            }
-        }
+        navigationPath.append(item.id)
     }
 }
