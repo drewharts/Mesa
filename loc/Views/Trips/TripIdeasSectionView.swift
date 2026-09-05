@@ -92,8 +92,9 @@ struct TripIdeasSectionView: View {
                                 .font(.title3)
                                 .foregroundStyle(.white.opacity(0.9))
                                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
-                        .padding(6)
                     }
                     .draggable(place.id) {
                         TripPlaceDragPreview()

@@ -43,7 +43,7 @@ class PlaceSearchService {
             return
         }
         
-        mesaBackendService.fetchSuggestions(query: query, provider: "google", latitude: latitude, longitude: longitude) { result in
+        mesaBackendService.fetchSuggestions(query: query, provider: "local_first", latitude: latitude, longitude: longitude) { result in
             switch result {
             case .success(let suggestions):
                 DispatchQueue.main.async {

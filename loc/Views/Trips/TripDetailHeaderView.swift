@@ -40,11 +40,8 @@ struct TripDetailHeaderView: View {
 
     /// Formats the trip date range for display.
     private var formattedDateRange: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        let start = formatter.string(from: trip.startDate)
-        formatter.dateFormat = "MMM d, yyyy"
-        let end = formatter.string(from: trip.endDate)
+        let start = Trip.utcDateFormatter(format: "MMM d").string(from: trip.startDate)
+        let end = Trip.utcDateFormatter(format: "MMM d, yyyy").string(from: trip.endDate)
         return "\(start) - \(end)"
     }
 

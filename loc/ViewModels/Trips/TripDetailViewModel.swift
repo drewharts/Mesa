@@ -88,12 +88,10 @@ class TripDetailViewModel: ObservableObject {
     /// Formats a day index into a display label (e.g. "Day 1 · Wed Jan 15").
     func dayLabel(for index: Int) -> String {
         guard let trip = trip else { return "Day \(index + 1)" }
-        let calendar = Calendar.current
-        guard let date = calendar.date(byAdding: .day, value: index, to: trip.startDate) else {
+        guard let date = Trip.utcCalendar.date(byAdding: .day, value: index, to: trip.startDate) else {
             return "Day \(index + 1)"
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE MMM d"
+        let formatter = Trip.utcDateFormatter(format: "EEE MMM d")
         return "Day \(index + 1) · \(formatter.string(from: date))"
     }
 
