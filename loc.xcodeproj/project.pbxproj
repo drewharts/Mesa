@@ -90,6 +90,8 @@
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
 		B093B35F2F1EFC67003E3BF7 /* ViewportBoundsHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportBoundsHelper.swift; sourceTree = "<group>"; };
 		B0C31A862D94CB6400E481F4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		388AF5B73DCE4912B4CE77B9 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 		B0C31A872D94CB6400E481F4 /* loc.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text; path = loc.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -163,6 +165,8 @@
 			children = (
 				B093B35F2F1EFC67003E3BF7 /* ViewportBoundsHelper.swift */,
 				B0C31A862D94CB6400E481F4 /* .gitignore */,
+				17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */,
+				388AF5B73DCE4912B4CE77B9 /* Secrets.xcconfig.example */,
 				B054DC5F2C42F5DA00C98088 /* loc */,
 				B054DC702C42F5DB00C98088 /* locTests */,
 				B054DC7A2C42F5DB00C98088 /* locUITests */,
@@ -608,6 +612,7 @@
 		};
 		B054DC822C42F5DB00C98088 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -648,6 +653,7 @@
 		};
 		B054DC832C42F5DB00C98088 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
