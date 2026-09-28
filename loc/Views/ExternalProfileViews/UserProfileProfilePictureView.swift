@@ -9,81 +9,22 @@ import SwiftUI
 
 struct UserProfileProfilePictureView: View {
     let profilePhotoURL: URL?
-    let isFollowing: Bool
-    let onToggleFollow: () -> Void
-    let totalPlacesCount: Int
-    let userName: String
-    
+
     // MARK: - Constants
-    private let profileSize: CGFloat = 120
-    
-    @State private var showingPlacesCount = false
+    private let profileSize: CGFloat = 96
+
     @State private var showingFullScreen = false
-    
-    // MARK: - Subtle Places Count Badge (matches own profile style)
-    private var placesCountBadge: some View {
-        let displayText = totalPlacesCount >= 1000 ? "\(totalPlacesCount / 1000)k+" : "\(totalPlacesCount)"
-        
-        return Button(action: {
-            showingPlacesCount = true
-        }) {
-            Text(displayText)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundColor(.secondary)
-                .frame(minWidth: 24)  // Ensures badge extends past circle edge for single digits
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                )
-        }
-        .buttonStyle(.plain)
-        .offset(x: 4, y: 0)  // Pull badge onto the circle for visible overlap
-    }
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Profile image with places count badge
-            ZStack(alignment: .bottomTrailing) {
-                profileImageView
-                    .frame(width: profileSize, height: profileSize)
-                    .clipShape(Circle())
-                    .shadow(radius: 4)
-                    .onTapGesture {
-                        if profilePhotoURL != nil {
-                            showingFullScreen = true
-                        }
-                    }
-
-                // Places count badge - subtle style matching own profile
-                if totalPlacesCount > 0 {
-                    placesCountBadge
+        profileImageView
+            .frame(width: profileSize, height: profileSize)
+            .clipShape(Circle())
+            .shadow(radius: 4)
+            .onTapGesture {
+                if profilePhotoURL != nil {
+                    showingFullScreen = true
                 }
             }
-            
-            Button(action: onToggleFollow) {
-                Text(isFollowing ? "Following" : "Follow")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isFollowing ? .primary : .white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(isFollowing ? Color(.systemGray5) : Color.blue)
-                    )
-            }
-        }
-        .padding(.top, 0)
-        .alert("Places Saved", isPresented: $showingPlacesCount) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("\(userName) has \(totalPlacesCount) places saved across all their lists, favorites, and reviews.")
-        }
         .fullScreenCover(isPresented: $showingFullScreen) {
             if let url = profilePhotoURL {
                 ZStack {

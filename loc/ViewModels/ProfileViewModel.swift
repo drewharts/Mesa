@@ -675,6 +675,13 @@ class ProfileViewModel: ObservableObject {
         let fallbacks = captureCurrentCountFallbacks()
         showLoadingIndicatorsIfInitialLoad(fallbacks)
 
+        // Lists are an independent section — start loading them immediately rather than
+        // waiting for the counts fetch below to finish first, so both sections populate
+        // concurrently instead of lists being delayed by however long counts takes.
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.listsViewModel.loadInitialLists()
+        }
+
         if isCuratedProfile {
             let followersCount = await resilientFetch(fallbacks.followers) { try await self.userService.getNumberFollowers(forUserId: userId) }
             socialViewModel.followersCount = followersCount
@@ -699,10 +706,6 @@ class ProfileViewModel: ObservableObject {
         }
 
         profileCountsLoadingState = .loaded
-
-        Task.detached(priority: .userInitiated) { [weak self] in
-            await self?.listsViewModel.loadInitialLists()
-        }
     }
 
     /// Captures current count values as fallbacks so cancelled queries preserve existing data.

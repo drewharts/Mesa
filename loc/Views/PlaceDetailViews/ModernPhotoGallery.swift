@@ -194,7 +194,8 @@ struct ModernPhotoGallery: View {
                     item: firstItem,
                     width: geo.size.width,
                     height: heroImageHeight,
-                    cornerRadius: cornerRadius
+                    cornerRadius: cornerRadius,
+                    onLoadFailed: { url in photosViewModel.reportExternalImageLoadFailure(url: url) }
                 )
                 .overlay(overflowOverlay(at: 0))
                 .overlay(videoPlayOverlay(at: 0))
@@ -238,7 +239,8 @@ struct ModernPhotoGallery: View {
                 item: items[actualIndex],
                 width: geo.size.width,
                 height: geo.size.width * 0.6,
-                cornerRadius: cornerRadius
+                cornerRadius: cornerRadius,
+                onLoadFailed: { url in photosViewModel.reportExternalImageLoadFailure(url: url) }
             )
             .overlay(overflowOverlay(at: actualIndex))
             .overlay(videoPlayOverlay(at: actualIndex))
@@ -275,7 +277,8 @@ struct ModernPhotoGallery: View {
                         item: items[actualIndex],
                         width: geo.size.width,
                         height: geo.size.width * 0.8,
-                        cornerRadius: cornerRadius
+                        cornerRadius: cornerRadius,
+                        onLoadFailed: { url in photosViewModel.reportExternalImageLoadFailure(url: url) }
                     )
                     .overlay(overflowOverlay(at: actualIndex))
                     .overlay(videoPlayOverlay(at: actualIndex))

@@ -15,8 +15,17 @@ struct FeedCommentsSheet: View {
     let onDismissCount: (Int) -> Void
     let onProfileTapped: (String) -> Void
 
-    @StateObject private var commentsViewModel = PostCommentsViewModel()
+    @StateObject private var commentsViewModel: PostCommentsViewModel
     @Environment(\.dismiss) private var dismiss
+
+    init(item: FeedItem, currentUserId: String, currentUserProfile: ProfileData?, onDismissCount: @escaping (Int) -> Void, onProfileTapped: @escaping (String) -> Void) {
+        self.item = item
+        self.currentUserId = currentUserId
+        self.currentUserProfile = currentUserProfile
+        self.onDismissCount = onDismissCount
+        self.onProfileTapped = onProfileTapped
+        _commentsViewModel = StateObject(wrappedValue: PostCommentsViewModel(reviewId: item.id))
+    }
 
     var body: some View {
         NavigationView {
@@ -34,7 +43,7 @@ struct FeedCommentsSheet: View {
             }
         }
         .task {
-            await commentsViewModel.fetchComments(reviewId: item.id)
+            await commentsViewModel.fetchComments()
         }
         .onDisappear {
             onDismissCount(commentsViewModel.comments.count)
@@ -139,7 +148,6 @@ struct FeedCommentsSheet: View {
                         Task {
                             await commentsViewModel.deleteComment(
                                 commentId: group.comment.id,
-                                reviewId: item.id,
                                 placeId: item.placeId,
                                 userId: currentUserId
                             )
@@ -160,7 +168,6 @@ struct FeedCommentsSheet: View {
                             Task {
                                 await commentsViewModel.deleteComment(
                                     commentId: reply.id,
-                                    reviewId: item.id,
                                     placeId: item.placeId,
                                     userId: currentUserId
                                 )
@@ -185,7 +192,6 @@ struct FeedCommentsSheet: View {
             onSend: {
                 Task {
                     await commentsViewModel.addComment(
-                        reviewId: item.id,
                         placeId: item.placeId,
                         userId: currentUserId,
                         userFirstName: currentUserProfile?.firstName ?? "",

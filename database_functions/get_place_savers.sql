@@ -4,8 +4,10 @@
 -- Returns ALL users who have "saved" a specific place through any method:
 -- 1. Favorites (added to favorites)
 -- 2. Place Lists (added to any list - uses added_by for proper attribution)
--- 3. External Places (saved a TikTok for this place)
--- 4. Reviews (reviewed the place)
+-- 3. Reviews (reviewed the place)
+--
+-- Does NOT include users who merely saved an external TikTok referencing this
+-- place (external_places) - that's too loose a connection to count as "saved."
 --
 -- Returns is_followed flag so UI can separate friends from non-friends.
 -- Returns has_reviewed flag to indicate if user left a review.
@@ -45,14 +47,7 @@ BEGIN
 
         UNION
 
-        -- 3. Users who saved a TikTok for this place
-        SELECT ep.user_id
-        FROM external_places ep
-        WHERE ep.place_id = p_place_id
-
-        UNION
-
-        -- 4. Users who reviewed this place
+        -- 3. Users who reviewed this place
         SELECT r.user_id
         FROM reviews r
         WHERE r.place_id = p_place_id
@@ -96,7 +91,8 @@ $function$;
 
 -- Add comment for documentation
 COMMENT ON FUNCTION public.get_place_savers(TEXT, TEXT) IS
-'Returns ALL users who saved a place via favorites, lists, TikToks, or reviews.
+'Returns ALL users who saved a place via favorites, lists, or reviews.
+Does not include users who only saved an external TikTok referencing the place.
 Includes is_followed flag to separate friends from non-friends in UI.
 Includes has_reviewed flag to indicate if user left a review for the place.
 Results ordered: current user first, then followed users, then others alphabetically.';

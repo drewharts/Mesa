@@ -29,6 +29,8 @@ struct TripPlaceActionBadge: View {
                         .foregroundStyle(.green)
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(.ultraThinMaterial))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } else {
@@ -38,6 +40,8 @@ struct TripPlaceActionBadge: View {
                         .foregroundStyle(.white)
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(.ultraThinMaterial))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

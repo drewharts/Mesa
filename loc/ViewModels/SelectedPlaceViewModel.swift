@@ -218,14 +218,6 @@ class SelectedPlaceViewModel: ObservableObject {
         dismissNavigation()
     }
 
-    /// Updates just the description of the currently selected place.
-    func updatePlaceDescription(_ description: String) {
-        if var place = selectedPlace {
-            place.description = description
-            selectionState.updatePlaceDetails(place)
-        }
-    }
-
     /// Returns the restaurant type for a place.
     func getRestaurantType(for placeId: String) -> String? {
         metadata.getRestaurantType(forPlaceId: placeId)

@@ -96,6 +96,18 @@ struct CreatePostView: View {
                 selectionLimit: 0
             )
         }
+        .onChange(of: selectedPlace.selectedPlace?.id) { _, _ in
+            syncResolvedPlaceIfNeeded()
+        }
+    }
+
+    /// Adopts the freshly-resolved place once its placeholder ID has been replaced with
+    /// its real backend UUID, so posts started before resolution finished still save correctly.
+    private func syncResolvedPlaceIfNeeded() {
+        guard viewModel.place.hasPlaceholderID,
+              let resolved = selectedPlace.selectedPlace,
+              !resolved.hasPlaceholderID else { return }
+        viewModel.place = resolved
     }
     
     /// Upload progress bar shown during media upload.

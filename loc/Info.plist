@@ -48,6 +48,11 @@
 	</array>
 	<key>MBXAccessToken</key>
 	<string>pk.eyJ1IjoiZHJld2hhcnRzIiwiYSI6ImNtNnNpbnBrdjA4aXcyaXE0aDV3Y25qZTQifQ.3TUkiF3r3mHx44dyywy2JQ</string>
+	<key>GMSApiKey</key>
+	<string></string>
+	<!-- GMSApiKey intentionally left blank in source control — this repo is public.
+	     Fill in your Google Maps API key locally (uncommitted) to run the app;
+	     configureGoogleMaps() in locApp.swift no-ops safely if this is empty. -->
 	<key>maxCount</key>
 	<integer>1</integer>
 </dict>

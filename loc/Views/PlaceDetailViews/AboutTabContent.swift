@@ -42,7 +42,6 @@ struct AboutTabContent: View {
             if let place = viewModel.place {
                 PlaceInfoSection(
                     place: place,
-                    isDescriptionLoading: viewModel.isDescriptionLoading,
                     isRefreshing: isRefreshing,
                     onRefresh: onRefresh,
                     onAddPost: onAddPost
