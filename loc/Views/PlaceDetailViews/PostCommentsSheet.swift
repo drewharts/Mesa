@@ -14,8 +14,14 @@ struct PostCommentsSheet: View {
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var profile: ProfileViewModel
 
-    @StateObject private var commentsViewModel = PostCommentsViewModel()
+    @StateObject private var commentsViewModel: PostCommentsViewModel
     @Environment(\.dismiss) private var dismiss
+
+    init(post: PlacePost, postsViewModel: PlacePostsViewModel) {
+        self.post = post
+        self.postsViewModel = postsViewModel
+        _commentsViewModel = StateObject(wrappedValue: PostCommentsViewModel(reviewId: post.id))
+    }
 
     var body: some View {
         NavigationView {
@@ -33,7 +39,7 @@ struct PostCommentsSheet: View {
             }
         }
         .task {
-            await commentsViewModel.fetchComments(reviewId: post.id)
+            await commentsViewModel.fetchComments()
         }
     }
 
@@ -147,7 +153,7 @@ struct PostCommentsSheet: View {
                     onDelete: {
                         Task {
                             guard let userId = userSession.currentUserId else { return }
-                            await commentsViewModel.deleteComment(commentId: group.comment.id, reviewId: post.id, placeId: post.placeId, userId: userId)
+                            await commentsViewModel.deleteComment(commentId: group.comment.id, placeId: post.placeId, userId: userId)
                         }
                     },
                     onReply: {
@@ -166,7 +172,7 @@ struct PostCommentsSheet: View {
                         onDelete: {
                             Task {
                                 guard let userId = userSession.currentUserId else { return }
-                                await commentsViewModel.deleteComment(commentId: reply.id, reviewId: post.id, placeId: post.placeId, userId: userId)
+                                await commentsViewModel.deleteComment(commentId: reply.id, placeId: post.placeId, userId: userId)
                             }
                         },
                         onReply: {
@@ -193,7 +199,6 @@ struct PostCommentsSheet: View {
                     let lastName = user?.lastName ?? ""
                     let photoUrl = user?.profilePhotoURL?.absoluteString ?? ""
                     await commentsViewModel.addComment(
-                        reviewId: post.id,
                         placeId: post.placeId,
                         userId: userId,
                         userFirstName: firstName,

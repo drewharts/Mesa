@@ -48,6 +48,11 @@
 	</array>
 	<key>MBXAccessToken</key>
 	<string>pk.eyJ1IjoiZHJld2hhcnRzIiwiYSI6ImNtNnNpbnBrdjA4aXcyaXE0aDV3Y25qZTQifQ.3TUkiF3r3mHx44dyywy2JQ</string>
+	<key>GMSApiKey</key>
+	<string>$(GMS_API_KEY)</string>
+	<!-- Substituted at build time from Secrets.xcconfig (gitignored — see
+	     Secrets.xcconfig.example), so the real key never touches source control.
+	     configureGoogleMaps() in locApp.swift no-ops safely if this resolves empty. -->
 	<key>maxCount</key>
 	<integer>1</integer>
 </dict>

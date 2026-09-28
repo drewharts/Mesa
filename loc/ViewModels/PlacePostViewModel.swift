@@ -24,7 +24,9 @@ class PlacePostViewModel: ObservableObject {
     @Published var showSentimentSection: Bool = false
     
     // MARK: - Exposed Properties
-    let place: DetailPlace
+    /// The place this post is being created for. Updated by the view if the place's
+    /// placeholder ID resolves to its real backend UUID while the sheet is open.
+    @Published var place: DetailPlace
     
     // MARK: - Private Properties
     private let userId: String
@@ -122,7 +124,14 @@ class PlacePostViewModel: ObservableObject {
     // MARK: - Post Submission
 
     /// Submits the post by uploading all media then saving to the database.
+    /// Refuses to submit while `place` still has its placeholder ID, since that would
+    /// permanently orphan the post on a sentinel UUID no place actually queries against.
     func submitPost(completion: @escaping (Result<PlacePost, Error>) -> Void) {
+        guard !place.hasPlaceholderID else {
+            completion(.failure(PostSubmissionError.placeStillResolving))
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         uploadProgress = 0.0
@@ -220,6 +229,7 @@ class PlacePostViewModel: ObservableObject {
     
     // MARK: - Post Deletion
     
+    /// Deletes an existing post by ID.
     func deletePost(postId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         isLoading = true
         errorMessage = nil
@@ -236,6 +246,18 @@ class PlacePostViewModel: ObservableObject {
                     completion(.failure(error))
                 }
             }
+        }
+    }
+}
+
+/// Errors specific to post submission.
+enum PostSubmissionError: LocalizedError {
+    case placeStillResolving
+
+    var errorDescription: String? {
+        switch self {
+        case .placeStillResolving:
+            return "This place is still loading. Please wait a moment and try again."
         }
     }
 }

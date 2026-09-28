@@ -452,8 +452,15 @@ struct ListContentView: View {
         }
     }
 
+    /// Whether this list's first page of places is still being fetched.
+    private var isLoadingInitial: Bool {
+        listsVM.isLoadingInitialPlaces(listId: list.list_id)
+    }
+
     var body: some View {
-        if !filteredPlaces.isEmpty {
+        if filteredPlaces.isEmpty && isLoadingInitial {
+            initialLoadingGrid
+        } else if !filteredPlaces.isEmpty {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
                     PopupPlaceCard(
@@ -499,6 +506,20 @@ struct ListContentView: View {
             }
             .padding(.vertical, 30)
         }
+    }
+
+    /// Shimmering placeholder grid shown while the list's first page of places is loading,
+    /// shaped like the real grid (same columns/aspect ratio/corner radius as PopupPlaceCard)
+    /// so content doesn't visibly reflow once real places arrive.
+    private var initialLoadingGrid: some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(0..<6, id: \.self) { _ in
+                ShimmerView()
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(.horizontal, 16)
     }
 }
 

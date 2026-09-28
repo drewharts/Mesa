@@ -19,7 +19,10 @@ struct CityAnnotationMarkerView: View {
             .lineLimit(1)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
+        // A solid color, not .ultraThinMaterial: this view is snapshotted into a static UIImage
+        // by MapMarkerImageFactory's ImageRenderer, which has no live backdrop for a blur
+        // material to sample — .ultraThinMaterial renders as opaque black with nothing behind it.
+        .background(Color(.systemBackground).opacity(0.85))
         .clipShape(Capsule())
         .overlay(
             Capsule()

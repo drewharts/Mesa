@@ -25,38 +25,49 @@ struct ProfileContentView: View {
         ZStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    // Profile Picture
-                    ProfilePictureView()
+                    // Profile Picture + socials (left column) with name/follow counts top-aligned
+                    // to the right — condensed horizontal header so more content is visible
+                    // below without scrolling.
+                    HStack(alignment: .top, spacing: 14) {
+                        ProfilePictureView()
 
-                    // Name
-                    let firstName = profile.user?.firstName ?? ""
-                    let lastName = profile.user?.lastName ?? ""
-                    Text("\(firstName) \(lastName)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 10) {
+                                let firstName = profile.user?.firstName ?? ""
+                                let lastName = profile.user?.lastName ?? ""
+                                Text("\(firstName) \(lastName)")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.black)
 
-                    // Follow Counts & Social Links
-                    ProfileFollowCountsView(
-                        data: .myProfile(
-                            followers: socialVM.followersCount,
-                            following: socialVM.followingCount,
-                            isFollowersLoading: socialVM.isFollowersLoading,
-                            isFollowingLoading: socialVM.isFollowingLoading,
-                            instagramUsername: profile.user?.instagramUsername,
-                            tiktokUsername: profile.user?.tiktokUsername
-                        ),
-                        onFollowersTap: {
-                            navigationPath.append(ProfileView.FollowListDestination.followers)
-                        },
-                        onFollowingTap: {
-                            navigationPath.append(ProfileView.FollowListDestination.following)
-                        },
-                        hideFollowing: profile.isCuratedProfile,
-                        onAddSocialsTap: {
-                            showEditProfileForSocials = true
+                                ProfileSocialLinksRow(
+                                    instagramUsername: profile.user?.instagramUsername,
+                                    tiktokUsername: profile.user?.tiktokUsername,
+                                    onAddSocialsTap: { showEditProfileForSocials = true }
+                                )
+                            }
+
+                            ProfileFollowCountsView(
+                                data: .myProfile(
+                                    followers: socialVM.followersCount,
+                                    following: socialVM.followingCount,
+                                    places: profile.totalUniquePlacesCount,
+                                    isFollowersLoading: socialVM.isFollowersLoading,
+                                    isFollowingLoading: socialVM.isFollowingLoading
+                                ),
+                                onFollowersTap: {
+                                    navigationPath.append(ProfileView.FollowListDestination.followers)
+                                },
+                                onFollowingTap: {
+                                    navigationPath.append(ProfileView.FollowListDestination.following)
+                                },
+                                hideFollowing: profile.isCuratedProfile
+                            )
                         }
-                    )
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 20)
                     .onAppear {
                         Task {
                             await profile.loadProfileCounts()

@@ -280,11 +280,17 @@ class TripService {
     // MARK: - Helpers
 
     /// Formats a Date to yyyy-MM-dd string for Supabase date columns.
+    ///
+    /// Extracts the calendar day using the device's local calendar (the calendar the user
+    /// was looking at when they picked the date) rather than reinterpreting the instant in
+    /// UTC. Reformatting a local-midnight Date through a UTC-timezone formatter shifts the
+    /// day for any timezone ahead of UTC, so we read the y/m/d components directly instead.
     private static func dateToString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: date)
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        guard let year = components.year, let month = components.month, let day = components.day else {
+            return Trip.formatDate(date)
+        }
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
 }
 
