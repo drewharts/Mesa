@@ -42,6 +42,9 @@ class SuggestedProfilesViewModel: ObservableObject {
     private let supabaseUserService: SupabaseUserService
     private let contactsService: ContactsService
 
+    /// The signed-in user, excluded from suggestions and used for follow lookups.
+    private var currentUserId: String?
+
     // MARK: - Initialization
 
     init(
@@ -61,26 +64,31 @@ class SuggestedProfilesViewModel: ObservableObject {
         !UserDefaults.standard.bool(forKey: hasSeenPopupKey)
     }
 
-    /// Resets the popup seen status for testing purposes.
-    static func resetPopupSeenStatus() {
-        UserDefaults.standard.removeObject(forKey: hasSeenPopupKey)
-    }
-
     // MARK: - Public Methods
+
+    /// Loads suggested profiles, then contact matches and the user's follow state for every displayed profile in parallel.
+    func load(currentUserId: String?) async {
+        self.currentUserId = currentUserId
+        await loadSuggestedProfiles()
+        guard let currentUserId else { return }
+        async let contacts: Void = loadContactMatches(currentUserId: currentUserId)
+        async let follows: Void = loadFollowStates(currentUserId: currentUserId)
+        _ = await (contacts, follows)
+    }
 
     /// Marks the popup as seen so it won't show again on future logins.
     func markPopupAsSeen() {
         UserDefaults.standard.set(true, forKey: Self.hasSeenPopupKey)
     }
 
-    /// Loads suggested profile data from the database for display.
-    func loadSuggestedProfiles() async {
+    /// Loads suggested profile data from the database for display, excluding the current user.
+    private func loadSuggestedProfiles() async {
         isLoading = true
         loadError = nil
 
         var loadedProfiles: [ProfileData] = []
 
-        for userId in Self.suggestedProfileIds {
+        for userId in Self.suggestedProfileIds where !isCurrentUser(userId) {
             do {
                 let profile = try await userService.fetchUserById(userId: userId)
                 loadedProfiles.append(profile)
@@ -103,13 +111,19 @@ class SuggestedProfilesViewModel: ObservableObject {
 
     /// Retries loading profiles after an error occurred.
     func retry() async {
-        await loadSuggestedProfiles()
+        await load(currentUserId: currentUserId)
+    }
+
+    /// Returns whether the given profile ID belongs to the signed-in user.
+    private func isCurrentUser(_ profileId: String) -> Bool {
+        guard let currentUserId else { return false }
+        return profileId.caseInsensitiveCompare(currentUserId) == .orderedSame
     }
 
     // MARK: - Contact Matching
 
     /// Requests contacts access, fetches phone numbers, and matches them against Supabase users.
-    func loadContactMatches(currentUserId: String) async {
+    private func loadContactMatches(currentUserId: String) async {
         isLoadingContacts = true
 
         let granted = await contactsService.requestAccess()
@@ -144,18 +158,15 @@ class SuggestedProfilesViewModel: ObservableObject {
 
     // MARK: - Follow Logic
 
-    /// Checks the initial follow status for all loaded profiles.
-    func checkFollowStates(currentUserId: String) async {
-        for profile in suggestedProfiles {
-            do {
-                let isFollowing = try await supabaseUserService.isFollowingUser(
-                    followerId: currentUserId,
-                    followingId: profile.id
-                )
-                followStates[profile.id] = isFollowing
-            } catch {
-                followStates[profile.id] = false
+    /// Fetches everyone the user follows in one query and marks matching profiles as followed.
+    private func loadFollowStates(currentUserId: String) async {
+        do {
+            let followingIds = try await supabaseUserService.fetchFollowingUserIds(userId: currentUserId)
+            for id in followingIds where followStates[id] == nil {
+                followStates[id] = true
             }
+        } catch {
+            print("⚠️ [SuggestedProfilesVM] Failed to load follow states: \(error.localizedDescription)")
         }
     }
 

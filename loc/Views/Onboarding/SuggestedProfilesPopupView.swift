@@ -31,7 +31,6 @@ struct SuggestedProfilesPopupView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        viewModel.markPopupAsSeen()
                         isPresented = false
                     }
                     .fontWeight(.semibold)
@@ -42,11 +41,9 @@ struct SuggestedProfilesPopupView: View {
             }
         }
         .task {
-            await viewModel.loadSuggestedProfiles()
-            if let currentUserId = userSession.currentUserId {
-                await viewModel.checkFollowStates(currentUserId: currentUserId)
-                await viewModel.loadContactMatches(currentUserId: currentUserId)
-            }
+            // Mark as seen on display so any dismissal (Done or swipe) counts
+            viewModel.markPopupAsSeen()
+            await viewModel.load(currentUserId: userSession.currentUserId)
         }
     }
 
@@ -97,6 +94,16 @@ struct SuggestedProfilesPopupView: View {
 
             Divider()
 
+            ScrollView {
+                scrollableProfiles
+            }
+
+            searchHintView
+        }
+    }
+
+    private var scrollableProfiles: some View {
+        LazyVStack(spacing: 0) {
             // Contacts-matched profiles section
             ContactsMatchSection(
                 contactMatches: viewModel.contactMatches,
@@ -141,12 +148,6 @@ struct SuggestedProfilesPopupView: View {
                         .padding(.leading, 76)
                 }
             }
-
-            Divider()
-
-            Spacer()
-
-            searchHintView
         }
     }
 

@@ -155,9 +155,6 @@ struct locApp: App {
         self.searchCoordinator = searchCoord
         self.splashScreenViewModel = SplashScreenViewModel(userSession: userSess, dataManager: dataMgr)
 
-        // TODO: Remove after testing - resets suggested profiles popup
-        SuggestedProfilesViewModel.resetPopupSeenStatus()
-
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
         appDelegate.deepLinkViewModel = deepLinkVM
