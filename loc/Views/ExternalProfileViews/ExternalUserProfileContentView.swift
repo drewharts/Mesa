@@ -26,47 +26,65 @@ struct ExternalUserProfileContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Profile Picture, Name, Followers
-                VStack(spacing: 16) {
-                    // Profile Picture
-                    UserProfileProfilePictureView(
-                        profilePhotoURL: viewModel.user.profilePhotoURL,
-                        isFollowing: viewModel.isFollowing,
-                        onToggleFollow: {
-                            guard let currentUserId = userSession.currentUserId else { return }
-                            viewModel.toggleFollowUser(currentUserId: currentUserId) { success, newFollowingState in
-                                if success {
-                                    profileVM.socialViewModel.updateFollowingState(
-                                        userId: viewModel.userId,
-                                        isFollowing: newFollowingState
-                                    )
-                                }
+                // Profile Picture (left) + name/follow counts (right), Follow button below —
+                // condensed horizontal header so more content is visible without scrolling.
+                VStack(spacing: 12) {
+                    HStack(alignment: .top, spacing: 14) {
+                        UserProfileProfilePictureView(profilePhotoURL: viewModel.user.profilePhotoURL)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 10) {
+                                Text(viewModel.user.fullName)
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.black)
+
+                                ProfileSocialLinksRow(
+                                    instagramUsername: viewModel.user.instagramUsername,
+                                    tiktokUsername: viewModel.user.tiktokUsername
+                                )
                             }
-                        },
-                        totalPlacesCount: viewModel.totalPlacesCount,
-                        userName: viewModel.user.firstName.isEmpty ? viewModel.user.fullName : viewModel.user.firstName
-                    )
 
-                    // Name
-                    Text(viewModel.user.fullName)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
+                            // Clickable Followers/Following/Places counts
+                            ProfileFollowCountsView(
+                                data: .external(
+                                    followers: viewModel.followers,
+                                    following: viewModel.followingCount,
+                                    places: viewModel.totalPlacesCount
+                                ),
+                                onFollowersTap: { showFollowers = true },
+                                onFollowingTap: { showFollowing = true },
+                                hideFollowing: viewModel.isCuratedProfile
+                            )
+                        }
 
-                    // Clickable Followers/Following counts & Social Links
-                    ProfileFollowCountsView(
-                        data: .external(
-                            followers: viewModel.followers,
-                            following: viewModel.followingCount,
-                            instagramUsername: viewModel.user.instagramUsername,
-                            tiktokUsername: viewModel.user.tiktokUsername
-                        ),
-                        onFollowersTap: { showFollowers = true },
-                        onFollowingTap: { showFollowing = true },
-                        hideFollowing: viewModel.isCuratedProfile
-                    )
+                        Spacer(minLength: 0)
+                    }
+
+                    Button(action: {
+                        guard let currentUserId = userSession.currentUserId else { return }
+                        viewModel.toggleFollowUser(currentUserId: currentUserId) { success, newFollowingState in
+                            if success {
+                                profileVM.socialViewModel.updateFollowingState(
+                                    userId: viewModel.userId,
+                                    isFollowing: newFollowingState
+                                )
+                            }
+                        }
+                    }) {
+                        Text(viewModel.isFollowing ? "Following" : "Follow")
+                            .font(.system(size: 14, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(viewModel.isFollowing ? .primary : .white)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(viewModel.isFollowing ? Color(.systemGray5) : Color.blue)
+                            )
+                    }
                 }
-                .padding(.top, -8)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
                 .padding(.bottom, 16)
 
                 Divider()

@@ -83,125 +83,85 @@ struct MapView: View {
         return mapViewModel.communityMarkers.filter { $0.id != selectedId }
     }
 
-    // Map content extracted to help Swift type checker
-    private var mapContentView: some View {
-        Map(position: $mapPosition) {
-            // Suppress regular annotations when trip overlay is active
-            if !mapDisplayCoordinatorVM.hasTripOverlay {
-                if mapViewModel.showingCityAnnotations {
-                    // City-level annotations (zoomed out)
-                    ForEach(mapViewModel.cityAnnotations) { city in
-                        Annotation(
-                            "",
-                            coordinate: city.coordinate,
-                            anchor: .center
-                        ) {
-                            CityAnnotationMarkerView(city: city, isSelected: false)
-                                .onTapGesture {
-                                    mapViewModel.handleCityAnnotationTap(city)
-                                }
-                        }
-                    }
-                } else {
-                    // Community places as small emoji markers (shown behind network places)
-                    // Hidden in "My Places" mode since community markers are not user-specific
-                    // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
-                    if !mapViewModel.showMyPlacesOnly {
-                        ForEach(filteredCommunityMarkers) { marker in
-                            Annotation(
-                                "",
-                                coordinate: marker.coordinate,
-                                anchor: .center
-                            ) {
-                                communityMarkerView(for: marker)
-                            }
-                        }
-                    }
+    // MARK: - Native Map Annotation Bridging
 
-                    // Network places (user + followed users) as main annotations
-                    // Use sortedAnnotations so selected annotation renders last (on top)
-                    ForEach(sortedAnnotations) { annotation in
-                        Annotation(
-                            annotation.name,
-                            coordinate: annotation.coordinate,
-                            anchor: .bottom
-                        ) {
-                            annotationMarkerView(for: annotation)
-                        }
-                    }
-                }
-            }
+    /// Merges city/community/network/trip pins and the user-location dot into MapKit's
+    /// unified annotation model, respecting the same mutual-exclusivity rules the old
+    /// SwiftUI Map content used (trip overlay suppresses the rest; city-zoom suppresses
+    /// community+network).
+    private var unifiedAnnotations: [MapAnnotationItem] {
+        var items: [MapAnnotationItem] = []
 
-            // Trip annotations (shown when viewing a specific trip)
-            ForEach(mapDisplayCoordinatorVM.activeTripAnnotations) { annotation in
-                Annotation(
-                    "",
-                    coordinate: annotation.coordinate,
-                    anchor: .center
-                ) {
-                    TripItineraryPinView(
-                        annotation: annotation,
-                        isSelected: mapDisplayCoordinatorVM.selectedTripAnnotationPlaceId == annotation.placeId,
-                        onTap: {
-                            mapDisplayCoordinatorVM.tappedTripPlaceId = annotation.placeId
-                        }
-                    )
+        if !mapDisplayCoordinatorVM.hasTripOverlay {
+            if mapViewModel.showingCityAnnotations {
+                items += mapViewModel.cityAnnotations.map(MapAnnotationItem.init(city:))
+            } else {
+                if !mapViewModel.showMyPlacesOnly {
+                    items += filteredCommunityMarkers.map(MapAnnotationItem.init(community:))
                 }
-            }
-
-            // Current location dot
-            if let userLocation = locationManager.currentLocation?.coordinate {
-                Annotation(
-                    "",
-                    coordinate: userLocation,
-                    anchor: .center
-                ) {
-                    userLocationMarker
-                }
+                items += sortedAnnotations.map(MapAnnotationItem.init(network:))
             }
         }
+
+        items += mapDisplayCoordinatorVM.activeTripAnnotations.map(MapAnnotationItem.init(trip:))
+
+        if let userLocation = locationManager.currentLocation?.coordinate {
+            items.append(MapAnnotationItem(userLocation: userLocation))
+        }
+
+        return items
     }
-    
-    // Annotation marker view with user photos
-    private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
-        // Highlight annotation when it's the selected place and any sheet/popup is open
-        let isSelected = isPlaceSelected &&
-                        selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
-        return CustomPlaceAnnotationView(
-            annotation: annotation,
-            annotationImage: mapViewModel.showEmojiAnnotations ? nil : mapViewModel.annotationImages[annotation.id],
-            isSelected: isSelected
-        )
-        .onTapGesture {
-            handleAnnotationTap(annotation)
+
+    /// Determines whether a given unified annotation represents the currently selected place.
+    /// Compares by the layer's own place identifier rather than the annotation's stableId, since
+    /// a place can be freshly tapped while still rendered under its original layer (e.g. a
+    /// community marker, before the async lookup swaps it to a preserved network annotation) —
+    /// matching by placeId keeps the highlight correct immediately, not just after that swap.
+    /// Trip pins use their own selection concept (mapDisplayCoordinatorVM.selectedTripAnnotationPlaceId)
+    /// since trip mode suppresses the normal selectedPlaceVM-driven flow entirely. City pins are
+    /// never treated as "selected" — tapping one navigates away rather than opening a detail sheet.
+    private func isAnnotationSelected(_ item: MapAnnotationItem) -> Bool {
+        switch item.layer {
+        case .network, .community:
+            guard let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString else { return false }
+            return item.placeId == selectedId
+        case .trip(let trip):
+            return trip.placeId == mapDisplayCoordinatorVM.selectedTripAnnotationPlaceId
+        case .city, .userLocation:
+            return false
         }
     }
 
-    // Community marker view - small emoji markers for places saved by users you don't follow
-    private func communityMarkerView(for marker: CommunityPlaceMarker) -> some View {
-        // Check if this marker is selected
-        let isSelected = isPlaceSelected &&
-                        selectedPlaceVM.selectedPlace?.id.uuidString == marker.id
-
-        // Scale size based on popularity (save count)
-        let fontSize: CGFloat = {
+    /// Resolves the correct image for a unified annotation item, reusing the existing
+    /// precomputed profile-photo composite cache where available and MapMarkerImageFactory
+    /// for everything else.
+    private func annotationImage(for item: MapAnnotationItem, isSelected: Bool) -> UIImage? {
+        switch item.layer {
+        case .network(let annotation):
+            if mapViewModel.showEmojiAnnotations {
+                return MapMarkerImageFactory.shared.emojiCircleImage(placeType: annotation.placeType, isSelected: isSelected)
+            }
+            if let baked = mapViewModel.annotationImages[annotation.id] {
+                return baked
+            }
+            return MapMarkerImageFactory.shared.emojiCircleImage(placeType: annotation.placeType, isSelected: isSelected)
+        case .community(let marker):
+            let fontSize: CGFloat
             switch marker.saveCount {
-            case 1...5: return 16
-            case 6...20: return 20
-            default: return 24
+            case 1...5: fontSize = 16
+            case 6...20: fontSize = 20
+            default: fontSize = 24
             }
-        }()
-
-        return CommunityMarkerView(
-            emoji: marker.emoji,
-            fontSize: fontSize,
-            isSelected: isSelected
-        )
-        .onTapGesture {
-            handleCommunityMarkerTap(marker)
+            return MapMarkerImageFactory.shared.communityMarkerImage(emoji: marker.emoji, fontSize: fontSize)
+        case .city(let city):
+            return MapMarkerImageFactory.shared.cityCapsuleImage(city: city, isSelected: isSelected)
+        case .trip(let trip):
+            return MapMarkerImageFactory.shared.tripPinImage(annotation: trip, isSelected: isSelected)
+        case .userLocation:
+            return MapMarkerImageFactory.shared.userLocationDotImage()
         }
     }
-    
+
     // Handle community marker tap
     private func handleCommunityMarkerTap(_ marker: CommunityPlaceMarker) {
         // Cancel any in-flight tap discovery (SpatialTapGesture fires simultaneously)
@@ -218,19 +178,6 @@ struct MapView: View {
                 }
             }
         }
-    }
-    
-    // User location marker
-    private var userLocationMarker: some View {
-        Circle()
-            .fill(Color.blue)
-            .frame(width: 18, height: 18)
-            .overlay(
-                Circle()
-                    .stroke(Color.white, lineWidth: 4)
-                    .frame(width: 18, height: 18)
-            )
-            .shadow(radius: 4)
     }
     
     /// Handles annotation tap with immediate navigation, backfilling full details in background.
@@ -277,53 +224,45 @@ struct MapView: View {
     
     var body: some View {
         ZStack {
-            MapReader { mapProxy in
-                mapContentView
-                .mapStyle(mapViewModel.isSatelliteMap ? .hybrid : .standard)
-                .mapControlVisibility(.hidden)
-                .ignoresSafeArea()
-                .onMapCameraChange(frequency: .onEnd) { context in
-                    // This fires only when camera stops moving - Apple handles debouncing!
-                    currentMapRegion = context.region
-
-                    // Update global map region for viewport-based searches
-                    appCoordinator.currentMapRegion = context.region
-
-                    // Skip viewport fetches when trip annotations are active
+            GoogleMapView(
+                mapPosition: $mapPosition,
+                annotations: unifiedAnnotations,
+                isSatelliteMap: mapViewModel.isSatelliteMap,
+                isAnnotationSelected: { item in isAnnotationSelected(item) },
+                onCameraSettled: { region in
+                    currentMapRegion = region
+                    appCoordinator.currentMapRegion = region
                     guard !mapDisplayCoordinatorVM.hasTripOverlay else { return }
-
-                    // Only load if user profile is available (View coordinates data flow)
                     if let userId = profile.user?.id {
                         Task.detached(priority: .background) {
-                            await mapViewModel.onMapCameraSettled(context.region, userId: userId)
+                            await mapViewModel.onMapCameraSettled(region, userId: userId)
                         }
                     }
+                },
+                onNetworkTap: { annotation in
+                    handleAnnotationTap(annotation)
+                },
+                onCommunityTap: { marker in
+                    handleCommunityMarkerTap(marker)
+                },
+                onCityTap: { city in
+                    mapViewModel.handleCityAnnotationTap(city)
+                },
+                onTripTap: { placeId in
+                    mapDisplayCoordinatorVM.tappedTripPlaceId = placeId
+                },
+                onLongPressCreatePlace: { coordinate in
+                    newPlaceCoordinate = coordinate
+                    showCreatePlacePopup = true
+                },
+                onDiscoveryTap: { coordinate in
+                    onMapTap?(coordinate)
+                },
+                annotationImageProvider: { item, isSelected in
+                    annotationImage(for: item, isSelected: isSelected)
                 }
-                .gesture(
-                    LongPressGesture(minimumDuration: 0.7)
-                        .sequenced(before: DragGesture(minimumDistance: 0))
-                        .onEnded { value in
-                            switch value {
-                            case .second(true, let drag?):
-                                // Convert the tap location to map coordinates using MapProxy
-                                if let coordinate = mapProxy.convert(drag.location, from: .local) {
-                                    newPlaceCoordinate = coordinate
-                                    showCreatePlacePopup = true
-                                }
-                            default:
-                                break
-                            }
-                        }
-                )
-                .simultaneousGesture(
-                    SpatialTapGesture()
-                        .onEnded { value in
-                            if let coordinate = mapProxy.convert(value.location, from: .local) {
-                                onMapTap?(coordinate)
-                            }
-                        }
-                )
-            }
+            )
+            .ignoresSafeArea()
             .onChange(of: recenterMap) { oldValue, newValue in
                 if newValue {
                     let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
@@ -336,6 +275,9 @@ struct MapView: View {
             .onChange(of: locationManager.currentLocation) { oldValue, newValue in
                 // Center map on user's actual location when it first becomes available
                 // This fixes the "Kansas problem" where new users start at the US center
+                #if DEBUG
+                print("[MapCenter] MapView.onChange(currentLocation): new=\(String(describing: newValue?.coordinate)) hasCenteredOnUserLocation=\(hasCenteredOnUserLocation) selectedPlace=\(String(describing: selectedPlaceVM.selectedPlace?.id))")
+                #endif
                 if !hasCenteredOnUserLocation,
                    let userLocation = newValue?.coordinate,
                    selectedPlaceVM.selectedPlace == nil {
@@ -406,6 +348,9 @@ struct MapView: View {
             }
         }
         .onAppear {
+            #if DEBUG
+            print("[MapCenter] MapView.onAppear: selectedPlace=\(String(describing: selectedPlaceVM.selectedPlace?.id)) currentLocation=\(String(describing: locationManager.currentLocation?.coordinate)) authStatus=\(CLLocationManager().authorizationStatus.rawValue)")
+            #endif
             // Set initial position when the view appears
             if let place = selectedPlaceVM.selectedPlace, let geoPoint = place.coordinate {
                 let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
@@ -552,22 +497,3 @@ struct MapView: View {
     }
 }
 
-struct PlaceAnnotationItem: Identifiable {
-    let id: UUID
-    let coordinate: CLLocationCoordinate2D
-    let place: DetailPlace
-}
-
-struct PlaceAnnotationView: View {
-    let place: DetailPlace
-    let image: UIImage?
-    let annotationImage: UIImage?
-    
-    var body: some View {
-        VStack(spacing: 2) {
-            if let annotationImage = annotationImage {
-                Image(uiImage: annotationImage)
-            }
-        }
-    }
-}

@@ -129,11 +129,6 @@ class PlaceDetailTabsViewModel: ObservableObject {
             notesViewModel: self.notesTabViewModel
         )
 
-        // Wire up description callback to update selected place
-        self.aboutTabViewModel.onDescriptionUpdated = { [weak selectedPlaceVM] description in
-            selectedPlaceVM?.updatePlaceDescription(description)
-        }
-
         // PlacePostsViewModel - fully refactored (no ViewModel dependencies)
         self.postsViewModel = PlacePostsViewModel(
             photosViewModel: photosVM,
@@ -323,11 +318,17 @@ class PlaceDetailTabsViewModel: ObservableObject {
         showSaversIndicator = false
         saverCount = 0
         placeRating = 0
+        isPlaceInList = false
 
         // Reset child VMs before setting currentPlace (prevents stale data flash)
         postsViewModel.setPlace(place)
         placePhotosViewModel.setPlace(place)
-        placeSaversViewModel.setPlace(place?.id.uuidString)
+
+        // Placeholder-ID places (not yet resolved from search) all share one sentinel UUID —
+        // querying savers with it would return unrelated profiles that happen to reference
+        // that value. refreshPlaceData() loads real savers once the backend UUID arrives.
+        let saversPlaceId = (place?.hasPlaceholderID == true) ? nil : place?.id.uuidString
+        placeSaversViewModel.setPlace(saversPlaceId)
 
         // Now update currentPlace — triggers reactive subscription with clean state
         handlePlaceChanged(place)
@@ -383,7 +384,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
     /// Check if the current place is saved in any of the user's lists OR favorites.
     private func checkPlaceListMembership(place: DetailPlace?) async {
-        guard let place = place, let userId = userSession.currentUserId else {
+        // Placeholder-ID places (not yet resolved from search) all share one sentinel UUID —
+        // querying with it would return whatever unrelated data happens to reference that
+        // value. refreshPlaceData() re-checks this once the real backend UUID arrives.
+        guard let place = place, !place.hasPlaceholderID, let userId = userSession.currentUserId else {
             isPlaceInList = false
             return
         }

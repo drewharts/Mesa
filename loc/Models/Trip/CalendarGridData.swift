@@ -21,7 +21,9 @@ struct CalendarGridData {
 
     /// Builds the calendar grid cells from a trip's start date and number of days.
     init(trip: Trip) {
-        let calendar = Calendar.current
+        // trip.startDate is a UTC-midnight anchor (see Trip.parseDate); must use Trip.utcCalendar
+        // here, not Calendar.current, or every day number/weekday shifts by one for non-UTC devices.
+        let calendar = Trip.utcCalendar
         let startDate = trip.startDate
         let numberOfDays = trip.numberOfDays
 

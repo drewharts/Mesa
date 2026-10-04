@@ -56,23 +56,11 @@ struct CommentRowView: View {
     }
 
     private var profileImage: some View {
-        Group {
-            if let url = URL(string: comment.profilePhotoUrl), !comment.profilePhotoUrl.isEmpty {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .foregroundColor(.gray)
-                }
-            } else {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
-                    .foregroundColor(.gray)
-            }
-        }
-        .frame(width: 32, height: 32)
-        .clipShape(Circle())
+        CachedProfileImage(
+            url: comment.profilePhotoUrl,
+            size: 32,
+            fallbackInitial: comment.userFirstName.prefix(1).uppercased()
+        )
         .onTapGesture { onProfileTapped() }
     }
 

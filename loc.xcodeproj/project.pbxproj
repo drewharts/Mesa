@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4A20061228EBC1D43FBB8E9E /* GoogleMapsUtils in Frameworks */ = {isa = PBXBuildFile; productRef = 48F55626743DD9488E979652 /* GoogleMapsUtils */; };
 		B004E8102ED66B28008E26EF /* MesaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B0667A9F2EB309CA00879683 /* MesaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B02D1F8D2F33A54F00BEE4BC /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B02D1F8C2F33A54F00BEE4BC /* GoogleService-Info.plist */; };
 		B054DC612C42F5DA00C98088 /* locApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC602C42F5DA00C98088 /* locApp.swift */; };
@@ -89,6 +90,8 @@
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
 		B093B35F2F1EFC67003E3BF7 /* ViewportBoundsHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportBoundsHelper.swift; sourceTree = "<group>"; };
 		B0C31A862D94CB6400E481F4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		388AF5B73DCE4912B4CE77B9 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 		B0C31A872D94CB6400E481F4 /* loc.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text; path = loc.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -121,6 +124,7 @@
 				B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */,
 				B067944A2E9C439600B9D273 /* Auth in Frameworks */,
 				B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */,
+				4A20061228EBC1D43FBB8E9E /* GoogleMapsUtils in Frameworks */,
 				B067944E2E9C439600B9D273 /* PostgREST in Frameworks */,
 				B067944C2E9C439600B9D273 /* Functions in Frameworks */,
 				B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */,
@@ -161,6 +165,8 @@
 			children = (
 				B093B35F2F1EFC67003E3BF7 /* ViewportBoundsHelper.swift */,
 				B0C31A862D94CB6400E481F4 /* .gitignore */,
+				17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */,
+				388AF5B73DCE4912B4CE77B9 /* Secrets.xcconfig.example */,
 				B054DC5F2C42F5DA00C98088 /* loc */,
 				B054DC702C42F5DB00C98088 /* locTests */,
 				B054DC7A2C42F5DB00C98088 /* locUITests */,
@@ -256,6 +262,7 @@
 			name = loc;
 			packageProductDependencies = (
 				B054DC8F2C4301FB00C98088 /* GoogleMaps */,
+				48F55626743DD9488E979652 /* GoogleMapsUtils */,
 				B061F1DD2C5815FA00042CB0 /* GooglePlaces */,
 				B0A819172CEA5F970041416F /* GoogleSignIn */,
 				B0A819192CEA5F970041416F /* GoogleSignInSwift */,
@@ -368,6 +375,7 @@
 			mainGroup = B054DC542C42F5DA00C98088;
 			packageReferences = (
 				B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
+				D49261BD610938D0B69391F0 /* XCRemoteSwiftPackageReference "google-maps-ios-utils" */,
 				B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
 				B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */,
@@ -604,6 +612,7 @@
 		};
 		B054DC822C42F5DB00C98088 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -612,6 +621,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"loc/Preview Content\"";
+				DEVELOPMENT_TEAM = 585YK2F2H6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = loc/Info.plist;
@@ -628,7 +638,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.68;
+				MARKETING_VERSION = 4.69;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -643,6 +653,7 @@
 		};
 		B054DC832C42F5DB00C98088 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 17EA320B9FB04BF68D1BE54A /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -667,7 +678,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.68;
+				MARKETING_VERSION = 4.69;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -768,7 +779,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.68;
+				MARKETING_VERSION = 4.69;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -805,7 +816,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.68;
+				MARKETING_VERSION = 4.69;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -879,7 +890,7 @@
 			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 9.0.0;
+				minimumVersion = 10.0.0;
 			};
 		};
 		B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */ = {
@@ -906,9 +917,22 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		D49261BD610938D0B69391F0 /* XCRemoteSwiftPackageReference "google-maps-ios-utils" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/google-maps-ios-utils";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		48F55626743DD9488E979652 /* GoogleMapsUtils */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D49261BD610938D0B69391F0 /* XCRemoteSwiftPackageReference "google-maps-ios-utils" */;
+			productName = GoogleMapsUtils;
+		};
 		B054DC8F2C4301FB00C98088 /* GoogleMaps */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;

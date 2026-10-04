@@ -24,10 +24,7 @@ class SplashScreenViewModel: ObservableObject {
         do {
             let profileId = try await resolveProfileId()
 
-            userSession.setUserLoggedIn(uid: profileId)
-            userSession.needsPhoneOnboarding = !UserSession.hasCompletedPhoneOnboarding
-            userSession.needsProfilePhoto = !UserSession.hasCompletedPhotoOnboarding
-            userSession.needsListOnboarding = !UserSession.hasCompletedListOnboarding
+            await userSession.beginSession(uid: profileId)
 
             Task.detached(priority: .userInitiated) {
                 await self.dataManager.initializeProfileData(userId: profileId)

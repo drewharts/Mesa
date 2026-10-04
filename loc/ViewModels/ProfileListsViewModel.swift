@@ -499,6 +499,11 @@ class ProfileListsViewModel: ObservableObject {
         await loadingViewModel.loadPlacesForList(listId: listId)
     }
 
+    /// Whether the first page of places for a list is currently being fetched.
+    func isLoadingInitialPlaces(listId: String) -> Bool {
+        loadingViewModel.isLoadingInitialPlaces(listId: listId)
+    }
+
     /// Loads more places for a list with pagination.
     func loadMorePlacesForList(listId: String, page: Int, pageSize: Int = 6) async throws -> [LightweightPlace] {
         try await loadingViewModel.loadMorePlacesForList(listId: listId, page: page, pageSize: pageSize)

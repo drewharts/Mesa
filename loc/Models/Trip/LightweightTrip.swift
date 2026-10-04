@@ -38,25 +38,21 @@ struct LightweightTrip: Codable, Identifiable, Equatable {
 
     /// Returns the inclusive number of days in this trip.
     var numberOfDays: Int {
-        let calendar = Calendar.current
-        let days = calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 0
+        let days = Trip.utcCalendar.dateComponents([.day], from: startDate, to: endDate).day ?? 0
         return max(days + 1, 1)
     }
 
     /// Formatted date range string (e.g. "Jan 15 - Jan 20, 2026").
     var dateRangeString: String {
-        let formatter = DateFormatter()
-        let calendar = Calendar.current
+        let calendar = Trip.utcCalendar
         let sameYear = calendar.component(.year, from: startDate) == calendar.component(.year, from: endDate)
 
         if sameYear {
-            formatter.dateFormat = "MMM d"
-            let start = formatter.string(from: startDate)
-            formatter.dateFormat = "MMM d, yyyy"
-            let end = formatter.string(from: endDate)
+            let start = Trip.utcDateFormatter(format: "MMM d").string(from: startDate)
+            let end = Trip.utcDateFormatter(format: "MMM d, yyyy").string(from: endDate)
             return "\(start) - \(end)"
         } else {
-            formatter.dateFormat = "MMM d, yyyy"
+            let formatter = Trip.utcDateFormatter(format: "MMM d, yyyy")
             return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
         }
     }

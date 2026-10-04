@@ -433,7 +433,11 @@ class SearchViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Handles selection of a place suggestion, intercepting city matches to show the city sheet.
+    /// Handles selection of a place suggestion. Navigates immediately using data already in
+    /// hand, then checks in the background whether the name actually matches a city in the
+    /// user's social graph — redirecting to the city sheet only in that rare case. This avoids
+    /// blocking every single suggestion tap on a network round-trip for a check that almost
+    /// never applies.
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         recentSearchesService.savePlace(
             id: suggestion.id,
@@ -441,22 +445,19 @@ class SearchViewModel: ObservableObject {
             address: suggestion.address
         )
 
-        // Check if this suggestion matches a city in our DB
+        let minimalPlace = DetailPlace(
+            googlePlaceId: suggestion.id,
+            name: suggestion.name,
+            address: suggestion.address,
+            coordinate: suggestion.coordinate,
+            source: suggestion.source
+        )
+        onPlaceSelected?(minimalPlace)
+
         Task {
             if let cityMatch = await matchCity(name: suggestion.name) {
                 onCitySelected?(cityMatch)
-                return
             }
-
-            // Not a city — proceed with normal place selection
-            let minimalPlace = DetailPlace(
-                googlePlaceId: suggestion.id,
-                name: suggestion.name,
-                address: suggestion.address,
-                coordinate: suggestion.coordinate,
-                source: suggestion.source
-            )
-            onPlaceSelected?(minimalPlace)
         }
     }
 

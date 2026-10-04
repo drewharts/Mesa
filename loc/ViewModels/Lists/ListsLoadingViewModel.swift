@@ -19,6 +19,9 @@ class ListsLoadingViewModel: ObservableObject {
     /// Loading more lists (pagination).
     @Published var isLoadingMorePlaceLists: Bool = false
 
+    /// List IDs whose first page of places is currently being fetched (list popup's initial load).
+    @Published var listsLoadingInitialPlaces: Set<String> = []
+
     // MARK: - Dependencies
 
     private let userService: UserService
@@ -91,21 +94,12 @@ class ListsLoadingViewModel: ObservableObject {
         let allMeta = await allMetaTask
         dataVM.allListsCache = allMeta
 
-        // Fetch shared and collaborative lists in parallel
-        var sharedLists: [SharedListInfo] = []
-        var collaborativeOwnedLists: [CollaborativeOwnedList] = []
-
-        do {
-            sharedLists = try await CollaborationService.shared.fetchSharedLists(userId: userId)
-        } catch {
-            print("❌ [ListsLoadingViewModel] Error fetching shared lists: \(error)")
-        }
-
-        do {
-            collaborativeOwnedLists = try await CollaborationService.shared.fetchCollaborativeOwnedLists(userId: userId)
-        } catch {
-            print("❌ [ListsLoadingViewModel] Error fetching collaborative owned lists: \(error)")
-        }
+        // Fetch shared and collaborative lists genuinely in parallel (previously two
+        // sequential awaits despite the comment claiming otherwise).
+        async let sharedListsTask = fetchSharedListsResilient(userId: userId)
+        async let collaborativeOwnedListsTask = fetchCollaborativeOwnedListsResilient(userId: userId)
+        let sharedLists = await sharedListsTask
+        let collaborativeOwnedLists = await collaborativeOwnedListsTask
 
         // Convert collaborative lists to LightweightPlaceList format
         let sharedAsLightweight = sharedLists.map { $0.toLightweightPlaceList() }
@@ -225,6 +219,26 @@ class ListsLoadingViewModel: ObservableObject {
         }
     }
 
+    /// Fetches lists shared with the user, tolerating failure (empty result on error).
+    private func fetchSharedListsResilient(userId: String) async -> [SharedListInfo] {
+        do {
+            return try await CollaborationService.shared.fetchSharedLists(userId: userId)
+        } catch {
+            print("❌ [ListsLoadingViewModel] Error fetching shared lists: \(error)")
+            return []
+        }
+    }
+
+    /// Fetches collaborative lists the user owns, tolerating failure (empty result on error).
+    private func fetchCollaborativeOwnedListsResilient(userId: String) async -> [CollaborativeOwnedList] {
+        do {
+            return try await CollaborationService.shared.fetchCollaborativeOwnedLists(userId: userId)
+        } catch {
+            print("❌ [ListsLoadingViewModel] Error fetching collaborative owned lists: \(error)")
+            return []
+        }
+    }
+
     // MARK: - Places Loading
 
     /// Loads places for multiple lists in parallel.
@@ -285,8 +299,15 @@ class ListsLoadingViewModel: ObservableObject {
     func loadPlacesForListIfNeeded(listId: String, fallbackCount: Int) async {
         guard let dataVM = dataViewModel else { return }
         if dataVM.lightweightPlaceListPlaces[listId] == nil {
+            listsLoadingInitialPlaces.insert(listId)
+            defer { listsLoadingInitialPlaces.remove(listId) }
             await loadPlacesForList(listId: listId)
         }
+    }
+
+    /// Whether the first page of places for a list is currently being fetched.
+    func isLoadingInitialPlaces(listId: String) -> Bool {
+        listsLoadingInitialPlaces.contains(listId)
     }
 
     /// Loads places for a single list.
@@ -344,5 +365,6 @@ class ListsLoadingViewModel: ObservableObject {
     func resetLoadingStates() {
         isLoadingInitialLists = false
         isLoadingMorePlaceLists = false
+        listsLoadingInitialPlaces.removeAll()
     }
 }
