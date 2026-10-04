@@ -99,31 +99,24 @@ struct ContentView: View {
             }
         }
         .onChange(of: userSession.needsListOnboarding) { oldValue, newValue in
-            // When list onboarding completes, reload profile data and show suggested profiles
+            // When list onboarding completes, auto-follow accounts first so the suggested
+            // profiles popup shows them as already followed, then present it
             if oldValue && !newValue {
-                if let userId = userSession.currentUserId {
-                    Task {
-                        await dataManager.loadProfileData(userId: userId)
+                let userId = userSession.currentUserId
+                Task { @MainActor in
+                    if let userId {
                         await SupabaseUserService.shared.autoFollowCuratedAccounts(userId: userId)
                         await SupabaseUserService.shared.autoFollowContactMatches(userId: userId)
                     }
-                }
-                if SuggestedProfilesViewModel.shouldShowPopup {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if SuggestedProfilesViewModel.shouldShowPopup {
                         PresentationService.shared.present(.suggestedProfiles)
+                    }
+                    if let userId {
+                        await dataManager.loadProfileData(userId: userId)
                     }
                 }
             }
-        }
-        .onChange(of: userSession.isUserLoggedIn) { oldValue, newValue in
-            // Show suggested profiles on login only if all onboarding is already complete
-            if !oldValue && newValue && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding && SuggestedProfilesViewModel.shouldShowPopup {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    PresentationService.shared.present(.suggestedProfiles)
-                }
-            }
-        }
-    }
+        }    }
     
     /// Processes a pending notification navigation by fetching the place and presenting its detail sheet.
     private func handleNotificationNavigation(_ pendingNavigation: PendingNavigation?) {

@@ -3,9 +3,11 @@
 //  loc
 //
 //  Unified follow counts view that works for both current user profile and external profiles.
-//  Displays follower/following counts and optional social link icons.
+//  Displays followers/following/places as three equally-spaced stats. Social links live in
+//  the separate ProfileSocialLinksRow so this row stays evenly spaced regardless of whether
+//  socials are present.
 //
-//  Single Responsibility: Display follow counts and social link icons with consistent styling.
+//  Single Responsibility: Display follow/place counts with consistent, evenly-spaced styling.
 //
 
 import SwiftUI
@@ -14,25 +16,24 @@ import SwiftUI
 struct ProfileFollowCountsData {
     let followersCount: Int
     let followingCount: Int
+    /// Total places saved/reviewed/created. Shown as a third stat alongside followers/following
+    /// when non-nil, instead of as a separate badge overlaid on the profile photo.
+    let placesCount: Int?
     let isFollowersLoading: Bool
     let isFollowingLoading: Bool
-    let instagramUsername: String?
-    let tiktokUsername: String?
 
     /// Creates data for external profiles.
     static func external(
         followers: Int,
         following: Int,
-        instagramUsername: String?,
-        tiktokUsername: String?
+        places: Int
     ) -> ProfileFollowCountsData {
         ProfileFollowCountsData(
             followersCount: followers,
             followingCount: following,
+            placesCount: places,
             isFollowersLoading: false,
-            isFollowingLoading: false,
-            instagramUsername: instagramUsername,
-            tiktokUsername: tiktokUsername
+            isFollowingLoading: false
         )
     }
 
@@ -40,68 +41,49 @@ struct ProfileFollowCountsData {
     static func myProfile(
         followers: Int,
         following: Int,
+        places: Int,
         isFollowersLoading: Bool,
-        isFollowingLoading: Bool,
-        instagramUsername: String?,
-        tiktokUsername: String?
+        isFollowingLoading: Bool
     ) -> ProfileFollowCountsData {
         ProfileFollowCountsData(
             followersCount: followers,
             followingCount: following,
+            placesCount: places,
             isFollowersLoading: isFollowersLoading,
-            isFollowingLoading: isFollowingLoading,
-            instagramUsername: instagramUsername,
-            tiktokUsername: tiktokUsername
+            isFollowingLoading: isFollowingLoading
         )
     }
 }
 
-/// Displays clickable follower/following counts and social link icons.
+/// Displays clickable follower/following/places counts, evenly spaced across the row's width.
 struct ProfileFollowCountsView: View {
     let data: ProfileFollowCountsData
     let onFollowersTap: () -> Void
     let onFollowingTap: () -> Void
     var hideFollowing: Bool = false
-    var onAddSocialsTap: (() -> Void)? = nil
 
     @State private var refreshToggle = false
 
-    /// Whether the user has a non-empty Instagram username.
-    private var hasInstagram: Bool {
-        guard let handle = data.instagramUsername else { return false }
-        return !handle.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    /// Whether the user has a non-empty TikTok username.
-    private var hasTikTok: Bool {
-        guard let handle = data.tiktokUsername else { return false }
-        return !handle.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    /// Whether the social icons section should be visible.
-    private var shouldShowSocialIcons: Bool {
-        hasInstagram || hasTikTok || onAddSocialsTap != nil
-    }
-
     var body: some View {
-        HStack(spacing: 24) {
-            followersButton
+        HStack(spacing: 0) {
+            followersButton.frame(maxWidth: .infinity, alignment: .leading)
 
             if !hideFollowing {
-                followingButton
+                followingButton.frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if shouldShowSocialIcons {
-                socialLinksSection
+            if data.placesCount != nil {
+                placesButton.frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.vertical, 10)
     }
 
-    /// Displays the followers count with loading state.
+    /// Displays the followers count with loading state. Left-aligned so the count and
+    /// label share a leading edge with the user's name above.
     private var followersButton: some View {
         Button(action: onFollowersTap) {
-            VStack {
+            VStack(alignment: .leading) {
                 if data.isFollowersLoading {
                     ProgressView()
                         .frame(width: 20, height: 20)
@@ -122,7 +104,7 @@ struct ProfileFollowCountsView: View {
     /// Displays the following count with loading state.
     private var followingButton: some View {
         Button(action: onFollowingTap) {
-            VStack {
+            VStack(alignment: .leading) {
                 if data.isFollowingLoading {
                     ProgressView()
                         .frame(width: 20, height: 20)
@@ -140,67 +122,16 @@ struct ProfileFollowCountsView: View {
         }
     }
 
-    // MARK: - Social Links
-
-    /// Displays Instagram and TikTok social link icon buttons.
-    private var socialLinksSection: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 28) {
-                instagramIcon
-                tiktokIcon
-            }
-
-            if let onTap = onAddSocialsTap, !hasInstagram && !hasTikTok {
-                Button(action: onTap) {
-                    Text("Add your socials")
-                        .font(.system(size: 10))
-                        .foregroundColor(.gray)
-                }
-            }
-        }
-    }
-
-    /// Displays the Instagram icon, opening the app/web if set or Edit Profile if empty.
-    private var instagramIcon: some View {
-        Group {
-            if hasInstagram, let handle = data.instagramUsername {
-                SocialLinkButton(
-                    imageName: "Instagram_Glyph_Black",
-                    systemFallback: "camera",
-                    appURL: "instagram://user?username=\(handle)",
-                    webURL: "https://instagram.com/\(handle)"
-                )
-            } else if let onTap = onAddSocialsTap {
-                Button(action: onTap) {
-                    Image("Instagram_Glyph_Black")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 18, height: 18)
-                        .opacity(0.3)
-                }
-            }
-        }
-    }
-
-    /// Displays the TikTok icon, opening the app/web if set or Edit Profile if empty.
-    private var tiktokIcon: some View {
-        Group {
-            if hasTikTok, let handle = data.tiktokUsername {
-                SocialLinkButton(
-                    imageName: "tiktok",
-                    systemFallback: "music.note",
-                    appURL: "https://tiktok.com/@\(handle)",
-                    webURL: "https://tiktok.com/@\(handle)"
-                )
-            } else if let onTap = onAddSocialsTap {
-                Button(action: onTap) {
-                    Image("tiktok")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 18, height: 18)
-                        .opacity(0.3)
-                }
-            }
+    /// Displays the saved places count as a static stat (no navigation target).
+    private var placesButton: some View {
+        VStack(alignment: .leading) {
+            Text("\(data.placesCount ?? 0)")
+                .font(.headline)
+                .foregroundColor(.black)
+                .fontWeight(.regular)
+            Text("Places")
+                .font(.caption)
+                .foregroundColor(.gray)
         }
     }
 }

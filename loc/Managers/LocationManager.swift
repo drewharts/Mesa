@@ -30,12 +30,18 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // Delegate method called when location updates
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if let location = locations.last {
+            #if DEBUG
+            print("[MapCenter] LocationManager.didUpdateLocations: \(location.coordinate)")
+            #endif
             currentLocation = location
         }
     }
 
     // New method for handling authorization changes
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        #if DEBUG
+        print("[MapCenter] LocationManager.didChangeAuthorization: \(manager.authorizationStatus.rawValue)")
+        #endif
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             locationManager.startUpdatingLocation()

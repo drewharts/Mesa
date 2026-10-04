@@ -139,6 +139,22 @@ class UserSession: ObservableObject {
         }
     }
     
+    /// Resolves the user's remaining onboarding steps, then marks them logged in so the correct screen shows immediately.
+    @MainActor
+    func beginSession(uid: String) async {
+        let status = await OnboardingStatusService.shared.resolveStatus(userId: uid)
+        applyOnboardingStatus(status)
+        setUserLoggedIn(uid: uid)
+    }
+
+    /// Applies a resolved onboarding status, persisting already-satisfied steps so later launches skip the server check.
+    @MainActor
+    private func applyOnboardingStatus(_ status: OnboardingStatus) {
+        if status.needsPhone { needsPhoneOnboarding = true } else { completePhoneOnboarding() }
+        if status.needsProfilePhoto { needsProfilePhoto = true } else { completeProfilePhotoOnboarding() }
+        if status.needsList { needsListOnboarding = true } else { completeListOnboarding() }
+    }
+
     func setUserLoggedIn(uid: String) {
         self.isUserLoggedIn = true
         self.currentUserId = uid

@@ -1,5 +1,6 @@
 import SwiftUI
 import GoogleSignIn
+import GoogleMaps
 import UserNotifications
 import Supabase
 
@@ -153,9 +154,6 @@ struct locApp: App {
         self.searchViewModel = searchVM
         self.searchCoordinator = searchCoord
         self.splashScreenViewModel = SplashScreenViewModel(userSession: userSess, dataManager: dataMgr)
-
-        // TODO: Remove after testing - resets suggested profiles popup
-        SuggestedProfilesViewModel.resetPopupSeenStatus()
 
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -327,7 +325,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        
+
+        configureGoogleMaps()
+
         // Set UNUserNotificationCenter delegate
         UNUserNotificationCenter.current().delegate = self
         
@@ -337,6 +337,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
     
+    /// Provides the Google Maps SDK with its API key from Info.plist, required before any GMSMapView is created.
+    private func configureGoogleMaps() {
+        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
+              !apiKey.isEmpty else {
+            print("⚠️ [AppDelegate] Missing GMSApiKey in Info.plist — Google Maps will not render")
+            return
+        }
+        GMSServices.provideAPIKey(apiKey)
+    }
+
     private func requestNotificationPermissions(application: UIApplication) {
         let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
         UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in

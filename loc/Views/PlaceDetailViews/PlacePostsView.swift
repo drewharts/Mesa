@@ -64,32 +64,8 @@ struct PlacePostsView: View {
     // MARK: - Action Buttons
     
     private var postActionButtons: some View {
-        // Post Button - Modern, sleek, inviting style with Apple glass
-            Button(action: onAddPost) {
-            HStack(spacing: 12) {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.secondary)
-                
-                Text("Share something...")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(.quaternary, lineWidth: 0.5)
-            )
-        }
-        .padding(.top, 8)
+        GlassComposerButton(icon: "plus", text: "Share something...", action: onAddPost)
+            .padding(.top, 8)
     }
     
     private var emptyStateView: some View {

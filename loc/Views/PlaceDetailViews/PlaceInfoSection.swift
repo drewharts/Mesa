@@ -10,7 +10,6 @@ import SwiftUI
 
 struct PlaceInfoSection: View {
     let place: DetailPlace
-    let isDescriptionLoading: Bool
     var isRefreshing: Bool = false
     var onRefresh: (() -> Void)? = nil
     var onAddPost: (() -> Void)? = nil
@@ -87,83 +86,69 @@ struct PlaceInfoSection: View {
                 .padding(.bottom, 8)
             }
 
-            // Description with loading state
-            if isDescriptionLoading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Customizing description...")
-                        .font(.footnote)
-                        .foregroundColor(.gray)
-                        .italic()
-                }
-                .padding(.bottom, 20)
-            } else {
-                Text(place.description ?? "No description available")
-                    .font(.footnote)
-                    .foregroundColor(.black)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.bottom, 12)
+            // Description sourced directly from place data (e.g. Google's editorial summary)
+            Text(place.description ?? "No description available")
+                .font(.footnote)
+                .foregroundColor(.black)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 12)
 
-                // Action buttons row - horizontal scroll
-                if hasActionButtons || onAddPost != nil {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            // Post button
-                            if let onAddPost {
-                                Button(action: onAddPost) {
-                                    actionButtonLabel(icon: "plus", text: "Post")
-                                }
-                                .buttonStyle(.plain)
+            // Prominent, always-visible review CTA (not buried in the scrollable row below)
+            if let onAddPost {
+                GlassComposerButton(icon: "square.and.pencil", text: "Write a Review", action: onAddPost)
+                    .padding(.bottom, hasActionButtons ? 10 : 12)
+            }
+
+            // Action buttons row - horizontal scroll
+            if hasActionButtons {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        // Menu button
+                        if let menuUrl = place.menuUrl, !menuUrl.isEmpty, let url = URL(string: menuUrl) {
+                            Button {
+                                showingMenu = true
+                            } label: {
+                                actionButtonLabel(icon: "book.pages", text: "Menu")
                             }
-
-                            // Menu button
-                            if let menuUrl = place.menuUrl, !menuUrl.isEmpty, let url = URL(string: menuUrl) {
-                                Button {
-                                    showingMenu = true
-                                } label: {
-                                    actionButtonLabel(icon: "book.pages", text: "Menu")
-                                }
-                                .buttonStyle(.plain)
-                                .sheet(isPresented: $showingMenu) {
-                                    SafariView(url: url)
-                                        .ignoresSafeArea()
-                                }
-                            }
-
-                            // Website button
-                            if let websiteUrl = place.websiteUrl, !websiteUrl.isEmpty, let url = URL(string: websiteUrl) {
-                                Button {
-                                    showingWebsite = true
-                                } label: {
-                                    actionButtonLabel(icon: "globe", text: "Website")
-                                }
-                                .buttonStyle(.plain)
-                                .sheet(isPresented: $showingWebsite) {
-                                    SafariView(url: url)
-                                        .ignoresSafeArea()
-                                }
-                            }
-
-                            // Call button
-                            if let phone = place.phone, !phone.isEmpty {
-                                Button {
-                                    let cleanedPhone = phone.replacingOccurrences(of: " ", with: "")
-                                        .replacingOccurrences(of: "-", with: "")
-                                        .replacingOccurrences(of: "(", with: "")
-                                        .replacingOccurrences(of: ")", with: "")
-                                    if let url = URL(string: "tel://\(cleanedPhone)") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                } label: {
-                                    actionButtonLabel(icon: "phone.fill", text: "Call")
-                                }
-                                .buttonStyle(.plain)
+                            .buttonStyle(.plain)
+                            .sheet(isPresented: $showingMenu) {
+                                SafariView(url: url)
+                                    .ignoresSafeArea()
                             }
                         }
+
+                        // Website button
+                        if let websiteUrl = place.websiteUrl, !websiteUrl.isEmpty, let url = URL(string: websiteUrl) {
+                            Button {
+                                showingWebsite = true
+                            } label: {
+                                actionButtonLabel(icon: "globe", text: "Website")
+                            }
+                            .buttonStyle(.plain)
+                            .sheet(isPresented: $showingWebsite) {
+                                SafariView(url: url)
+                                    .ignoresSafeArea()
+                            }
+                        }
+
+                        // Call button
+                        if let phone = place.phone, !phone.isEmpty {
+                            Button {
+                                let cleanedPhone = phone.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "-", with: "")
+                                    .replacingOccurrences(of: "(", with: "")
+                                    .replacingOccurrences(of: ")", with: "")
+                                if let url = URL(string: "tel://\(cleanedPhone)") {
+                                    UIApplication.shared.open(url)
+                                }
+                            } label: {
+                                actionButtonLabel(icon: "phone.fill", text: "Call")
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .padding(.bottom, 12)
                 }
+                .padding(.bottom, 12)
             }
         }
     }
@@ -177,7 +162,7 @@ struct PlaceInfoSection: View {
     mockPlace.rating = 4.5
     mockPlace.userRatingsTotal = 234
 
-    return PlaceInfoSection(place: mockPlace, isDescriptionLoading: false)
+    return PlaceInfoSection(place: mockPlace)
         .padding()
 }
 
