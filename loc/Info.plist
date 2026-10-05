@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSContactsUsageDescription</key>
-	<string>Mesa uses your contacts to help you find friends who are already on the app.</string>
+	<string>Mesa uploads the phone numbers in your contacts to its servers to find friends who already have Mesa accounts. They are used only for this match and are not stored.</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleURLTypes</key>
