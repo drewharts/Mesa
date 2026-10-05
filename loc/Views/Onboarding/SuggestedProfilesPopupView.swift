@@ -109,6 +109,7 @@ struct SuggestedProfilesPopupView: View {
                 contactMatches: viewModel.contactMatches,
                 isLoading: viewModel.isLoadingContacts,
                 contactsAccessDenied: viewModel.contactsAccessDenied,
+                needsConsent: viewModel.needsContactsConsent,
                 followStates: viewModel.followStates,
                 onProfileTap: { profile in
                     navigationPath.append(profile)
@@ -121,6 +122,12 @@ struct SuggestedProfilesPopupView: View {
                             currentUserId: currentUserId
                         )
                     }
+                },
+                onAllowContacts: {
+                    Task { await viewModel.grantContactsConsent() }
+                },
+                onDeclineContacts: {
+                    viewModel.declineContactsConsent()
                 }
             )
 

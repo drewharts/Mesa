@@ -33,6 +33,7 @@ class SuggestedProfilesViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var isLoadingContacts = false
     @Published var contactsAccessDenied = false
+    @Published var needsContactsConsent = false
     @Published var loadError: Error?
     @Published var followStates: [String: Bool] = [:]
 
@@ -122,38 +123,42 @@ class SuggestedProfilesViewModel: ObservableObject {
 
     // MARK: - Contact Matching
 
-    /// Requests contacts access, fetches phone numbers, and matches them against Supabase users.
+    /// Records the user's consent to upload contacts, then runs contact matching.
+    func grantContactsConsent() async {
+        contactsService.recordUploadConsent(granted: true)
+        needsContactsConsent = false
+        guard let currentUserId else { return }
+        await loadContactMatches(currentUserId: currentUserId)
+    }
+
+    /// Records that the user declined contact upload and hides the consent prompt.
+    func declineContactsConsent() {
+        contactsService.recordUploadConsent(granted: false)
+        needsContactsConsent = false
+    }
+
+    /// Matches device contacts against Mesa users, surfacing the consent prompt if the user hasn't decided yet.
     private func loadContactMatches(currentUserId: String) async {
         isLoadingContacts = true
+        defer { isLoadingContacts = false }
 
-        let granted = await contactsService.requestAccess()
-        guard granted else {
+        switch await contactsService.findMatchingUsers(requestingUserId: currentUserId) {
+        case .consentRequired:
+            needsContactsConsent = true
+        case .consentDeclined:
+            break
+        case .accessDenied:
             contactsAccessDenied = true
-            isLoadingContacts = false
-            return
+        case .matched(let matches):
+            applyContactMatches(matches)
         }
+    }
 
-        let phoneNumbers = await contactsService.fetchNormalizedPhoneNumbers()
-        guard !phoneNumbers.isEmpty else {
-            isLoadingContacts = false
-            return
-        }
-
-        do {
-            let matches = try await contactsService.matchContacts(
-                phoneNumbers: phoneNumbers,
-                requestingUserId: currentUserId
-            )
-            contactMatches = matches
-
-            // Remove contact matches from suggested profiles to avoid duplicates
-            let matchIds = Set(matches.map(\.id))
-            suggestedProfiles = suggestedProfiles.filter { !matchIds.contains($0.id) }
-        } catch {
-            print("⚠️ [SuggestedProfilesVM] Contact matching failed: \(error.localizedDescription)")
-        }
-
-        isLoadingContacts = false
+    /// Publishes contact matches and removes them from suggested profiles to avoid duplicates.
+    private func applyContactMatches(_ matches: [ProfileData]) {
+        contactMatches = matches
+        let matchIds = Set(matches.map(\.id))
+        suggestedProfiles = suggestedProfiles.filter { !matchIds.contains($0.id) }
     }
 
     // MARK: - Follow Logic
