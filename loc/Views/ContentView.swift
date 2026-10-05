@@ -106,7 +106,6 @@ struct ContentView: View {
                 Task { @MainActor in
                     if let userId {
                         await SupabaseUserService.shared.autoFollowCuratedAccounts(userId: userId)
-                        await SupabaseUserService.shared.autoFollowContactMatches(userId: userId)
                     }
                     if SuggestedProfilesViewModel.shouldShowPopup {
                         PresentationService.shared.present(.suggestedProfiles)

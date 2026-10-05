@@ -12,12 +12,17 @@ struct ContactsMatchSection: View {
     let contactMatches: [ProfileData]
     let isLoading: Bool
     let contactsAccessDenied: Bool
+    let needsConsent: Bool
     let followStates: [String: Bool]
     let onProfileTap: (ProfileData) -> Void
     let onFollowTap: (String) -> Void
+    let onAllowContacts: () -> Void
+    let onDeclineContacts: () -> Void
 
     var body: some View {
-        if isLoading {
+        if needsConsent {
+            ContactsConsentCard(onAllow: onAllowContacts, onDecline: onDeclineContacts)
+        } else if isLoading {
             loadingRow
         } else if contactsAccessDenied {
             accessDeniedRow

@@ -112,23 +112,12 @@ class RecommendedUsersViewModel: ObservableObject {
         }
     }
 
-    /// Loads contact-matched users from the device contacts. Returns empty on failure or denied permission.
+    /// Loads contact-matched users only if the user previously consented to contact upload; never prompts.
     private func loadContactMatches() async -> [ProfileData] {
-        let granted = await contactsService.requestAccess()
-        guard granted else { return [] }
-
-        let phoneNumbers = await contactsService.fetchNormalizedPhoneNumbers()
-        guard !phoneNumbers.isEmpty else { return [] }
-
-        do {
-            return try await contactsService.matchContacts(
-                phoneNumbers: phoneNumbers,
-                requestingUserId: userId
-            )
-        } catch {
-            print("[RecommendedUsersVM] Contact matching failed: \(error.localizedDescription)")
+        guard case .matched(let matches) = await contactsService.findMatchingUsers(requestingUserId: userId) else {
             return []
         }
+        return matches
     }
 
     /// Loads popular users ranked by total places count via RPC.
