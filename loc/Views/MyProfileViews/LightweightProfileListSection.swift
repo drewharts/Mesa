@@ -48,13 +48,8 @@ private struct ListCardImage: View {
 
     var body: some View {
         ZStack {
-            if let previewPhotos = list.preview_photos, !previewPhotos.isEmpty {
-                PreviewPhotoCollage(photoURLs: previewPhotos)
-            } else if !places.isEmpty {
-                ListPhotoCollage(
-                    places: Array(places.prefix(3)),
-                    placeColors: $placeColors
-                )
+            if list.preview_photos?.isEmpty == false || !places.isEmpty {
+                ListCoverCollage(previewPhotos: list.preview_photos, places: places, placeColors: $placeColors)
             } else {
                 EmptyListCard()
             }

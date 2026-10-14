@@ -80,11 +80,28 @@ struct ExternalPlaceDirectResponse: Codable {
     }
 }
 
+/// Shares one in-flight profile request among concurrent callers asking for the same user ID.
+private actor ProfileRequestCoalescer {
+    private var inFlight: [String: Task<ProfileData, Error>] = [:]
+
+    /// Returns the profile for the ID, joining an in-flight request for the same ID when one exists.
+    func profile(for userId: String, fetch: @Sendable @escaping () async throws -> ProfileData) async throws -> ProfileData {
+        if let existing = inFlight[userId] {
+            return try await existing.value
+        }
+        let task = Task { try await fetch() }
+        inFlight[userId] = task
+        defer { inFlight[userId] = nil }
+        return try await task.value
+    }
+}
+
 /// Legacy UserService - now delegates all calls to SupabaseUserService
 /// This wrapper exists for backward compatibility with existing ViewModels
 class UserService: ObservableObject {
     nonisolated(unsafe) static let shared = UserService()
     private let supabase = SupabaseUserService.shared // All data comes from Supabase
+    private let profileRequests = ProfileRequestCoalescer()
     
     private init() {
         // UserService is a compatibility wrapper - all data from Supabase
@@ -155,7 +172,15 @@ class UserService: ObservableObject {
         }
     }
     
+    /// Fetches a profile by profile ID or Supabase auth UID, sharing one request among concurrent callers for the same ID.
     func fetchUserById(userId: String) async throws -> ProfileData {
+        try await profileRequests.profile(for: userId) { [self] in
+            try await requestUserById(userId: userId)
+        }
+    }
+
+    /// Requests a profile by profile ID, falling back to a Supabase auth UID lookup.
+    private func requestUserById(userId: String) async throws -> ProfileData {
         do {
             // First try to fetch by id (works for UIDs and new Supabase users)
             let profile: ProfileData = try await SupabaseManager.shared.client
@@ -459,6 +484,11 @@ class UserService: ObservableObject {
         return try await supabase.fetchPlaceListsByProximity(userId: userId, userLatitude: userLatitude, userLongitude: userLongitude, page: page, pageSize: pageSize)
     }
     
+    /// Fetches the first page of places for each list in one request, keyed by list ID.
+    func fetchFirstPlacesForLists(listIds: [String], pageSize: Int = 6) async throws -> [String: [LightweightPlace]] {
+        return try await supabase.fetchFirstPlacesForLists(listIds: listIds, pageSize: pageSize)
+    }
+
     /// Fetch a single place list by ID (for deep link navigation)
     func fetchPlaceListById(listId: String) async throws -> LightweightPlaceList? {
         return try await supabase.fetchPlaceListById(listId: listId)

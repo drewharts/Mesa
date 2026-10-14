@@ -96,12 +96,22 @@ class AddPlaceToListViewModel: ObservableObject {
         successMessage = nil
 
         // First get the full place details
-        searchService.selectSuggestion(suggestion) { [weak self] detailPlace in
-            guard let self = self else { return }
-            Task { @MainActor in
-                await self.addPlaceToList(detailPlace)
+        searchService.selectSuggestion(
+            suggestion,
+            onError: { [weak self] error in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    self.errorMessage = "Failed to add place: \(error)"
+                    self.isAddingPlace = false
+                }
+            },
+            onResultResolved: { [weak self] detailPlace in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    await self.addPlaceToList(detailPlace)
+                }
             }
-        }
+        )
     }
 
     // MARK: - Private Methods

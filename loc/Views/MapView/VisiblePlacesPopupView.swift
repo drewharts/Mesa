@@ -58,22 +58,19 @@ struct VisiblePlacesPopupView: View {
             }
         }
         .onAppear(perform: configureViewModel)
-        .onChange(of: viewModel.selectedFilter) {
-            viewModel.resetImageLoading()
-        }
     }
     
     // MARK: - ViewModel Configuration
     
-    /// Coordinator pattern: View extracts data from EnvironmentObjects and configures ViewModel
-    /// This keeps ViewModel decoupled from other ViewModels (SRP)
+    /// Configures the ViewModel with the map's in-memory places and images, keeping it decoupled from other ViewModels.
     private func configureViewModel() {
         viewModel.configure(
             mapRegion: mapRegion,
             userId: profile.user?.id,
+            seedAnnotations: mapViewModel.viewportAnnotations,
+            seedCommunityMarkers: mapViewModel.communityMarkers,
             existingPlaceImages: detailPlaceViewModel.placeImages
         )
-        viewModel.onAppear()
     }
     
     // MARK: - Header Section
@@ -112,9 +109,22 @@ struct VisiblePlacesPopupView: View {
     private var contentSection: some View {
         if !viewModel.visiblePlaces.isEmpty {
             placesGrid
+        } else if viewModel.showsLoadingIndicator {
+            loadingView
         } else {
             emptyStateView
         }
+    }
+
+    // MARK: - Loading State
+
+    private var loadingView: some View {
+        VStack {
+            Spacer()
+            ProgressView()
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
     
     private var placesGrid: some View {

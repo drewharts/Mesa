@@ -98,8 +98,8 @@ final class ShareablePlaceTests: XCTestCase {
         XCTAssertEqual(place?.address, "123 Main")
         XCTAssertEqual(place?.city, "SF")
         XCTAssertEqual(place?.mapboxId, "poi.1")
-        XCTAssertEqual(place?.latitude, 37.7, accuracy: 0.001)
-        XCTAssertEqual(place?.longitude, -122.4, accuracy: 0.001)
+        XCTAssertEqual(place?.latitude ?? .nan, 37.7, accuracy: 0.001)
+        XCTAssertEqual(place?.longitude ?? .nan, -122.4, accuracy: 0.001)
     }
 
     func testFromURL_MinimalURL() {

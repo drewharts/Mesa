@@ -98,8 +98,8 @@ final class TripDayPlaceTests: XCTestCase {
         XCTAssertEqual(place.note, "Great spot for lunch")
         XCTAssertEqual(place.placeName, "The Cafe")
         XCTAssertEqual(place.placeAddress, "456 Oak Ave")
-        XCTAssertEqual(place.placeLatitude, 37.7749, accuracy: 0.0001)
-        XCTAssertEqual(place.placeLongitude, -122.4194, accuracy: 0.0001)
+        XCTAssertEqual(place.placeLatitude ?? .nan, 37.7749, accuracy: 0.0001)
+        XCTAssertEqual(place.placeLongitude ?? .nan, -122.4194, accuracy: 0.0001)
         XCTAssertEqual(place.placePhoto, "https://example.com/photo.jpg")
         XCTAssertEqual(place.addedByName, "Alice")
         XCTAssertEqual(place.addedByPhotoUrl, "https://example.com/alice.jpg")
@@ -139,8 +139,8 @@ final class TripDayPlaceTests: XCTestCase {
 
         XCTAssertEqual(lightweight.place_id, "place-full")
         XCTAssertEqual(lightweight.name, "The Cafe")
-        XCTAssertEqual(lightweight.latitude, 37.7749, accuracy: 0.0001)
-        XCTAssertEqual(lightweight.longitude, -122.4194, accuracy: 0.0001)
+        XCTAssertEqual(lightweight.latitude ?? .nan, 37.7749, accuracy: 0.0001)
+        XCTAssertEqual(lightweight.longitude ?? .nan, -122.4194, accuracy: 0.0001)
         XCTAssertEqual(lightweight.latest_review_photo, "https://example.com/photo.jpg")
         XCTAssertEqual(lightweight.content_url, "https://tiktok.com/video/123")
     }

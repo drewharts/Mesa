@@ -754,6 +754,27 @@ class SupabaseUserService: ObservableObject {
         return places
     }
     
+    /// Fetches the first page of places for each list in one request, keyed by list ID (lists with no places map to an empty array).
+    func fetchFirstPlacesForLists(listIds: [String], pageSize: Int = 6) async throws -> [String: [LightweightPlace]] {
+        guard !listIds.isEmpty else { return [:] }
+
+        struct Params: Encodable {
+            let p_list_ids: [String]
+            let p_page_size: Int
+        }
+
+        let rows: [ListPlaceRow] = try await supabase.client
+            .rpc("get_first_places_for_lists", params: Params(p_list_ids: listIds, p_page_size: pageSize))
+            .execute()
+            .value
+
+        var placesByList = Dictionary(listIds.map { ($0, [LightweightPlace]()) }, uniquingKeysWith: { first, _ in first })
+        for row in rows {
+            placesByList[row.listId, default: []].append(row.place)
+        }
+        return placesByList
+    }
+
     /// Fetch user's created places (lightweight data for tiles, paginated)
     func fetchUserCreatedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
         struct Params: Encodable {
@@ -1199,13 +1220,26 @@ extension SupabaseUserService {
             added_by: addedBy
         )
         
-        // Insert the new item
-        try await supabase.client
-            .from("place_list_items")
-            .insert(newItem)
-            .execute()
+        // Insert the new item (waits briefly if the place itself is still being saved)
+        try await insertListItemWaitingForPlace(newItem)
         
         print("✅ [Supabase] Added place \(placeId) to list \(listId) by user \(addedBy) at position \(nextOrder)")
+    }
+
+    /// Inserts a list item, retrying briefly when the place row doesn't exist yet.
+    /// Newly searched places are saved by the backend in the background after it returns their ID,
+    /// so an immediate insert can hit the place_list_items_place_id_fkey constraint (Postgres 23503).
+    private func insertListItemWaitingForPlace<Item: Encodable>(_ item: Item) async throws {
+        let retryDelaysMs: [UInt64] = [400, 800, 1_200, 1_600]
+        for delayMs in retryDelaysMs {
+            do {
+                try await supabase.client.from("place_list_items").insert(item).execute()
+                return
+            } catch let error as PostgrestError where error.code == "23503" {
+                try await Task.sleep(nanoseconds: delayMs * 1_000_000)
+            }
+        }
+        try await supabase.client.from("place_list_items").insert(item).execute()
     }
     
     /// Remove a place from a list
@@ -1303,3 +1337,18 @@ extension SupabaseUserService {
     }
 }
 
+/// One row from get_first_places_for_lists: the owning list ID plus the place fields LightweightPlace decodes.
+private struct ListPlaceRow: Decodable {
+    let listId: String
+    let place: LightweightPlace
+
+    private enum CodingKeys: String, CodingKey {
+        case list_id
+    }
+
+    /// Decodes the list ID and reuses LightweightPlace's decoding for the remaining columns.
+    init(from decoder: Decoder) throws {
+        listId = try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .list_id)
+        place = try LightweightPlace(from: decoder)
+    }
+}
