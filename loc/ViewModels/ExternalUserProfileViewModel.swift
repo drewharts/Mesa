@@ -566,28 +566,13 @@ class ExternalUserProfileViewModel: ObservableObject {
 
             listsDataViewModel.userLists = searchResults
 
-            // Load places for search results in parallel
-            await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
-                for list in searchResults {
-                    group.addTask {
-                        do {
-                            let places = try await self.userService.fetchPlacesForPlaceList(
-                                listId: list.list_id,
-                                page: 1,
-                                pageSize: 6
-                            )
-                            return (list.list_id, places)
-                        } catch {
-                            return (list.list_id, nil)
-                        }
-                    }
-                }
-
-                for await (listId, places) in group {
-                    if let places = places {
-                        self.listsDataViewModel.setPlacesForList(listId: listId, places: places)
-                    }
-                }
+            // Load places for all search results in one request
+            let placesByList = (try? await userService.fetchFirstPlacesForLists(
+                listIds: searchResults.map(\.list_id),
+                pageSize: 6
+            )) ?? [:]
+            for (listId, places) in placesByList {
+                listsDataViewModel.setPlacesForList(listId: listId, places: places)
             }
         } catch {
             print("ExternalUserProfileViewModel Error searching lists: \(error)")

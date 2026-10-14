@@ -241,34 +241,16 @@ class ListsLoadingViewModel: ObservableObject {
 
     // MARK: - Places Loading
 
-    /// Loads places for multiple lists in parallel.
+    /// Loads the first page of places for multiple lists in a single request.
     func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         guard let dataVM = dataViewModel else { return }
 
-        var allPlaces: [String: [LightweightPlace]] = [:]
-
-        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
-            for list in lists {
-                group.addTask {
-                    do {
-                        let places = try await self.userService.fetchPlacesForPlaceList(
-                            listId: list.list_id,
-                            page: 1,
-                            pageSize: 6
-                        )
-                        return (list.list_id, places)
-                    } catch {
-                        print("❌ [ListsLoadingViewModel] Error loading places for list \(list.list_id): \(error.localizedDescription)")
-                        return (list.list_id, nil)
-                    }
-                }
-            }
-
-            for await (listId, places) in group {
-                if let places = places {
-                    allPlaces[listId] = places
-                }
-            }
+        let allPlaces: [String: [LightweightPlace]]
+        do {
+            allPlaces = try await userService.fetchFirstPlacesForLists(listIds: lists.map(\.list_id), pageSize: 6)
+        } catch {
+            print("❌ [ListsLoadingViewModel] Error loading places for lists: \(error.localizedDescription)")
+            return
         }
 
         // Prefetch external content metadata

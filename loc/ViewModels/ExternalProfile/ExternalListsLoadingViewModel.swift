@@ -151,38 +151,20 @@ class ExternalListsLoadingViewModel: ObservableObject {
 
     // MARK: - Places Loading
 
-    /// Loads places for multiple lists in parallel using TaskGroup.
+    /// Loads the first page of places for every not-yet-loaded list in a single request.
     func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         guard let dataVM = dataViewModel else { return }
 
-        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
-            for list in lists {
-                guard !loadedListIds.contains(list.list_id),
-                      !loadingListIds.contains(list.list_id) else { continue }
+        let listIds = lists.map(\.list_id).filter { !loadedListIds.contains($0) && !loadingListIds.contains($0) }
+        guard !listIds.isEmpty else { return }
 
-                loadingListIds.insert(list.list_id)
+        loadingListIds.formUnion(listIds)
+        defer { loadingListIds.subtract(listIds) }
 
-                group.addTask {
-                    do {
-                        let places = try await self.userService.fetchPlacesForPlaceList(
-                            listId: list.list_id,
-                            page: 1,
-                            pageSize: 6
-                        )
-                        return (list.list_id, places)
-                    } catch {
-                        return (list.list_id, nil)
-                    }
-                }
-            }
-
-            for await (listId, places) in group {
-                loadingListIds.remove(listId)
-                if let places = places {
-                    loadedListIds.insert(listId)
-                    dataVM.setPlacesForList(listId: listId, places: places)
-                }
-            }
+        guard let placesByList = try? await userService.fetchFirstPlacesForLists(listIds: listIds, pageSize: 6) else { return }
+        for (listId, places) in placesByList {
+            loadedListIds.insert(listId)
+            dataVM.setPlacesForList(listId: listId, places: places)
         }
     }
 
