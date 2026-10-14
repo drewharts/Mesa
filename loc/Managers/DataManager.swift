@@ -45,7 +45,8 @@ class DataManager: ObservableObject {
         return locationManager.currentLocation?.coordinate
     }
 
-    /// Loads essential profile data, then kicks off viewport places and photo prefetch in parallel.
+    /// Loads essential profile data, then kicks off map annotation calculation and photo prefetch.
+    /// Viewport annotations are fetched by the map itself (MapViewportViewModel) once its camera settles.
     func initializeProfileData(userId: String) async {
         startDataLoadingFlags()
         
@@ -54,12 +55,8 @@ class DataManager: ObservableObject {
             await loadEssentialDataOnly(userId: userId)
         }
         
-        // ✅ PHASE 2: Load viewport places (non-blocking)
-        Task.detached(priority: .userInitiated) { [weak self] in
-            await self?.measureLoadingTime("Viewport Places") {
-                await self?.loadViewportPlacesOnly(userId: userId)
-            }
-        }
+        // ✅ PHASE 2: Calculate annotations from already-loaded data
+        calculateMapAnnotations()
 
         // ✅ PHASE 3: Prefetch followed users' profile photos for faster map rendering
         Task.detached(priority: .utility) { [weak self] in
@@ -103,62 +100,6 @@ class DataManager: ObservableObject {
             self.profileViewModel.listsViewModel.userLists = listMetadataResult ?? []
 
         }
-    }
-    
-    /// ✅ NEW: Load only places in the current viewport (much faster!)
-    private func loadViewportPlacesOnly(userId: String) async {
-        // Get the current map region from LocationManager
-        guard let userLocation = locationManager.currentLocation?.coordinate else {
-            print("⚠️ [DataManager] No location available, skipping viewport loading")
-            return
-        }
-        
-        // Create a reasonable viewport around user's location
-        let viewportRegion = MKCoordinateRegion(
-            center: userLocation,
-            span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1) // ~11km radius
-        )
-        
-        do {
-            // Use the existing viewport loading logic
-            let bounds = getViewportBounds(from: viewportRegion)
-            
-            // Load places in viewport (much faster than all places!)
-            // Result is used to update internal caches, then calculateMapAnnotations() reads from cache
-            _ = try await placeService.fetchPlacesInViewportWithUserId(
-                northLat: bounds.northLat,
-                southLat: bounds.southLat,
-                eastLng: bounds.eastLng,
-                westLng: bounds.westLng,
-                userId: userId
-            )
-            
-            // Trigger map annotation calculation for viewport places
-            calculateMapAnnotations()
-            
-        } catch {
-            print("❌ [DataManager] Error loading viewport places: \(error.localizedDescription)")
-        }
-    }
-    
-    /// Helper to convert region to bounds (same as MapViewModel)
-    private func getViewportBounds(from region: MKCoordinateRegion) -> (
-        northLat: Double,
-        southLat: Double,
-        eastLng: Double,
-        westLng: Double
-    ) {
-        let centerLat = region.center.latitude
-        let centerLng = region.center.longitude
-        let latDelta = region.span.latitudeDelta
-        let lngDelta = region.span.longitudeDelta
-        
-        return (
-            northLat: centerLat + (latDelta / 2),
-            southLat: centerLat - (latDelta / 2),
-            eastLng: centerLng + (lngDelta / 2),
-            westLng: centerLng - (lngDelta / 2)
-        )
     }
     
     /// PHASE 0: Load ALL user places in a single optimized query

@@ -754,6 +754,27 @@ class SupabaseUserService: ObservableObject {
         return places
     }
     
+    /// Fetches the first page of places for each list in one request, keyed by list ID (lists with no places map to an empty array).
+    func fetchFirstPlacesForLists(listIds: [String], pageSize: Int = 6) async throws -> [String: [LightweightPlace]] {
+        guard !listIds.isEmpty else { return [:] }
+
+        struct Params: Encodable {
+            let p_list_ids: [String]
+            let p_page_size: Int
+        }
+
+        let rows: [ListPlaceRow] = try await supabase.client
+            .rpc("get_first_places_for_lists", params: Params(p_list_ids: listIds, p_page_size: pageSize))
+            .execute()
+            .value
+
+        var placesByList = Dictionary(listIds.map { ($0, [LightweightPlace]()) }, uniquingKeysWith: { first, _ in first })
+        for row in rows {
+            placesByList[row.listId, default: []].append(row.place)
+        }
+        return placesByList
+    }
+
     /// Fetch user's created places (lightweight data for tiles, paginated)
     func fetchUserCreatedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
         struct Params: Encodable {
@@ -1303,3 +1324,18 @@ extension SupabaseUserService {
     }
 }
 
+/// One row from get_first_places_for_lists: the owning list ID plus the place fields LightweightPlace decodes.
+private struct ListPlaceRow: Decodable {
+    let listId: String
+    let place: LightweightPlace
+
+    private enum CodingKeys: String, CodingKey {
+        case list_id
+    }
+
+    /// Decodes the list ID and reuses LightweightPlace's decoding for the remaining columns.
+    init(from decoder: Decoder) throws {
+        listId = try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .list_id)
+        place = try LightweightPlace(from: decoder)
+    }
+}
