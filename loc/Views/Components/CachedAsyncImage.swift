@@ -4,9 +4,23 @@ import SwiftUI
 struct CachedAsyncImage<Placeholder: View>: View {
     let url: URL?
     let targetSize: CGSize?
-    @ViewBuilder let placeholder: () -> Placeholder
+    let placeholder: () -> Placeholder
+    let onFailure: (() -> Void)?
 
     @State private var loadedImage: UIImage?
+
+    /// Creates the image view; `onFailure` (last, so trailing-closure placeholders keep working) fires when the URL can't be loaded.
+    init(
+        url: URL?,
+        targetSize: CGSize?,
+        @ViewBuilder placeholder: @escaping () -> Placeholder,
+        onFailure: (() -> Void)? = nil
+    ) {
+        self.url = url
+        self.targetSize = targetSize
+        self.placeholder = placeholder
+        self.onFailure = onFailure
+    }
 
     var body: some View {
         Group {
@@ -22,10 +36,13 @@ struct CachedAsyncImage<Placeholder: View>: View {
         }
     }
 
-    /// Loads image via ImageCacheService (cache -> deduplicated fetch -> downsample -> cache).
+    /// Loads image via ImageCacheService (cache -> deduplicated fetch -> downsample -> cache), reporting non-cancelled failures.
     private func loadImage() async {
         loadedImage = nil
         guard let imageURL = url else { return }
         loadedImage = await ImageCacheService.shared.fetchImage(for: imageURL, targetSize: targetSize)
+        if loadedImage == nil && !Task.isCancelled {
+            onFailure?()
+        }
     }
 }
