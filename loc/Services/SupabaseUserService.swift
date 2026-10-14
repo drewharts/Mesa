@@ -1220,13 +1220,26 @@ extension SupabaseUserService {
             added_by: addedBy
         )
         
-        // Insert the new item
-        try await supabase.client
-            .from("place_list_items")
-            .insert(newItem)
-            .execute()
+        // Insert the new item (waits briefly if the place itself is still being saved)
+        try await insertListItemWaitingForPlace(newItem)
         
         print("✅ [Supabase] Added place \(placeId) to list \(listId) by user \(addedBy) at position \(nextOrder)")
+    }
+
+    /// Inserts a list item, retrying briefly when the place row doesn't exist yet.
+    /// Newly searched places are saved by the backend in the background after it returns their ID,
+    /// so an immediate insert can hit the place_list_items_place_id_fkey constraint (Postgres 23503).
+    private func insertListItemWaitingForPlace<Item: Encodable>(_ item: Item) async throws {
+        let retryDelaysMs: [UInt64] = [400, 800, 1_200, 1_600]
+        for delayMs in retryDelaysMs {
+            do {
+                try await supabase.client.from("place_list_items").insert(item).execute()
+                return
+            } catch let error as PostgrestError where error.code == "23503" {
+                try await Task.sleep(nanoseconds: delayMs * 1_000_000)
+            }
+        }
+        try await supabase.client.from("place_list_items").insert(item).execute()
     }
     
     /// Remove a place from a list
