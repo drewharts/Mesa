@@ -411,6 +411,24 @@ struct ViewportBounds {
     let westLng: Double
 }
 
+extension ViewportBounds {
+    /// Creates bounds spanning the visible area of the given region.
+    init(region: MKCoordinateRegion) {
+        self.init(
+            northLat: region.center.latitude + region.span.latitudeDelta / 2,
+            southLat: region.center.latitude - region.span.latitudeDelta / 2,
+            eastLng: region.center.longitude + region.span.longitudeDelta / 2,
+            westLng: region.center.longitude - region.span.longitudeDelta / 2
+        )
+    }
+
+    /// Returns whether the coordinate lies within these bounds.
+    func contains(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        coordinate.latitude >= southLat && coordinate.latitude <= northLat &&
+            coordinate.longitude >= westLng && coordinate.longitude <= eastLng
+    }
+}
+
 /// Represents the current filter state for map annotations.
 struct MapFilterState {
     let selectedListId: String?

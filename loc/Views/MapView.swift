@@ -407,6 +407,7 @@ struct MapView: View {
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)
+                .environmentObject(mapViewModel)
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(profile)
                 .environmentObject(locationManager)
