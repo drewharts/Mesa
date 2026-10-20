@@ -241,6 +241,12 @@ struct MainView: View {
             case .importPlaceConfirmation(let placeId, let contentUrl):
                 importPlaceConfirmationSheet(placeId: placeId, contentUrl: contentUrl)
 
+            case .importProgress(let contentUrl):
+                ImportProgressView(contentUrl: contentUrl)
+                    .environmentObject(detailPlaceViewModel)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+
             // Map Popups (User's Own Data)
             case .list(let listId):
                 listSheet(listId: listId)
