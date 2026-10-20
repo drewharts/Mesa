@@ -21,6 +21,7 @@ enum AppSheetType: Identifiable, Equatable {
     case externalPlaceSelection
     case noPlacesFound(contentUrl: String)
     case importPlaceConfirmation(placeId: String, contentUrl: String)
+    case importProgress(contentUrl: String)
 
     // MARK: - Map Popups (User's Own Data)
 
@@ -72,6 +73,8 @@ enum AppSheetType: Identifiable, Equatable {
             return "noPlacesFound-\(contentUrl)"
         case .importPlaceConfirmation(let placeId, let contentUrl):
             return "importPlaceConfirmation-\(placeId)-\(contentUrl)"
+        case .importProgress(let contentUrl):
+            return "importProgress-\(contentUrl)"
         case .list(let listId):
             return "list-\(listId)"
         case .externalVideos:
@@ -115,6 +118,8 @@ enum AppSheetType: Identifiable, Equatable {
             return lhsUrl == rhsUrl
         case (.importPlaceConfirmation(let lhsId, let lhsUrl), .importPlaceConfirmation(let rhsId, let rhsUrl)):
             return lhsId == rhsId && lhsUrl == rhsUrl
+        case (.importProgress(let lhsUrl), .importProgress(let rhsUrl)):
+            return lhsUrl == rhsUrl
         case (.list(let lhsId), .list(let rhsId)):
             return lhsId == rhsId
         case (.externalVideos, .externalVideos):
