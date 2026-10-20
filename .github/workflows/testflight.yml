@@ -1,0 +1,74 @@
+name: TestFlight
+
+on:
+  push:
+    branches: [testflight]
+  workflow_dispatch:
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      SCHEME: loc
+      PROJECT: loc.xcodeproj
+      ARCHIVE_PATH: /tmp/mesa-ci/loc.xcarchive
+      EXPORT_PATH: /tmp/mesa-ci/export
+      ASC_KEY_PATH: /tmp/mesa-ci/AuthKey.p8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Prepare temp dir
+        run: mkdir -p /tmp/mesa-ci
+
+      - name: Write Secrets.xcconfig
+        env:
+          GMS_API_KEY: ${{ secrets.GMS_API_KEY }}
+        run: printf 'GMS_API_KEY = %s\n' "$GMS_API_KEY" > Secrets.xcconfig
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$ASC_KEY_PATH"
+
+      - name: Compute build number
+        # Offset keeps CI builds above any build number already uploaded by hand.
+        run: echo "BUILD_NUMBER=$(( ${{ vars.BUILD_NUMBER_OFFSET || 1000 }} + ${{ github.run_number }} ))" >> "$GITHUB_ENV"
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM=585YK2F2H6 \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Export and upload to TestFlight
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist ci/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -rf "$ASC_KEY_PATH" Secrets.xcconfig
