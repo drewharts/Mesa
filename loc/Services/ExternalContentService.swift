@@ -355,7 +355,16 @@ class ExternalContentService: ObservableObject {
         detailPlace.city = dict["city"] as? String
         detailPlace.description = dict["description"] as? String
         detailPlace.mapboxId = dict["mapboxId"] as? String
-        detailPlace.googlePlaceId = dict["googlePlaceId"] as? String
+        detailPlace.googlePlaceId = (dict["googlePlaceId"] ?? dict["googlePlacesId"]) as? String
+
+        // Photos: backend place dicts carry photoUrls and/or a single thumbnailUrl
+        // (Google Places photo URL). Mirror DetailPlace's Decodable fallback so
+        // AsyncImage-based rows have something to load.
+        if let urls = dict["photoUrls"] as? [String], !urls.isEmpty {
+            detailPlace.photoUrls = urls
+        } else if let thumbnail = (dict["thumbnailUrl"] ?? dict["thumbnail_url"]) as? String, !thumbnail.isEmpty {
+            detailPlace.photoUrls = [thumbnail]
+        }
         detailPlace.source = dict["source"] as? String
         
         // Categories
