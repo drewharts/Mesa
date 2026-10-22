@@ -12,6 +12,7 @@ struct ImportProgressView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @StateObject private var viewModel: ImportProgressViewModel
     @State private var showingAddAllToList = false
+    @State private var showingManualAdd = false
     @State private var addAllConfirmation: String?
     @State private var confirmationDismissTask: Task<Void, Never>?
 
@@ -209,12 +210,43 @@ struct ImportProgressView: View {
                         .cornerRadius(12)
                 }
             }
+            if viewModel.isFinished {
+                if viewModel.savedPlaces.isEmpty {
+                    Button {
+                        showingManualAdd = true
+                    } label: {
+                        Label("Add a place manually", systemImage: "magnifyingglass")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.accentColor)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
+                } else {
+                    Button {
+                        showingManualAdd = true
+                    } label: {
+                        Label("Add another place", systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+            }
             Button(viewModel.isFinished ? "Done" : "Hide") {
                 viewModel.dismiss()
             }
             .font(.subheadline)
         }
         .padding()
+        .sheet(isPresented: $showingManualAdd) {
+            // Reuses the existing search + assign flow; links the place to this video (external_places).
+            PlaceCorrectionSheet(mode: .newAssignment(contentUrl: viewModel.contentUrl)) { place in
+                detailPlaceViewModel.places[place.id.uuidString] = place
+                viewModel.appendManualPlace(place)
+                showAddAllConfirmation("Added \(place.name)")
+            }
+            .environmentObject(profile)
+        }
     }
 }
 

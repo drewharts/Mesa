@@ -119,6 +119,18 @@ class ImportProgressViewModel: ObservableObject {
 
     // MARK: - Actions
 
+    /// Adds a place the user picked by hand (already linked to this video via external_places).
+    func appendManualPlace(_ place: DetailPlace) {
+        guard !savedPlaces.contains(where: { $0.id == place.id }) else { return }
+        savedPlaces.append(place)
+        let nextIndex = (places.map { $0.index }.max() ?? -1) + 1
+        places.append(ImportJobPlace(index: nextIndex, name: place.name, status: .saved,
+                                     placeId: place.id.uuidString, place: place))
+        errorMessage = nil
+        statusText = "Added \(savedPlaces.count) place\(savedPlaces.count == 1 ? "" : "s")"
+        isFinished = true
+    }
+
     /// Opens the existing confirmation prompt for a single saved place.
     func openConfirmation(for place: DetailPlace, detailPlaceVM: DetailPlaceViewModel) {
         detailPlaceVM.places[place.id.uuidString] = place
