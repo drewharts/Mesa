@@ -196,6 +196,8 @@ struct MesaSuggestion: Codable, Identifiable {
     let location: MesaLocation
     let name: String
     let source: String
+    /// Google place types (e.g. "locality", "restaurant"); absent from older backends.
+    let types: [String]?
 }
 
 /// Response model for Mesa backend suggestions endpoint
@@ -212,6 +214,20 @@ struct MesaPlaceSuggestion: PlaceSuggestion {
     let address: String?
     let coordinate: CLLocationCoordinate2D
     let source: String
+    var types: [String] = []
+
+    /// True for cities, regions, countries, neighborhoods, postal codes — areas, not businesses.
+    var isGeographicArea: Bool {
+        let areaTypes: Set<String> = [
+            "locality", "sublocality", "sublocality_level_1", "sublocality_level_2",
+            "neighborhood", "administrative_area_level_1", "administrative_area_level_2",
+            "administrative_area_level_3", "country", "postal_code", "colloquial_area",
+            "postal_town", "continent", "archipelago"
+        ]
+        let typeSet = Set(types)
+        if typeSet.contains("establishment") || typeSet.contains("point_of_interest") { return false }
+        return !typeSet.isDisjoint(with: areaTypes)
+    }
 }
 
 /// Mesa implementation of PlaceResult
@@ -386,7 +402,8 @@ class MesaBackendService {
                     latitude: suggestion.location.latitude,
                     longitude: suggestion.location.longitude
                 ),
-                source: suggestion.source
+                source: suggestion.source,
+                types: suggestion.types ?? []
             )
         }
     }
