@@ -26,6 +26,7 @@ class SearchPageViewModel: ObservableObject {
     var onViewAllKeywords: ((String, [String]) -> Void)?
     var onCoordinateSelected: ((CLLocationCoordinate2D) -> Void)?
     var onCitySelected: ((CitySearchResult) -> Void)?
+    var onRegionSelected: ((MKCoordinateRegion) -> Void)?
 
     // MARK: - Dependencies
 
@@ -66,6 +67,9 @@ class SearchPageViewModel: ObservableObject {
         }
         searchViewModel.onCitySelected = { [weak self] city in
             self?.handleCitySelection(city)
+        }
+        searchViewModel.onRegionSelected = { [weak self] region in
+            self?.onRegionSelected?(region)
         }
     }
 

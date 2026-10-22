@@ -648,6 +648,12 @@ struct MainView: View {
                     appCoordinator.showKeywordResultsPopup = true
                 }
             }
+            if let region = appCoordinator.regionToFocus {
+                appCoordinator.regionToFocus = nil
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    mapPosition = .region(region)
+                }
+            }
             if let coordinate = appCoordinator.coordinateForPlaceCreation {
                 appCoordinator.coordinateForPlaceCreation = nil
                 withAnimation(.easeOut(duration: 0.25)) {

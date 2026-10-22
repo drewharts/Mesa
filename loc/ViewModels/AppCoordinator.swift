@@ -29,6 +29,8 @@ class AppCoordinator: ObservableObject {
 
     /// Coordinate from search input — triggers map navigation and create-place popup
     @Published var coordinateForPlaceCreation: CLLocationCoordinate2D?
+    /// Area (city/region) chosen in search; map zooms here when search closes. No pin.
+    var regionToFocus: MKCoordinateRegion?
 
     // MARK: - Keyword Results Popup Trigger
     /// Used to trigger keyword results popup from search (SearchContainerView -> MainView -> MapContainerView)

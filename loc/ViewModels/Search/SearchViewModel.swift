@@ -118,6 +118,8 @@ class SearchViewModel: ObservableObject {
     // MARK: - Callbacks (instead of direct ViewModel references)
     var onPlaceSelected: ((DetailPlace) -> Void)?
     var onCitySelected: ((CitySearchResult) -> Void)?
+    /// Called when the user picks a city/region result: just move the map there.
+    var onRegionSelected: ((MKCoordinateRegion) -> Void)?
     
     // MARK: - Initialization
     init(placeService: PlaceService, userService: UserService, locationManager: LocationManager) {
@@ -439,6 +441,10 @@ class SearchViewModel: ObservableObject {
     /// blocking every single suggestion tap on a network round-trip for a check that almost
     /// never applies.
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
+        if suggestion.isGeographicArea {
+            selectGeographicArea(suggestion)
+            return
+        }
         recentSearchesService.savePlace(
             id: suggestion.id,
             name: suggestion.name,
@@ -457,6 +463,41 @@ class SearchViewModel: ObservableObject {
         Task {
             if let cityMatch = await matchCity(name: suggestion.name) {
                 onCitySelected?(cityMatch)
+            }
+        }
+    }
+
+    /// Cities/regions: look up the area's bounds with MapKit and move the map there.
+    /// No pin, no place sheet, nothing saved.
+    private func selectGeographicArea(_ suggestion: MesaPlaceSuggestion) {
+        let query = [suggestion.name, suggestion.address]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+        let hasCoordinate = abs(suggestion.coordinate.latitude) > 0.0001 || abs(suggestion.coordinate.longitude) > 0.0001
+        Task { @MainActor in
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = query
+            request.resultTypes = .address
+            var region: MKCoordinateRegion?
+            if let response = try? await MKLocalSearch(request: request).start() {
+                region = response.boundingRegion
+                if let item = response.mapItems.first,
+                   let circle = item.placemark.region as? CLCircularRegion {
+                    let meters = max(circle.radius * 2.2, 2000)
+                    region = MKCoordinateRegion(center: circle.center, latitudinalMeters: meters, longitudinalMeters: meters)
+                }
+            }
+            if region == nil, hasCoordinate {
+                region = MKCoordinateRegion(
+                    center: suggestion.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.2, longitudeDelta: 0.2)
+                )
+            }
+            if let region {
+                onRegionSelected?(region)
+            } else {
+                print("⚠️ [SearchViewModel] Couldn't locate area '\(query)'")
             }
         }
     }
