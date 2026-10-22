@@ -244,6 +244,7 @@ struct MainView: View {
             case .importProgress(let contentUrl):
                 ImportProgressView(contentUrl: contentUrl)
                     .environmentObject(detailPlaceViewModel)
+                    .environmentObject(profileViewModel)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
 
