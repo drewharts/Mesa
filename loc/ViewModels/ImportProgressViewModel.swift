@@ -139,12 +139,8 @@ class ImportProgressViewModel: ObservableObject {
         )
     }
 
-    /// Hands all saved places to the existing multi-place selection flow.
+    /// Hands all saved places to the existing Detected Places screen (view + add to lists, incl. add all).
     func reviewAllPlaces(detailPlaceVM: DetailPlaceViewModel) {
-        if savedPlaces.count == 1, let place = savedPlaces.first {
-            openConfirmation(for: place, detailPlaceVM: detailPlaceVM)
-            return
-        }
         for place in savedPlaces {
             detailPlaceVM.places[place.id.uuidString] = place
         }
@@ -156,7 +152,7 @@ class ImportProgressViewModel: ObservableObject {
             NotificationCenter.default.post(
                 name: NSNotification.Name("ExternalContentMultiplePlacesFound"),
                 object: nil,
-                userInfo: ["places": places, "contentUrl": url]
+                userInfo: ["places": places, "tikTokUrl": url]
             )
         }
     }

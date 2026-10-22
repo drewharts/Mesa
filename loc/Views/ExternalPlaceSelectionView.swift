@@ -8,6 +8,7 @@ struct ExternalPlaceSelectionView: View {
     @EnvironmentObject var userSession: UserSession
     @State private var selectedPlaceForList: DetailPlace?
     @State private var showingListSelection = false
+    @State private var isBulkAdd = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
     @State private var tripSelectionViewModel: PlaceTripSelectionViewModel?
 
@@ -67,6 +68,7 @@ struct ExternalPlaceSelectionView: View {
                                 place: place,
                                 onBookmarkTapped: {
                                     profile.listsViewModel.ensureListsLoaded()
+                                    isBulkAdd = false
                                     selectedPlaceForList = place
                                     showingListSelection = true
                                 },
@@ -91,7 +93,26 @@ struct ExternalPlaceSelectionView: View {
                 // Bottom buttons
                 VStack(spacing: 12) {
                     Divider()
-                    
+
+                    if externalContentVM.importedPlaces.count > 1 {
+                        Button {
+                            profile.listsViewModel.ensureListsLoaded()
+                            isBulkAdd = true
+                            selectedPlaceForList = externalContentVM.importedPlaces.first
+                            showingListSelection = true
+                        } label: {
+                            Label("Add all \(externalContentVM.importedPlaces.count) to a list", systemImage: "text.badge.plus")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color(.systemGray5))
+                                .foregroundColor(.primary)
+                                .cornerRadius(10)
+                        }
+                        .padding(.horizontal, 20)
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
                     Button("Done") {
                         profile.clearPlaceSelection()
                     }
@@ -140,6 +161,9 @@ struct ExternalPlaceSelectionView: View {
                     userSession: userSession
                 )
                 tripSelectionViewModel = PlaceTripSelectionViewModel()
+            }
+            if newValue {
+                listSelectionViewModel?.bulkPlaces = isBulkAdd ? externalContentVM.importedPlaces : []
             }
         }
     }
