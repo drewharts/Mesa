@@ -11,7 +11,6 @@ struct ImportProgressView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @StateObject private var viewModel: ImportProgressViewModel
-    @State private var showingAddAllToList = false
     @State private var showingManualAdd = false
     @State private var addAllConfirmation: String?
     @State private var confirmationDismissTask: Task<Void, Never>?
@@ -36,15 +35,6 @@ struct ImportProgressView: View {
         .onDisappear {
             viewModel.stop()
             confirmationDismissTask?.cancel()
-        }
-        .sheet(isPresented: $showingAddAllToList) {
-            ImportAddAllToListSheet(
-                places: viewModel.savedPlaces,
-                listsVM: profile.listsViewModel,
-                onAdded: { message in showAddAllConfirmation(message) }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -187,26 +177,12 @@ struct ImportProgressView: View {
                 Button {
                     viewModel.reviewAllPlaces(detailPlaceVM: detailPlaceViewModel)
                 } label: {
-                    Text(viewModel.savedPlaces.count == 1 ? "Open place" : "View \(viewModel.savedPlaces.count) places")
+                    Text(viewModel.savedPlaces.count == 1 ? "View & add to a list" : "View \(viewModel.savedPlaces.count) places & add to lists")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.accentColor)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
-                }
-            }
-            if viewModel.isFinished && !viewModel.savedPlaces.isEmpty {
-                Button {
-                    showingAddAllToList = true
-                } label: {
-                    Label(viewModel.savedPlaces.count == 1 ? "Add to a list" : "Add all \(viewModel.savedPlaces.count) to a list",
-                          systemImage: "text.badge.plus")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.systemGray5))
-                        .foregroundColor(.primary)
                         .cornerRadius(12)
                 }
             }
@@ -247,99 +223,5 @@ struct ImportProgressView: View {
             }
             .environmentObject(profile)
         }
-    }
-}
-
-/// Picker that adds every imported place to one existing or new list.
-struct ImportAddAllToListSheet: View {
-    let places: [DetailPlace]
-    @ObservedObject var listsVM: ProfileListsViewModel
-    let onAdded: (String) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var showingNewList = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        NavigationView {
-            List {
-                Section {
-                    Button {
-                        showingNewList = true
-                    } label: {
-                        Label("New list", systemImage: "plus.circle.fill")
-                            .font(.body.weight(.semibold))
-                    }
-                }
-                Section(header: Text("Your lists")) {
-                    if listsVM.lightweightPlaceLists.isEmpty {
-                        Text("No lists yet. Create one above.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    ForEach(listsVM.lightweightPlaceLists, id: \.list_id) { list in
-                        Button {
-                            addAll(toListId: list.list_id, listName: list.name)
-                        } label: {
-                            HStack {
-                                Text(list.name)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text("\(listsVM.lightweightPlaceListCounts[list.list_id] ?? list.place_count)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                }
-                if let errorMessage = errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundColor(.red)
-                }
-            }
-            .navigationTitle(places.count == 1 ? "Add to list" : "Add \(places.count) places")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-        }
-        .onAppear { listsVM.ensureListsLoaded() }
-        .sheet(isPresented: $showingNewList) {
-            NewListSheetView(onSave: { listName in
-                let result = await listsVM.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
-                switch result {
-                case .success(let createdList):
-                    // Let the new-list sheet finish dismissing before closing this one.
-                    try? await Task.sleep(nanoseconds: 400_000_000)
-                    await MainActor.run {
-                        addAll(toListId: createdList.id.uuidString, listName: createdList.name)
-                    }
-                case .failure(let error):
-                    await MainActor.run { errorMessage = error.localizedDescription }
-                }
-            })
-            .presentationDetents([.height(200)])
-            .presentationDragIndicator(.visible)
-        }
-    }
-
-    /// Adds every place not already in the list, then reports back and closes.
-    @MainActor
-    private func addAll(toListId listId: String, listName: String) {
-        let existing = Set((listsVM.lightweightPlaceListPlaces[listId] ?? []).map { $0.place_id })
-        let toAdd = places.filter { !existing.contains($0.id.uuidString) }
-        for place in toAdd {
-            listsVM.addPlaceToLightweightList(listId: listId, place: place)
-        }
-        let skipped = places.count - toAdd.count
-        var message = "Added \(toAdd.count) place\(toAdd.count == 1 ? "" : "s") to \(listName)"
-        if skipped > 0 {
-            message += " (\(skipped) already there)"
-        }
-        onAdded(message)
-        dismiss()
     }
 }

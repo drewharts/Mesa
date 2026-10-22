@@ -48,6 +48,9 @@ class PlaceListSelectionViewModel: ObservableObject {
     
     // MARK: - Search State
     @Published var filteredLists: [LightweightPlaceList] = []
+
+    /// When non-empty, tapping a list adds ALL of these places (bulk "Add all to a list").
+    var bulkPlaces: [DetailPlace] = []
     @Published var isSearching: Bool = false
     
     /// Count of collaborative lists (shared with you OR you shared with others)
@@ -420,6 +423,10 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     func toggle(place: DetailPlace, in list: LightweightPlaceList) {
+        if !bulkPlaces.isEmpty {
+            addAll(bulkPlaces, to: list)
+            return
+        }
         // Prefer the freshest data from our paginated lists array, but fall back to the
         // passed-in list for search results that exist beyond the loaded page.
         let currentList = lists.first(where: { $0.list_id == list.list_id }) ?? list
@@ -446,6 +453,27 @@ class PlaceListSelectionViewModel: ObservableObject {
         // This is event-driven, not time-driven. Once user interacts with any list,
         // they've acknowledged the new list and we can clear the highlight state.
         profile.listsViewModel.clearRecentlyCreatedList()
+    }
+
+    /// Adds every place to the list, skipping ones already in it (checked against the DB).
+    func addAll(_ places: [DetailPlace], to list: LightweightPlaceList) {
+        let currentList = lists.first(where: { $0.list_id == list.list_id }) ?? list
+        Task { @MainActor in
+            var added = 0
+            var skipped = 0
+            for place in places {
+                let exists = (try? await PlaceListService.shared.isPlaceInList(listId: currentList.list_id, placeId: place.id.uuidString)) ?? false
+                if exists { skipped += 1; continue }
+                profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place)
+                added += 1
+            }
+            updateLocalListCount(listId: currentList.list_id, delta: added)
+            placeMembership[currentList.list_id] = true
+            var message = "Added \(added) place\(added == 1 ? "" : "s") to \(currentList.name)"
+            if skipped > 0 { message += " (\(skipped) already there)" }
+            showConfirmation(message, type: .added)
+            profile.listsViewModel.clearRecentlyCreatedList()
+        }
     }
 
     /// Toggles the favorite status for a place via ProfileViewModel.
