@@ -45,19 +45,11 @@ struct TripMapView: View {
         Map(position: $viewModel.mapPosition) {
             // Route lines between consecutive stops (drawn beneath the pins)
             ForEach(viewModel.routeSegments) { segment in
-                if segment.isWalkingRoute {
-                    MapPolyline(coordinates: segment.coordinates)
-                        .stroke(
-                            Color.mesaAccent.opacity(0.75),
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
-                        )
-                } else {
-                    MapPolyline(coordinates: segment.coordinates)
-                        .stroke(
-                            Color.mesaAccent.opacity(0.6),
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round, dash: [6, 6])
-                        )
-                }
+                MapPolyline(coordinates: segment.coordinates)
+                    .stroke(
+                        Color.mesaAccent.opacity(segment.isWalkingRoute ? 0.8 : 0.45),
+                        style: StrokeStyle(lineWidth: segment.isWalkingRoute ? 4 : 2.5, lineCap: .round, lineJoin: .round)
+                    )
             }
 
             ForEach(viewModel.annotations) { annotation in

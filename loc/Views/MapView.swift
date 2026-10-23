@@ -228,6 +228,7 @@ struct MapView: View {
                 mapPosition: $mapPosition,
                 annotations: unifiedAnnotations,
                 isSatelliteMap: mapViewModel.isSatelliteMap,
+                tripRoutes: mapDisplayCoordinatorVM.activeTripRoutes,
                 isAnnotationSelected: { item in isAnnotationSelected(item) },
                 onCameraSettled: { region in
                     currentMapRegion = region

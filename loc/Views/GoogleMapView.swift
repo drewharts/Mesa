@@ -27,6 +27,8 @@ struct GoogleMapView: UIViewRepresentable {
     @Binding var mapPosition: MapCameraPosition
     let annotations: [MapAnnotationItem]
     let isSatelliteMap: Bool
+    /// Route lines between consecutive trip stops (drawn under the trip pins).
+    var tripRoutes: [TripRouteSegment] = []
     /// Per-item selection test, since a "selected" place's identity is looked up differently
     /// depending on which layer it belongs to (network/community share a place id scheme,
     /// trip pins have their own placeId, city pins are never treated as "selected").
@@ -69,6 +71,7 @@ struct GoogleMapView: UIViewRepresentable {
         context.coordinator.parent = self
         mapView.mapType = isSatelliteMap ? .hybrid : .normal
         context.coordinator.syncAnnotations(annotations, on: mapView)
+        context.coordinator.syncTripRoutes(tripRoutes, on: mapView)
         context.coordinator.syncCameraIfNeeded(mapPosition, on: mapView)
         context.coordinator.syncSelection()
     }
@@ -122,6 +125,35 @@ struct GoogleMapView: UIViewRepresentable {
             renderer.delegate = self
             clusterManager = GMUClusterManager(map: mapView, algorithm: algorithm, renderer: renderer)
             clusterManager.setMapDelegate(self)
+        }
+
+        // MARK: Trip route lines
+
+        private var tripRoutePolylines: [GMSPolyline] = []
+        private var lastTripRoutesSignature: String = ""
+
+        /// Redraws trip route polylines only when the set of routes changes.
+        func syncTripRoutes(_ routes: [TripRouteSegment], on mapView: GMSMapView) {
+            let signature = routes
+                .map { "\($0.id):\($0.isWalkingRoute ? 1 : 0):\($0.coordinates.count)" }
+                .joined(separator: "|")
+            guard signature != lastTripRoutesSignature else { return }
+            lastTripRoutesSignature = signature
+
+            tripRoutePolylines.forEach { $0.map = nil }
+            tripRoutePolylines = routes.map { route in
+                let path = GMSMutablePath()
+                route.coordinates.forEach { path.add($0) }
+                let polyline = GMSPolyline(path: path)
+                let accent = UIColor(Color.mesaAccent)
+                polyline.strokeColor = accent.withAlphaComponent(route.isWalkingRoute ? 0.8 : 0.45)
+                polyline.strokeWidth = route.isWalkingRoute ? 4 : 2.5
+                polyline.geodesic = !route.isWalkingRoute
+                polyline.zIndex = 0
+                polyline.isTappable = false
+                polyline.map = mapView
+                return polyline
+            }
         }
 
         // MARK: Annotation diffing
