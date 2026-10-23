@@ -15,6 +15,9 @@ struct TripDayPlaceCard: View {
 
     private let cardHeight: CGFloat = 150
 
+    /// Whether the full note is shown (notes collapse to 3 lines by default).
+    @State private var isNoteExpanded = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             photoCard
@@ -126,7 +129,22 @@ struct TripDayPlaceCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .italic()
-                    .lineLimit(2)
+                    .lineLimit(isNoteExpanded ? nil : 3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if note.count > 110 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isNoteExpanded.toggle()
+                        }
+                    } label: {
+                        Text(isNoteExpanded ? "less" : "more")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.mesaAccent)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .padding(.horizontal, 2)

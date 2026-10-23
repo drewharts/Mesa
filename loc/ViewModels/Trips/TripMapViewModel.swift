@@ -120,6 +120,124 @@ class TripMapViewModel: ObservableObject {
         return result
     }
 
+    // MARK: - Routes
+
+    /// A drawable line between two consecutive stops in a day.
+    struct RouteSegment: Identifiable {
+        let id: String
+        let dayIndex: Int
+        let coordinates: [CLLocationCoordinate2D]
+        /// True when the line follows a MapKit walking route; false for the straight-line fallback.
+        let isWalkingRoute: Bool
+    }
+
+    /// Walking route geometry cached per stop pair for the app session, so reopening the map
+    /// doesn't re-request directions. Key: "lat,lon->lat,lon".
+    private static var walkingRouteCache: [String: [CLLocationCoordinate2D]] = [:]
+    /// Pairs whose directions request failed this session (use straight lines, don't retry).
+    private static var failedRouteKeys: Set<String> = []
+
+    /// Bumped when new route geometry arrives so SwiftUI redraws.
+    @Published private var routeRevision = 0
+    private var routeTask: Task<Void, Never>?
+
+    /// Max walking-direction requests per map open (MapKit throttles ~50/min).
+    private let maxRouteRequests = 30
+    /// Pairs farther apart than this skip walking directions and draw a straight line.
+    private let maxWalkingDistanceMeters: CLLocationDistance = 8_000
+
+    private static func routeKey(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> String {
+        String(format: "%.5f,%.5f->%.5f,%.5f", a.latitude, a.longitude, b.latitude, b.longitude)
+    }
+
+    /// Consecutive stop pairs per visible day, in itinerary order (matching pin numbers).
+    private var routePairs: [(dayIndex: Int, from: TripMapAnnotation, to: TripMapAnnotation)] {
+        let grouped = Dictionary(grouping: annotations, by: \.dayIndex)
+        var pairs: [(dayIndex: Int, from: TripMapAnnotation, to: TripMapAnnotation)] = []
+        for dayIndex in grouped.keys.sorted() {
+            let stops = (grouped[dayIndex] ?? []).sorted { $0.stopNumber < $1.stopNumber }
+            guard stops.count >= 2 else { continue }
+            for i in 0..<(stops.count - 1) {
+                pairs.append((dayIndex: dayIndex, from: stops[i], to: stops[i + 1]))
+            }
+        }
+        return pairs
+    }
+
+    /// Lines to draw: walking route when available, otherwise a straight line.
+    var routeSegments: [RouteSegment] {
+        _ = routeRevision
+        return routePairs.map { pair in
+            let key = Self.routeKey(pair.from.coordinate, pair.to.coordinate)
+            if let coords = Self.walkingRouteCache[key], coords.count >= 2 {
+                return RouteSegment(id: "\(pair.from.id)->\(pair.to.id)", dayIndex: pair.dayIndex,
+                                    coordinates: coords, isWalkingRoute: true)
+            }
+            return RouteSegment(id: "\(pair.from.id)->\(pair.to.id)", dayIndex: pair.dayIndex,
+                                coordinates: [pair.from.coordinate, pair.to.coordinate], isWalkingRoute: false)
+        }
+    }
+
+    /// Fetches walking routes for all stop pairs (all days) that aren't cached yet, one at a time.
+    func loadRoutes() {
+        routeTask?.cancel()
+        let allPairs = Self.buildAnnotations(dayPlaces: dayPlaces, dayIndices: dayIndices)
+        let grouped = Dictionary(grouping: allPairs, by: \.dayIndex)
+        var needed: [(CLLocationCoordinate2D, CLLocationCoordinate2D)] = []
+        for dayIndex in grouped.keys.sorted() {
+            let stops = (grouped[dayIndex] ?? []).sorted { $0.stopNumber < $1.stopNumber }
+            guard stops.count >= 2 else { continue }
+            for i in 0..<(stops.count - 1) {
+                let a = stops[i].coordinate, b = stops[i + 1].coordinate
+                let key = Self.routeKey(a, b)
+                guard Self.walkingRouteCache[key] == nil, !Self.failedRouteKeys.contains(key) else { continue }
+                let distance = CLLocation(latitude: a.latitude, longitude: a.longitude)
+                    .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
+                guard distance <= maxWalkingDistanceMeters else { continue }
+                needed.append((a, b))
+            }
+        }
+        guard !needed.isEmpty else { return }
+        let batch = Array(needed.prefix(maxRouteRequests))
+
+        routeTask = Task { @MainActor [weak self] in
+            for (a, b) in batch {
+                guard !Task.isCancelled else { return }
+                let key = Self.routeKey(a, b)
+                if let coords = await Self.fetchWalkingRoute(from: a, to: b) {
+                    Self.walkingRouteCache[key] = coords
+                    self?.routeRevision += 1
+                } else {
+                    Self.failedRouteKeys.insert(key)
+                }
+            }
+        }
+    }
+
+    /// Requests a walking route from MapKit and returns its polyline coordinates.
+    private static func fetchWalkingRoute(
+        from a: CLLocationCoordinate2D,
+        to b: CLLocationCoordinate2D
+    ) async -> [CLLocationCoordinate2D]? {
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: a))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: b))
+        request.transportType = .walking
+        request.requestsAlternateRoutes = false
+        do {
+            let response = try await MKDirections(request: request).calculate()
+            guard let polyline = response.routes.first?.polyline, polyline.pointCount >= 2 else { return nil }
+            var coords = [CLLocationCoordinate2D](
+                repeating: kCLLocationCoordinate2DInvalid,
+                count: polyline.pointCount
+            )
+            polyline.getCoordinates(&coords, range: NSRange(location: 0, length: polyline.pointCount))
+            return coords
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: - Camera
 
     /// Fits the map camera to show all current annotations with padding.
