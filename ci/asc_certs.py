@@ -47,6 +47,24 @@ if __name__ == "__main__":
         # Public certificate only (no private key exists here).
         print("CREATED", d["data"]["id"], d["data"]["attributes"].get("expirationDate"))
         print("CERT_DER_B64", d["data"]["attributes"]["certificateContent"])
+    elif sys.argv[1] == "asc-info":
+        # Read-only probes: app, versions, and permission checks (GET only).
+        st, d = call("GET", "/v1/apps?filter[bundleId]=drewharts.locc")
+        print("apps", st)
+        app = d["data"][0]["id"] if st == 200 and d.get("data") else None
+        print("app id", app, d["data"][0]["attributes"].get("name") if app else "")
+        if app:
+            st, v = call("GET", f"/v1/apps/{app}/appStoreVersions?limit=10")
+            print("appStoreVersions", st)
+            for x in v.get("data", []):
+                a = x["attributes"]; print(" ", a.get("versionString"), a.get("appStoreState") or a.get("appVersionState"), a.get("platform"), a.get("createdDate"))
+            if st != 200: print(json.dumps(v.get("errors"))[:300])
+            st, r = call("GET", f"/v1/reviewSubmissions?filter[app]={app}&limit=5")
+            print("reviewSubmissions", st, [(x["attributes"].get("state"), x["attributes"].get("submittedDate")) for x in r.get("data", [])] if st == 200 else json.dumps(r.get("errors"))[:300])
+            st, b = call("GET", f"/v1/builds?filter[app]={app}&sort=-uploadedDate&limit=3")
+            print("builds", st, [(x["attributes"].get("version"), x["attributes"].get("processingState")) for x in b.get("data", [])])
+        st, u = call("GET", "/v1/users?limit=1")
+        print("users (admin-only)", st)
     elif sys.argv[1] == "revoke":
         for cid in sys.argv[2:]:
             st, d = call("DELETE", f"/v1/certificates/{cid}")
