@@ -4,6 +4,8 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>MesaAPIBaseURL</key>
+	<string>$(MESA_API_BASE_URL)</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Mesa uploads the phone numbers in your contacts to its servers to find friends who already have Mesa accounts. They are used only for this match and are not stored.</string>
 	<key>CFBundleIconName</key>
