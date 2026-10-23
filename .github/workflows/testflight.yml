@@ -60,6 +60,19 @@ jobs:
           rm -f /tmp/mesa-ci/dist.p12
           security find-identity -v -p codesigning "$KEYCHAIN" | grep -c "Apple Distribution"
 
+      - name: Install App Store provisioning profiles
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          DIST_CERT_ID: 5483KTU7R3
+        run: |
+          python3 -m pip install -q --break-system-packages pyjwt cryptography 2>/dev/null || python3 -m pip install -q pyjwt cryptography
+          OUT="$HOME/Library/MobileDevice/Provisioning Profiles"
+          python3 ci/asc_certs.py ensure-profile "Mesa CI AppStore" drewharts.locc "$DIST_CERT_ID" "$OUT"
+          python3 ci/asc_certs.py ensure-profile "Mesa CI AppStore Share" drewharts.locc.MesaShare "$DIST_CERT_ID" "$OUT"
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          cp "$OUT"/*.mobileprovision "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/"
+
       - name: Compute build number
         # Offset keeps CI builds above any build number already uploaded by hand.
         run: echo "BUILD_NUMBER=$(( ${{ vars.BUILD_NUMBER_OFFSET || 1000 }} + ${{ github.run_number }} ))" >> "$GITHUB_ENV"
@@ -83,7 +96,7 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportPath "$EXPORT_PATH" \
-            -exportOptionsPlist ci/ExportOptions.plist \
+            -exportOptionsPlist ci/ExportOptionsManual.plist \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
