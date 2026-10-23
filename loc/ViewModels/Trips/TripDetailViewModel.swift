@@ -188,18 +188,129 @@ class TripDetailViewModel: ObservableObject {
             place.sortOrder = index
             places[index] = place
         }
+        applyDayOrder(dayIndex: dayIndex, places: places)
+    }
+
+    /// Sets a day's order locally (sort_order = position), refreshes map/routes, persists via RPC,
+    /// and rolls back to the previous order if the save fails.
+    func applyDayOrder(dayIndex: Int, places newOrder: [TripDayPlace]) {
+        let previous = dayPlaces[dayIndex] ?? []
+        var places = newOrder
+        for index in places.indices {
+            places[index].sortOrder = index
+        }
+        guard places.map(\.id) != previous.map(\.id) || places.map(\.sortOrder) != previous.map(\.sortOrder) else {
+            return
+        }
         dayPlaces[dayIndex] = places
         travelTimesViewModel.recalculateDay(dayIndex: dayIndex, places: places)
+        refreshMapAnnotations()
 
-        // Persist reorder via RPC
-        let placeIds = places.map(\.id)
+        let entryIds = places.map(\.id)
         Task {
-            try? await tripService.reorderDayPlaces(
-                tripId: tripId,
-                dayIndex: dayIndex,
-                placeIds: placeIds
-            )
+            do {
+                try await tripService.reorderDayPlaces(
+                    tripId: tripId,
+                    dayIndex: dayIndex,
+                    placeIds: entryIds
+                )
+            } catch {
+                print("[TripDetailVM] Failed to reorder: \(error)")
+                dayPlaces[dayIndex] = previous
+                travelTimesViewModel.recalculateDay(dayIndex: dayIndex, places: previous)
+                refreshMapAnnotations()
+            }
         }
+    }
+
+    /// Moves a stop up (-1) or down (+1) within its day.
+    func moveStop(entryId: String, by offset: Int) {
+        guard let (dayIndex, index) = indexOfEntry(entryId) else { return }
+        var places = dayPlaces[dayIndex] ?? []
+        let target = index + offset
+        guard places.indices.contains(target) else { return }
+        places.swapAt(index, target)
+        applyDayOrder(dayIndex: dayIndex, places: places)
+    }
+
+    /// Drag-and-drop: moves a stop so it sits just before `beforeEntryId`
+    /// (or at the end of `dayIndex` when nil). Handles same-day and cross-day moves.
+    func moveStop(entryId: String, toDayIndex: Int, beforeEntryId: String?) async {
+        guard canEdit, entryId != beforeEntryId,
+              let (sourceDay, sourceIndex) = indexOfEntry(entryId) else { return }
+        let moving = dayPlaces[sourceDay]![sourceIndex]
+
+        if sourceDay == toDayIndex {
+            var places = dayPlaces[toDayIndex] ?? []
+            places.remove(at: sourceIndex)
+            let insertAt = beforeEntryId.flatMap { id in places.firstIndex(where: { $0.id == id }) } ?? places.count
+            places.insert(moving, at: insertAt)
+            applyDayOrder(dayIndex: toDayIndex, places: places)
+            return
+        }
+
+        // Cross-day: existing move (appends to target day), then position it.
+        await movePlaceToDifferentDay(entryId: entryId, toDayIndex: toDayIndex)
+        guard var places = dayPlaces[toDayIndex],
+              let movedIndex = places.firstIndex(where: { $0.id == entryId }) else { return }
+        let moved = places.remove(at: movedIndex)
+        let insertAt = beforeEntryId.flatMap { id in places.firstIndex(where: { $0.id == id }) } ?? places.count
+        places.insert(moved, at: insertAt)
+        applyDayOrder(dayIndex: toDayIndex, places: places)
+        refreshMapAnnotations()
+    }
+
+    // MARK: - Insert Between Stops
+
+    /// Where a new stop should be inserted (presented as the existing Add Place sheet).
+    struct InsertRequest: Identifiable, Equatable {
+        let id = UUID()
+        let dayIndex: Int
+        /// Insert after this entry; nil = at the start of the day.
+        let afterEntryId: String?
+        let existingEntryIds: Set<String>
+    }
+
+    /// Drives the Add Place sheet for an insert.
+    @Published var insertRequest: InsertRequest?
+    /// Kept after the sheet closes so onDismiss can finish positioning.
+    private var pendingInsert: InsertRequest?
+
+    /// Opens the existing Add Place sheet targeting `dayIndex`, to insert after `afterEntryId`.
+    func requestInsert(dayIndex: Int, afterEntryId: String?, presentFromOverview: Bool = true) {
+        guard canEdit else { return }
+        let existing = Set((dayPlaces[dayIndex] ?? []).map(\.id))
+        let request = InsertRequest(dayIndex: dayIndex, afterEntryId: afterEntryId, existingEntryIds: existing)
+        pendingInsert = request
+        if presentFromOverview {
+            insertRequest = request
+        }
+    }
+
+    /// After the Add Place sheet closes: reloads, then moves newly added stops into position.
+    func completePendingInsert() async {
+        guard let request = pendingInsert else { return }
+        pendingInsert = nil
+        await loadTrip()
+
+        let places = dayPlaces[request.dayIndex] ?? []
+        let added = places.filter { !request.existingEntryIds.contains($0.id) }
+        guard !added.isEmpty else {
+            refreshMapAnnotations()
+            return
+        }
+        var remaining = places.filter { request.existingEntryIds.contains($0.id) }
+        let insertAt: Int
+        if let afterId = request.afterEntryId, let afterIndex = remaining.firstIndex(where: { $0.id == afterId }) {
+            insertAt = afterIndex + 1
+        } else if request.afterEntryId == nil {
+            insertAt = 0
+        } else {
+            insertAt = remaining.count
+        }
+        remaining.insert(contentsOf: added, at: insertAt)
+        applyDayOrder(dayIndex: request.dayIndex, places: remaining)
+        refreshMapAnnotations()
     }
 
     // MARK: - Cross-Day Move
@@ -327,7 +438,8 @@ class TripDetailViewModel: ObservableObject {
 
     /// Re-sends annotations to the main map (respecting the current day filter).
     private func refreshMapAnnotations() {
-        guard mapCoordinator?.activeTripId == tripId else { return }
+        guard let coordinator = mapCoordinator,
+              coordinator.activeTripId == nil || coordinator.activeTripId == tripId else { return }
         let annotations = buildTripAnnotations(forDay: selectedDayForDetail)
         mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
     }
@@ -359,6 +471,9 @@ class TripDetailViewModel: ObservableObject {
         let ideaEntryIds = Set(ideaPlaces.map(\.id))
         if ideaEntryIds.contains(droppedId) {
             Task { await moveIdeaToDay(entryId: droppedId, dayIndex: dayIndex) }
+        } else if indexOfEntry(droppedId) != nil {
+            // A scheduled stop dragged from the itinerary onto a calendar day
+            Task { await moveStop(entryId: droppedId, toDayIndex: dayIndex, beforeEntryId: nil) }
         } else {
             Task { await addPlaceToSpecificDay(placeId: droppedId, dayIndex: dayIndex) }
         }

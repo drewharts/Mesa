@@ -18,6 +18,8 @@ struct TripDayItineraryView: View {
     let onPlaceTap: (String) -> Void
     var nextStopId: String? = nil
     var onToggleVisited: ((String) -> Void)? = nil
+    var onInsertAfter: ((String) -> Void)? = nil
+    var onMoveBy: ((String, Int) -> Void)? = nil
 
     var body: some View {
         if places.isEmpty {
@@ -72,6 +74,33 @@ struct TripDayItineraryView: View {
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .draggable(place.id) {
                     TripPlaceDragPreview()
+                }
+                .contextMenu {
+                    if canEdit {
+                        if let onInsertAfter {
+                            Button {
+                                onInsertAfter(place.id)
+                            } label: {
+                                Label("Add stop after", systemImage: "plus")
+                            }
+                        }
+                        if let onMoveBy {
+                            if index > 0 {
+                                Button {
+                                    onMoveBy(place.id, -1)
+                                } label: {
+                                    Label("Move up", systemImage: "arrow.up")
+                                }
+                            }
+                            if index < places.count - 1 {
+                                Button {
+                                    onMoveBy(place.id, 1)
+                                } label: {
+                                    Label("Move down", systemImage: "arrow.down")
+                                }
+                            }
+                        }
+                    }
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     if canEdit, let onToggleVisited {
