@@ -164,7 +164,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
             }
         }
         
-        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.description = DetailPlace.sanitizedDescription(try container.decodeIfPresent(String.self, forKey: .description))
         self.priceLevel = try container.decodeIfPresent(String.self, forKey: .priceLevel)
         self.reservable = try container.decodeIfPresent(Bool.self, forKey: .reservable)
         self.servesBreakfast = try container.decodeIfPresent(Bool.self, forKey: .servesBreakfast)
@@ -444,5 +444,23 @@ extension CLLocationCoordinate2D {
     /// Coordinates at (0,0) are in the middle of the Atlantic Ocean and indicate missing data.
     var isValidForNavigation: Bool {
         return !(latitude == 0 && longitude == 0)
+    }
+}
+
+
+extension DetailPlace {
+    /// Some older AI descriptions were stored as raw or truncated JSON (e.g. `{"description":"Go for`
+    /// or just `{`). Unwrap valid JSON; hide anything else that starts with `{`.
+    static func sanitizedDescription(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{") else { return trimmed.isEmpty ? nil : raw }
+        if let data = trimmed.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let text = obj["description"] as? String {
+            let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return clean.isEmpty ? nil : clean
+        }
+        return nil
     }
 }
