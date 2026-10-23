@@ -1,0 +1,6 @@
+- Watch your TikTok imports happen live with a new progress screen.
+- Import places from TikTok photo slideshows, and pick up places named in on-screen text.
+- Re-importing a TikTok you've already saved is now much faster.
+- Your lists open faster in the list picker, sorted by most recently used and then by what's nearby.
+- Searching for a city or region now zooms the map there instead of dropping a pin.
+- Fixed odd characters showing up in some place descriptions.

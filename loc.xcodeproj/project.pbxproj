@@ -625,6 +625,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = loc/Info.plist;
+				MESA_API_BASE_URL = "https://mesa.drewharts.com";
 				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Mesa uses your location in the background to continuously update nearby places and provide real-time location-based recommendations. For example, when you're walking around, Mesa will show you restaurants and places that are close to your current location.";
@@ -665,6 +666,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = loc/Info.plist;
+				MESA_API_BASE_URL = "https://mesa.drewharts.com";
 				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Mesa uses your location in the background to continuously update nearby places and provide real-time location-based recommendations. For example, when you're walking around, Mesa will show you restaurants and places that are close to your current location.";
