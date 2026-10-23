@@ -17,6 +17,8 @@ jobs:
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: mkdir -p /tmp/asc && echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$ASC_KEY_PATH"
       - name: Run
-        run: python3 ci/asc_certs.py $(cat ci/cert-action.txt)
+        run: |
+          python3 ci/asc_certs.py $(cat ci/cert-action.txt)
+          python3 ci/asc_certs.py create-dist ci/dist.csr
       - if: always()
         run: rm -rf /tmp/asc

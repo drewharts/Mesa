@@ -37,6 +37,16 @@ def list_certs():
 if __name__ == "__main__":
     if sys.argv[1] == "list":
         list_certs()
+    elif sys.argv[1] == "create-dist":
+        csr = open(sys.argv[2]).read()
+        csr = "".join(l for l in csr.splitlines() if "CERTIFICATE REQUEST" not in l)
+        st, d = call("POST", "/v1/certificates", {"data": {"type": "certificates", "attributes": {
+            "certificateType": "DISTRIBUTION", "csrContent": csr}}})
+        if st != 201:
+            print("CREATE FAILED", st, json.dumps(d.get("errors"))); sys.exit(1)
+        # Public certificate only (no private key exists here).
+        print("CREATED", d["data"]["id"], d["data"]["attributes"].get("expirationDate"))
+        print("CERT_DER_B64", d["data"]["attributes"]["certificateContent"])
     elif sys.argv[1] == "revoke":
         for cid in sys.argv[2:]:
             st, d = call("DELETE", f"/v1/certificates/{cid}")
