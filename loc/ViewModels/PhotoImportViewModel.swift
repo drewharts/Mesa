@@ -69,17 +69,21 @@ class PhotoImportViewModel: ObservableObject {
         }
     }
 
-    /// Confirms onboarding, marks as seen, and opens the photo picker.
+    /// Confirms onboarding, marks it as seen, and opens the photo picker once the alert has finished dismissing.
     func confirmOnboarding() {
         UserDefaults.standard.set(true, forKey: Self.onboardingKey)
         showImportOnboarding = false
-        showPhotoPicker = true
+        // SwiftUI silently drops a picker presented while the alert is still animating out.
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            showPhotoPicker = true
+        }
     }
     
     /// Processes selected photos: loads images, clusters by GPS, and routes to the appropriate flow.
     func processSelectedPhotos() async {
-        isInPhotoImportFlow = true
         guard !selectedItems.isEmpty else { return }
+        isInPhotoImportFlow = true
 
         isProcessingPhoto = true
         selectedImages = []
