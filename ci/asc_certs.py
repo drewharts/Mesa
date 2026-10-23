@@ -54,7 +54,7 @@ if __name__ == "__main__":
         app = d["data"][0]["id"] if st == 200 and d.get("data") else None
         print("app id", app, d["data"][0]["attributes"].get("name") if app else "")
         if app:
-            st, v = call("GET", f"/v1/apps/{app}/appStoreVersions?limit=10")
+            st, v = call("GET", f"/v1/apps/{app}/appStoreVersions?limit=200")
             print("appStoreVersions", st)
             for x in v.get("data", []):
                 a = x["attributes"]; print(" ", a.get("versionString"), a.get("appStoreState") or a.get("appVersionState"), a.get("platform"), a.get("createdDate"))
