@@ -66,6 +66,7 @@ jobs:
 
       - name: Archive
         run: |
+          python3 ci/use_distribution_identity.py
           xcodebuild archive \
             -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
             -destination 'generic/platform=iOS' \
@@ -75,7 +76,6 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             DEVELOPMENT_TEAM=585YK2F2H6 \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
       - name: Export and upload to TestFlight
