@@ -33,6 +33,7 @@ struct AboutTabContent: View {
 
     // MARK: - View-Owned Presentation State
     @State private var showingNoteSheet = false
+    @StateObject private var insightsViewModel = PlaceInsightsViewModel()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -44,9 +45,14 @@ struct AboutTabContent: View {
                     place: place,
                     isRefreshing: isRefreshing,
                     onRefresh: onRefresh,
-                    onAddPost: onAddPost
+                    onAddPost: onAddPost,
+                    takeText: insightsViewModel.take
                 )
             }
+
+            // 1b. Friends first + "People order" from TikTok mentions
+            PlaceInsightsSection(viewModel: insightsViewModel)
+                .padding(.bottom, 12)
             
             // 2. User's private note (only shown if note exists)
             PlaceNoteDisplayView(
@@ -75,6 +81,12 @@ struct AboutTabContent: View {
                 onPhotoTapped: onPhotoTapped
             )
             .padding(.top, 20)
+        }
+        .task(id: viewModel.placeId) {
+            await insightsViewModel.load(placeId: viewModel.placeId)
+        }
+        .onReceive(insightsViewModel.$priorityPhotoURLs) { urls in
+            viewModel.placePhotosViewModel.priorityPhotoURLs = urls
         }
         .sheet(isPresented: $showingNoteSheet) {
             PlaceNoteSheetView(viewModel: viewModel.notesViewModel)
