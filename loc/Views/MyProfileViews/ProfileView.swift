@@ -101,16 +101,6 @@ struct ProfileView: View {
             } message: {
                 Text(deepLinkViewModel.noLocationAlertMessage)
             }
-            .sheet(isPresented: Binding(
-                get: { externalContentVM.isShowingNoPlacesFound },
-                set: { externalContentVM.isShowingNoPlacesFound = $0 }
-            )) {
-                NoPlacesFoundView(contentUrl: externalContentVM.noPlacesFoundContentUrl)
-                    .environmentObject(profile)
-                    .environmentObject(userSession)
-                    .environmentObject(placeVM)
-                    .presentationDragIndicator(.visible)
-            }
             // Staff Engineer: Reactive logout - dismiss fullScreenCover when user logs out
             .onChange(of: userSession.isUserLoggedIn) { _, isLoggedIn in
                 if !isLoggedIn {
