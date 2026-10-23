@@ -268,50 +268,12 @@ class DeepLinkManager: ObservableObject {
             return
         }
 
-        let result = await externalContentService.processURL(urlString)
-        
-        switch result {
-        case .success(let detailPlaces):
-            if detailPlaces.isEmpty {
-                // Show user-friendly message
-                await MainActor.run {
-                    let message = "We couldn't figure out what place is associated with this video."
-                    self.onNoLocationFound?(message)
-                }
-                currentProcessingURL = nil
-                return
-            }
-            
-            if detailPlaces.count == 1 {
-                let place = detailPlaces[0]
-
-                // Navigate directly - backend returns full place details
-                await navigateToPlace(place, contentUrl: urlString)
-            } else {
-                // Multiple places - let ProfileViewModel handle the selection
-                await MainActor.run {
-                    // We need to trigger the ProfileViewModel's multiple place handling
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("ExternalContentMultiplePlacesFound"),
-                        object: nil,
-                        userInfo: ["places": detailPlaces, "contentUrl": urlString]
-                    )
-                }
-                // Keep URL stored for when user selects a place
-            }
-            
-        case .failure(let error):
-            print("❌ [DeepLinkManager] Result is .failure: \(error.localizedDescription)")
-            await MainActor.run {
-                if let externalContentVM = self.profileViewModel?.externalContentViewModel {
-                    externalContentVM.noPlacesFoundContentUrl = urlString
-                    externalContentVM.isShowingNoPlacesFound = true
-                } else {
-                    self.onNoLocationFound?("We couldn't identify a place in this video.")
-                }
-            }
-            currentProcessingURL = nil
+        // Live import: the progress sheet starts the async job and polls it.
+        await MainActor.run {
+            self.isProcessingDeepLink = false
+            PresentationService.shared.present(.importProgress(contentUrl: urlString))
         }
+        currentProcessingURL = nil
     }
     
     private func loadPlaceDetails(_ shareablePlace: ShareablePlace) async {

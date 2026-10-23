@@ -123,6 +123,15 @@ private struct SearchPageViewContent: View {
                     }
                 }
 
+                viewModel.onRegionSelected = { region in
+                    appCoordinator.regionToFocus = region
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        showSearchPage = false
+                    }
+                }
+
                 viewModel.onCitySelected = { city in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         PresentationService.shared.present(.cityOverview(

@@ -132,6 +132,90 @@ class ExternalContentService: ObservableObject {
         }
     }
     
+    // MARK: - Async Import Jobs
+
+    /// Starts an asynchronous import. Returns a job id, or places if the backend answered synchronously.
+    func startImport(_ url: String) async -> Result<ImportStartResult, Error> {
+        guard let requestURL = URL(string: "\(baseURL)/process-url") else {
+            return .failure(NSError(domain: "ExternalContentService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
+        }
+        var request = await createRequest(url: requestURL, contentURL: url)
+        request.setValue("1", forHTTPHeaderField: "X-Mesa-Async")
+        if let body = try? JSONSerialization.data(withJSONObject: ["url": url, "async": true]) {
+            request.httpBody = body
+        }
+        do {
+            let (data, response) = try await NetworkSessionManager.shared.apiSession.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 202,
+               let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let jobId = json["job_id"] as? String {
+                return .success(.job(id: jobId))
+            }
+            if let error = validateResponse(response) {
+                return .failure(error)
+            }
+            return .success(.places(try parseSyncPlaces(data)))
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Fetches the latest snapshot of an import job.
+    func fetchImportJob(id: String) async -> Result<ImportJob, Error> {
+        guard let requestURL = URL(string: "\(baseURL)/import-jobs/\(id)") else {
+            return .failure(NSError(domain: "ExternalContentService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
+        }
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = "GET"
+        await addAuthenticationToken(to: &request)
+        do {
+            let (data, response) = try await NetworkSessionManager.shared.apiSession.data(for: request)
+            if let error = validateResponse(response) {
+                return .failure(error)
+            }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw NSError(domain: "ExternalContentService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse import job"])
+            }
+            return .success(parseImportJob(json, fallbackId: id))
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Parses a sync /process-url body ({place} or {place, saved_places}) into places.
+    private func parseSyncPlaces(_ data: Data) throws -> [DetailPlace] {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+        if let saved = json["saved_places"] as? [[String: Any]] {
+            return saved.compactMap { try? parseDetailPlaceFromDictionary($0) }
+        }
+        if let placeDict = json["place"] as? [String: Any] {
+            return [try parseDetailPlaceFromDictionary(placeDict)]
+        }
+        return []
+    }
+
+    /// Converts an import_jobs row into an ImportJob model.
+    private func parseImportJob(_ json: [String: Any], fallbackId: String) -> ImportJob {
+        let rawPlaces = json["places"] as? [[String: Any]] ?? []
+        let places: [ImportJobPlace] = rawPlaces.enumerated().map { index, dict in
+            let placeObject = (dict["place"] as? [String: Any]).flatMap { try? parseDetailPlaceFromDictionary($0) }
+            return ImportJobPlace(
+                index: index,
+                name: dict["name"] as? String ?? "Place",
+                status: ImportJobPlaceStatus(rawValue: dict["status"] as? String ?? "") ?? .found,
+                placeId: dict["place_id"] as? String,
+                place: placeObject
+            )
+        }
+        return ImportJob(
+            id: json["id"] as? String ?? fallbackId,
+            status: ImportJobStatus(rawValue: json["status"] as? String ?? "") ?? .queued,
+            totalFound: json["total_found"] as? Int ?? places.count,
+            places: places,
+            error: json["error"] as? String
+        )
+    }
+
     func getTikTokOEmbed(url: String) async -> Result<ExternalOEmbedResponse, Error> {
         guard let encodedURL = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let requestURL = URL(string: "\(baseURL)/tiktok/oembed?url=\(encodedURL)") else {
@@ -271,7 +355,16 @@ class ExternalContentService: ObservableObject {
         detailPlace.city = dict["city"] as? String
         detailPlace.description = dict["description"] as? String
         detailPlace.mapboxId = dict["mapboxId"] as? String
-        detailPlace.googlePlaceId = dict["googlePlaceId"] as? String
+        detailPlace.googlePlaceId = (dict["googlePlaceId"] ?? dict["googlePlacesId"]) as? String
+
+        // Photos: backend place dicts carry photoUrls and/or a single thumbnailUrl
+        // (Google Places photo URL). Mirror DetailPlace's Decodable fallback so
+        // AsyncImage-based rows have something to load.
+        if let urls = dict["photoUrls"] as? [String], !urls.isEmpty {
+            detailPlace.photoUrls = urls
+        } else if let thumbnail = (dict["thumbnailUrl"] ?? dict["thumbnail_url"]) as? String, !thumbnail.isEmpty {
+            detailPlace.photoUrls = [thumbnail]
+        }
         detailPlace.source = dict["source"] as? String
         
         // Categories

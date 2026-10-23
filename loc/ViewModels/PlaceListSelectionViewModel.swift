@@ -48,6 +48,9 @@ class PlaceListSelectionViewModel: ObservableObject {
     
     // MARK: - Search State
     @Published var filteredLists: [LightweightPlaceList] = []
+
+    /// When non-empty, tapping a list adds ALL of these places (bulk "Add all to a list").
+    var bulkPlaces: [DetailPlace] = []
     @Published var isSearching: Bool = false
     
     /// Count of collaborative lists (shared with you OR you shared with others)
@@ -113,9 +116,73 @@ class PlaceListSelectionViewModel: ObservableObject {
     
     // MARK: - Public API
     
+    // MARK: - Cross-instance cache & last-used list
+
+    /// Lists from the most recent load, keyed by user id. Lets the sheet render
+    /// instantly on every open while a fresh fetch runs in the background.
+    private static var cachedLists: [String: [LightweightPlaceList]] = [:]
+    private static let lastUsedListKey = "PlaceListSelection.lastUsedListId"
+
+    static var lastUsedListId: String? {
+        get { UserDefaults.standard.string(forKey: lastUsedListKey) }
+        set { UserDefaults.standard.set(newValue, forKey: lastUsedListKey) }
+    }
+
+    /// Coordinate to sort by: centroid of bulk places when adding all, else the single place.
+    private func targetCoordinate(for place: DetailPlace) -> CLLocationCoordinate2D? {
+        let coords = (bulkPlaces.isEmpty ? [place] : bulkPlaces).compactMap { $0.coordinate }
+        guard !coords.isEmpty else { return place.coordinate }
+        let lat = coords.map { $0.latitude }.reduce(0, +) / Double(coords.count)
+        let lng = coords.map { $0.longitude }.reduce(0, +) / Double(coords.count)
+        return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    }
+
+    /// Distance (meters) from the target to a list's places, using the server's
+    /// proximity distance when the list was fetched for this target.
+    private func distance(of list: LightweightPlaceList) -> Double? {
+        guard let target = sortTarget else { return nil }
+        if let avg = list.averageLocation {
+            return CLLocation(latitude: avg.latitude, longitude: avg.longitude)
+                .distance(from: CLLocation(latitude: target.latitude, longitude: target.longitude))
+        }
+        return list.distance_meters
+    }
+
+    /// Coordinate lists are sorted against (nil when the place(s) have no location).
+    private var sortTarget: CLLocationCoordinate2D?
+
+    /// Last-used list first, then by proximity, lists without located places last.
+    private func sortForDisplay(_ source: [LightweightPlaceList]) -> [LightweightPlaceList] {
+        let lastUsed = Self.lastUsedListId
+        let indexed = Array(source.enumerated())
+        return indexed.sorted { a, b in
+            let aLast = a.element.list_id == lastUsed
+            let bLast = b.element.list_id == lastUsed
+            if aLast != bLast { return aLast }
+            let da = distance(of: a.element)
+            let db = distance(of: b.element)
+            switch (da, db) {
+            case let (x?, y?):
+                if x != y { return x < y }
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            default:
+                break
+            }
+            return a.offset < b.offset
+        }.map { $0.element }
+    }
+
+    // MARK: - Public API
+    
     func loadInitialLists(for place: DetailPlace) async {
-        guard let userId = userSession.currentUserId,
-              let coord = place.coordinate else { return }
+        guard let userId = userSession.currentUserId else { return }
+        let target = targetCoordinate(for: place)
+        sortTarget = target
+        // Without coordinates we still load lists; distances are just ignored.
+        let coord = target ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
         
         // Guard: Don't reload if we already have lists loaded
         // This prevents .task from wiping out paginated lists when view re-renders
@@ -128,50 +195,61 @@ class PlaceListSelectionViewModel: ObservableObject {
         placeCoordinates = coord
         currentPage = 1
         hasMore = true
-        isLoadingInitial = true
         placeMembership.removeAll()
         sharedLists = []
+        isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
+
+        // Show cached lists immediately (stale distances are fine for a first paint);
+        // only show the spinner when we have nothing at all.
+        if let cached = Self.cachedLists[userId], !cached.isEmpty {
+            lists = sortForDisplay(cached)
+            filteredLists = applyLocalFilters(to: lists)
+            isLoadingInitial = false
+        } else {
+            isLoadingInitial = true
+        }
         
         // Fetch owned lists, shared lists, AND collaborative owned lists in parallel
-        // This ensures ALL collaborative lists are available for the "Shared" filter
         async let ownedListsTask = fetchOwnedLists(userId: userId, coord: coord)
         async let sharedListsTask = fetchSharedLists(userId: userId)
-    async let collaborativeOwnedTask = fetchCollaborativeOwnedLists(userId: userId)
+        async let collaborativeOwnedTask = fetchCollaborativeOwnedLists(userId: userId)
     
-    let (ownedLists, fetchedSharedLists, collaborativeOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask)
+        let (ownedLists, fetchedSharedLists, collaborativeOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask)
     
-    // Cache shared lists for later (they don't paginate)
-    sharedLists = fetchedSharedLists
+        // Cache shared lists for later (they don't paginate)
+        sharedLists = fetchedSharedLists
     
-    // Merge with proper deduplication to prevent duplicate IDs in ForEach
-    // Priority: owned lists > collaborative owned > shared with me
-    let uniqueLists = deduplicateLists(
-        ownedLists: ownedLists,
-        collaborativeOwnedLists: collaborativeOwnedLists,
-        sharedLists: fetchedSharedLists
-    )
-    lists = uniqueLists
-    hasMore = ownedLists.count >= pageSize
-    hasLoadedOnce = true
+        var uniqueLists = deduplicateLists(
+            ownedLists: ownedLists,
+            collaborativeOwnedLists: collaborativeOwnedLists,
+            sharedLists: fetchedSharedLists
+        )
+        // Keep the last-used list visible even if it's beyond the first proximity page.
+        if let lastUsed = Self.lastUsedListId,
+           !uniqueLists.contains(where: { $0.list_id == lastUsed }),
+           let cachedLast = Self.cachedLists[userId]?.first(where: { $0.list_id == lastUsed }) {
+            uniqueLists.append(cachedLast)
+        }
+        uniqueLists = sortForDisplay(uniqueLists)
+        // Count only fetched owned lists toward pagination bookkeeping.
+        lists = uniqueLists
+        hasMore = ownedLists.count >= pageSize
+        hasLoadedOnce = true
+        if !uniqueLists.isEmpty {
+            Self.cachedLists[userId] = uniqueLists
+        }
 
-        // Initialize filtered lists with all loaded lists
         filteredLists = applyLocalFilters(to: uniqueLists)
+        isLoadingInitial = false
 
-        // Load place membership data for all lists (so we can show checkmarks)
+        // Membership checks (one small query per list, in parallel) run after the lists
+        // are visible so they never block the first render.
         if !uniqueLists.isEmpty {
             await loadPlaceMembershipForLists(uniqueLists, placeId: place.id.uuidString)
-
-            // Re-apply filters now that membership data is available
-            // This ensures "already saved" lists sort to the top
             if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
                 filteredLists = applyLocalFilters(to: lists)
             }
         }
-
-        // Check if place is in user's favorites
-        isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
-
-        isLoadingInitial = false
     }
     
     // MARK: - Private Fetch Methods
@@ -264,8 +342,14 @@ class PlaceListSelectionViewModel: ObservableObject {
 
         // Sort lists that already contain the place to the top
         // Swift sort is stable — preserves proximity order within each group
-        result.sort { list1, _ in
-            placeMembership[list1.list_id] == true
+        // (Skipped in bulk mode, where membership only reflects the first place.)
+        // Last-used list stays pinned on top.
+        if bulkPlaces.isEmpty {
+            let lastUsed = Self.lastUsedListId
+            let pinned = result.filter { $0.list_id == lastUsed }
+            let rest = result.filter { $0.list_id != lastUsed }
+            result = pinned + rest.filter { placeMembership[$0.list_id] == true }
+                + rest.filter { placeMembership[$0.list_id] != true }
         }
 
         return result
@@ -420,6 +504,10 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     func toggle(place: DetailPlace, in list: LightweightPlaceList) {
+        if !bulkPlaces.isEmpty {
+            addAll(bulkPlaces, to: list)
+            return
+        }
         // Prefer the freshest data from our paginated lists array, but fall back to the
         // passed-in list for search results that exist beyond the loaded page.
         let currentList = lists.first(where: { $0.list_id == list.list_id }) ?? list
@@ -439,6 +527,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             updateLocalListCount(listId: currentList.list_id, delta: +1)
             profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
             placeMembership[currentList.list_id] = true
+            Self.lastUsedListId = currentList.list_id
             showConfirmation("Saved to \(currentList.name)", type: .added)
         }
         
@@ -446,6 +535,28 @@ class PlaceListSelectionViewModel: ObservableObject {
         // This is event-driven, not time-driven. Once user interacts with any list,
         // they've acknowledged the new list and we can clear the highlight state.
         profile.listsViewModel.clearRecentlyCreatedList()
+    }
+
+    /// Adds every place to the list, skipping ones already in it (checked against the DB).
+    func addAll(_ places: [DetailPlace], to list: LightweightPlaceList) {
+        let currentList = lists.first(where: { $0.list_id == list.list_id }) ?? list
+        Self.lastUsedListId = currentList.list_id
+        Task { @MainActor in
+            var added = 0
+            var skipped = 0
+            for place in places {
+                let exists = (try? await PlaceListService.shared.isPlaceInList(listId: currentList.list_id, placeId: place.id.uuidString)) ?? false
+                if exists { skipped += 1; continue }
+                profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place)
+                added += 1
+            }
+            updateLocalListCount(listId: currentList.list_id, delta: added)
+            placeMembership[currentList.list_id] = true
+            var message = "Added \(added) place\(added == 1 ? "" : "s") to \(currentList.name)"
+            if skipped > 0 { message += " (\(skipped) already there)" }
+            showConfirmation(message, type: .added)
+            profile.listsViewModel.clearRecentlyCreatedList()
+        }
     }
 
     /// Toggles the favorite status for a place via ProfileViewModel.

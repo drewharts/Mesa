@@ -241,6 +241,13 @@ struct MainView: View {
             case .importPlaceConfirmation(let placeId, let contentUrl):
                 importPlaceConfirmationSheet(placeId: placeId, contentUrl: contentUrl)
 
+            case .importProgress(let contentUrl):
+                ImportProgressView(contentUrl: contentUrl)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(profileViewModel)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+
             // Map Popups (User's Own Data)
             case .list(let listId):
                 listSheet(listId: listId)
@@ -639,6 +646,12 @@ struct MainView: View {
                 appCoordinator.hasPendingKeywordPopup = false
                 DispatchQueue.main.async {
                     appCoordinator.showKeywordResultsPopup = true
+                }
+            }
+            if let region = appCoordinator.regionToFocus {
+                appCoordinator.regionToFocus = nil
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    mapPosition = .region(region)
                 }
             }
             if let coordinate = appCoordinator.coordinateForPlaceCreation {

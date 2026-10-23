@@ -927,39 +927,20 @@ class ProfileExternalContentViewModel: ObservableObject {
             currentProcessingUrl = urlString
         }
 
-        let result = await contentService.processURL(urlString)
-
         // Clear from recently processed after 30 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
             self.recentlyProcessedURLs.remove(urlString)
         }
 
-        switch result {
-        case .success(let detailPlaces):
+        // Live import: the progress sheet starts the async job and polls it.
+        await MainActor.run {
             importError = nil
-
-            await handleSuccessfulContentProcessing(
-                detailPlaces: detailPlaces,
-                urlString: urlString,
-                selectedPlaceVM: selectedPlaceVM,
-                placeVM: placeVM,
-                deepLinkManager: deepLinkManager
-            )
-
-            return true
-
-        case .failure(let error):
-            print("❌ [ProfileExternalContentViewModel] Content processing failed: \(error.localizedDescription)")
-
-            await MainActor.run {
-                setImportErrorMessage(from: error)
-                isProcessingContent = false
-                deepLinkManager?.isProcessingDeepLink = false
-                currentProcessingUrl = nil
-            }
-
-            return false
+            isProcessingContent = false
+            deepLinkManager?.isProcessingDeepLink = false
+            currentProcessingUrl = nil
+            PresentationService.shared.present(.importProgress(contentUrl: urlString))
         }
+        return true
     }
 
     /// Handles successful content URL processing with extracted places.
