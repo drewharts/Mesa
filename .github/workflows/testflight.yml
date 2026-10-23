@@ -89,7 +89,8 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             DEVELOPMENT_TEAM=585YK2F2H6 \
-            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            MESA_API_BASE_URL=https://mesa-backend-staging.up.railway.app
 
       - name: Export and upload to TestFlight
         run: |
