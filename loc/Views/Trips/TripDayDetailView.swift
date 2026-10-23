@@ -35,6 +35,10 @@ struct TripDayDetailView: View {
             onPlaceTap: { placeId in
                 viewModel.highlightTripAnnotation(placeId: placeId)
                 selectedPlaceId = placeId
+            },
+            nextStopId: viewModel.nextStopId(dayIndex: dayIndex),
+            onToggleVisited: { entryId in
+                viewModel.toggleVisited(entryId: entryId)
             }
         )
         .navigationTitle(viewModel.dayLabel(for: dayIndex))

@@ -50,6 +50,7 @@ struct TripDetailContentView: View {
 
             ForEach(viewModel.dayIndices, id: \.self) { dayIndex in
                 let places = viewModel.dayPlaces[dayIndex] ?? []
+                let nextId = viewModel.nextStopId(dayIndex: dayIndex)
                 if !places.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
                         Button {
@@ -86,7 +87,11 @@ struct TripDetailContentView: View {
                                 badgeColor: pinInfo[place.id]?.color ?? TripMapViewModel.colorForDay(dayIndex),
                                 onTap: {
                                     viewModel.selectedPlaceIdForDetail = place.placeId
-                                }
+                                },
+                                isNext: place.id == nextId,
+                                onToggleVisited: viewModel.canEdit ? {
+                                    viewModel.toggleVisited(entryId: place.id)
+                                } : nil
                             )
                         }
                     }

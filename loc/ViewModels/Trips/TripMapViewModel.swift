@@ -100,7 +100,9 @@ class TripMapViewModel: ObservableObject {
 
             for (stopIndex, place) in placesWithCoords.enumerated() {
                 guard let lat = place.placeLatitude, let lon = place.placeLongitude else { continue }
-                let color = colorForStop(dayIndex: dayIndex, stopIndex: stopIndex, totalStops: totalStops)
+                let color = place.isVisited
+                    ? Color(.systemGray3)
+                    : colorForStop(dayIndex: dayIndex, stopIndex: stopIndex, totalStops: totalStops)
                 let annotation = TripMapAnnotation(
                     id: place.id,
                     coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
@@ -111,7 +113,8 @@ class TripMapViewModel: ObservableObject {
                     totalStopsInDay: totalStops,
                     color: color,
                     placeId: place.placeId,
-                    placeType: place.placeType
+                    placeType: place.placeType,
+                    isVisited: place.isVisited
                 )
                 result.append(annotation)
             }

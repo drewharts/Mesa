@@ -16,10 +16,13 @@ struct TripRouteSegment: Identifiable, Equatable {
     let coordinates: [CLLocationCoordinate2D]
     /// True when the line follows a MapKit walking route; false for the straight-line fallback.
     let isWalkingRoute: Bool
+    /// True when the leg ends at a visited stop (already walked) — drawn muted.
+    var isCompleted: Bool = false
 
     static func == (lhs: TripRouteSegment, rhs: TripRouteSegment) -> Bool {
         lhs.id == rhs.id
             && lhs.isWalkingRoute == rhs.isWalkingRoute
+            && lhs.isCompleted == rhs.isCompleted
             && lhs.coordinates.count == rhs.coordinates.count
     }
 }
@@ -66,13 +69,15 @@ final class TripRouteService {
             let id = "\(pair.from.id)->\(pair.to.id)"
             let key = routeKey(pair.from.coordinate, pair.to.coordinate)
             if let coords = walkingRouteCache[key], coords.count >= 2 {
-                return TripRouteSegment(id: id, dayIndex: pair.dayIndex, coordinates: coords, isWalkingRoute: true)
+                return TripRouteSegment(id: id, dayIndex: pair.dayIndex, coordinates: coords,
+                                        isWalkingRoute: true, isCompleted: pair.to.isVisited)
             }
             return TripRouteSegment(
                 id: id,
                 dayIndex: pair.dayIndex,
                 coordinates: [pair.from.coordinate, pair.to.coordinate],
-                isWalkingRoute: false
+                isWalkingRoute: false,
+                isCompleted: pair.to.isVisited
             )
         }
     }

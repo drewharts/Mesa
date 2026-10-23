@@ -270,6 +270,68 @@ class TripDetailViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Visited
+
+    /// First not-yet-visited stop in a day (in itinerary order).
+    func nextStopId(dayIndex: Int) -> String? {
+        guard dayIndex >= 0 else { return nil }
+        let places = dayPlaces[dayIndex] ?? []
+        return places.first(where: { !$0.isVisited })?.id
+    }
+
+    /// Toggles a stop's visited state optimistically and persists it; rolls back on failure.
+    func toggleVisited(entryId: String) {
+        guard canEdit,
+              let (dayIndex, index) = indexOfEntry(entryId) else { return }
+        var place = dayPlaces[dayIndex]![index]
+
+        let previousAt = place.visitedAt
+        let previousBy = place.visitedBy
+        let userId = ServiceContainer.shared.authService.currentUserId
+
+        if place.isVisited {
+            place.visitedAt = nil
+            place.visitedBy = nil
+        } else {
+            place.visitedAt = ISO8601DateFormatter().string(from: Date())
+            place.visitedBy = userId
+        }
+        dayPlaces[dayIndex]?[index] = place
+        refreshMapAnnotations()
+
+        let newAt = place.visitedAt
+        let newBy = place.visitedBy
+        Task {
+            do {
+                try await tripService.setVisited(entryId: entryId, visitedAt: newAt, visitedBy: newBy)
+            } catch {
+                print("[TripDetailVM] Failed to update visited: \(error)")
+                if let (d, i) = indexOfEntry(entryId) {
+                    dayPlaces[d]?[i].visitedAt = previousAt
+                    dayPlaces[d]?[i].visitedBy = previousBy
+                    refreshMapAnnotations()
+                }
+            }
+        }
+    }
+
+    /// Day index and array index for an entry id.
+    private func indexOfEntry(_ entryId: String) -> (Int, Int)? {
+        for (dayIndex, places) in dayPlaces {
+            if let index = places.firstIndex(where: { $0.id == entryId }) {
+                return (dayIndex, index)
+            }
+        }
+        return nil
+    }
+
+    /// Re-sends annotations to the main map (respecting the current day filter).
+    private func refreshMapAnnotations() {
+        guard mapCoordinator?.activeTripId == tripId else { return }
+        let annotations = buildTripAnnotations(forDay: selectedDayForDetail)
+        mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
+    }
+
     // MARK: - Ideas
 
     /// Deletes an Idea entry permanently by its entry ID.

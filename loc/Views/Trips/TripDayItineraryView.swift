@@ -16,6 +16,8 @@ struct TripDayItineraryView: View {
     let onMove: (IndexSet, Int) -> Void
     let onDelete: (String) -> Void
     let onPlaceTap: (String) -> Void
+    var nextStopId: String? = nil
+    var onToggleVisited: ((String) -> Void)? = nil
 
     var body: some View {
         if places.isEmpty {
@@ -60,7 +62,9 @@ struct TripDayItineraryView: View {
                     TripDayPlaceCard(
                         place: place,
                         number: index + 1,
-                        onTap: { onPlaceTap(place.placeId) }
+                        onTap: { onPlaceTap(place.placeId) },
+                        isNext: place.id == nextStopId,
+                        onToggleVisited: (canEdit && onToggleVisited != nil) ? { onToggleVisited?(place.id) } : nil
                     )
                 }
                 .listRowSeparator(.hidden)
@@ -68,6 +72,17 @@ struct TripDayItineraryView: View {
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .draggable(place.id) {
                     TripPlaceDragPreview()
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    if canEdit, let onToggleVisited {
+                        Button {
+                            onToggleVisited(place.id)
+                        } label: {
+                            Label(place.isVisited ? "Unvisit" : "Visited",
+                                  systemImage: place.isVisited ? "arrow.uturn.backward" : "checkmark")
+                        }
+                        .tint(Color.mesaAccent)
+                    }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     if canEdit {
