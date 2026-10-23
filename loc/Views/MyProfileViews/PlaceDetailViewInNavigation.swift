@@ -30,8 +30,7 @@ struct PlaceDetailViewInNavigation: View {
     var body: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Loading place details...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                PlaceDetailSkeletonView()
             } else if let error = viewModel.loadError {
                 VStack(spacing: 16) {
                     Text("Error loading place")

@@ -68,7 +68,8 @@ struct TripDayDetailView: View {
             }
         }
         .navigationDestination(item: $selectedPlaceId) { placeId in
-            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
+            // Map camera is driven by the trip pin highlight (avoids a double camera jump)
+            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: false)
         }
         .sheet(isPresented: $showInsertSheet, onDismiss: {
             Task { await viewModel.completePendingInsert() }

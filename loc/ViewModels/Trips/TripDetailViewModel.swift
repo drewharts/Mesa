@@ -53,6 +53,9 @@ class TripDetailViewModel: ObservableObject {
 
     // MARK: - Computed
 
+    /// Summary from the trips list (name/dates) shown while the detail loads.
+    var seedSummary: LightweightTrip? { TripDataCache.shared.summary(for: tripId) }
+
     /// Returns sorted day indices for the trip.
     var dayIndices: [Int] {
         guard let trip = trip else { return [] }
@@ -107,13 +110,21 @@ class TripDetailViewModel: ObservableObject {
     // MARK: - Load Trip
 
     /// Fetches trip details and organizes places by day index.
+    /// Shows cached data instantly (if any), then refreshes from the network.
+    /// Collaborators and permissions load in parallel after the itinerary is on screen.
     func loadTrip() async {
-        isLoading = true
+        if trip == nil, let cached = TripDataCache.shared.detail(for: tripId) {
+            trip = cached.trip
+            dayPlaces = cached.dayPlaces
+            isOwner = cached.trip.ownerId == ServiceContainer.shared.authService.currentUserId
+            if isOwner { canEdit = true }
+            travelTimesViewModel.recalculate(dayPlaces: dayPlaces)
+        }
+        isLoading = trip == nil
         error = nil
 
         do {
             let result = try await tripService.fetchTripWithPlaces(tripId: tripId)
-            trip = result.trip
 
             // Organize places by day index
             var grouped: [Int: [TripDayPlace]] = [:]
@@ -124,7 +135,12 @@ class TripDetailViewModel: ObservableObject {
             for key in grouped.keys {
                 grouped[key]?.sort { $0.sortOrder < $1.sortOrder }
             }
-            dayPlaces = grouped
+            trip = result.trip
+            if grouped != dayPlaces {
+                dayPlaces = grouped
+            }
+            TripDataCache.shared.storeDetail(trip: result.trip, dayPlaces: grouped)
+            isLoading = false
             travelTimesViewModel.recalculate(dayPlaces: dayPlaces)
 
             // Prefetch external content metadata for PopupPlaceCard thumbnail display
@@ -135,17 +151,42 @@ class TripDetailViewModel: ObservableObject {
                 }
             }
 
-            // Fetch collaborators for header display
-            await loadCollaborators()
+            // Warm place details so tapping a stop opens instantly
+            prefetchPlaceDetails(placeIds: result.dayPlaces.map(\.placeId))
 
-            // Check permissions
-            await checkPermissions()
+            // Collaborators + permissions in parallel (no longer block the itinerary)
+            async let collaboratorsLoad: Void = loadCollaborators()
+            async let permissionsLoad: Void = checkPermissions()
+            _ = await (collaboratorsLoad, permissionsLoad)
         } catch {
-            self.error = error.localizedDescription
+            if trip == nil {
+                self.error = error.localizedDescription
+            }
             print("[TripDetailVM] Failed to load trip: \(error)")
         }
 
         isLoading = false
+    }
+
+    /// Fetches place details for the trip's stops in the background (cached in TripDataCache).
+    private func prefetchPlaceDetails(placeIds: [String]) {
+        let missing = Array(Set(placeIds).filter { TripDataCache.shared.place(for: $0) == nil }).prefix(40)
+        guard !missing.isEmpty else { return }
+        Task(priority: .utility) {
+            await withTaskGroup(of: (String, DetailPlace?).self) { group in
+                for placeId in missing {
+                    group.addTask {
+                        let place = try? await PlaceService.shared.fetchPlace(withId: placeId)
+                        return (placeId, place)
+                    }
+                }
+                for await (placeId, place) in group {
+                    if let place {
+                        TripDataCache.shared.storePlace(place, id: placeId)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Collaborators
@@ -484,6 +525,7 @@ class TripDetailViewModel: ObservableObject {
     /// Deletes the entire trip.
     func deleteTrip() async throws {
         try await tripService.deleteTrip(tripId: tripId)
+        TripDataCache.shared.removeTrip(tripId)
     }
 
     // MARK: - Map Annotation Coordination
@@ -502,9 +544,13 @@ class TripDetailViewModel: ObservableObject {
     /// Handles day filter changes: filters annotations or restores all after reload.
     func handleDayFilterChange(old: Int?, new: Int?) async {
         if old != nil && new == nil {
+            // Restore the full-trip map from local state right away, then refresh quietly
+            mapCoordinator?.showTripOnMap(annotations: buildTripAnnotations(), tripId: tripId)
+            let before = dayPlaces
             await loadTrip()
-            let annotations = buildTripAnnotations()
-            mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
+            if dayPlaces != before {
+                mapCoordinator?.showTripOnMap(annotations: buildTripAnnotations(), tripId: tripId)
+            }
         } else if let dayIndex = new {
             let annotations = buildTripAnnotations(forDay: dayIndex)
             mapCoordinator?.showTripOnMap(annotations: annotations, tripId: tripId)
