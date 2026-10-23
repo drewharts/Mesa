@@ -20,6 +20,7 @@ struct TripMapAnnotation: Identifiable, Equatable {
     let color: Color
     let placeId: String
     let placeType: String?
+    var isVisited: Bool = false
 
     static func == (lhs: TripMapAnnotation, rhs: TripMapAnnotation) -> Bool {
         lhs.id == rhs.id
@@ -27,5 +28,6 @@ struct TripMapAnnotation: Identifiable, Equatable {
             && lhs.stopNumber == rhs.stopNumber
             && lhs.totalStopsInDay == rhs.totalStopsInDay
             && lhs.placeId == rhs.placeId
+            && lhs.isVisited == rhs.isVisited
     }
 }

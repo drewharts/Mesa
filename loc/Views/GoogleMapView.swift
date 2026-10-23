@@ -135,7 +135,7 @@ struct GoogleMapView: UIViewRepresentable {
         /// Redraws trip route polylines only when the set of routes changes.
         func syncTripRoutes(_ routes: [TripRouteSegment], on mapView: GMSMapView) {
             let signature = routes
-                .map { "\($0.id):\($0.isWalkingRoute ? 1 : 0):\($0.coordinates.count)" }
+                .map { "\($0.id):\($0.isWalkingRoute ? 1 : 0):\($0.isCompleted ? 1 : 0):\($0.coordinates.count)" }
                 .joined(separator: "|")
             guard signature != lastTripRoutesSignature else { return }
             lastTripRoutesSignature = signature
@@ -145,8 +145,9 @@ struct GoogleMapView: UIViewRepresentable {
                 let path = GMSMutablePath()
                 route.coordinates.forEach { path.add($0) }
                 let polyline = GMSPolyline(path: path)
-                let accent = UIColor(Color.mesaAccent)
-                polyline.strokeColor = accent.withAlphaComponent(route.isWalkingRoute ? 0.8 : 0.45)
+                let base = route.isCompleted ? UIColor.systemGray : UIColor(Color.mesaAccent)
+                let alpha: CGFloat = route.isCompleted ? 0.35 : (route.isWalkingRoute ? 0.8 : 0.45)
+                polyline.strokeColor = base.withAlphaComponent(alpha)
                 polyline.strokeWidth = route.isWalkingRoute ? 4 : 2.5
                 polyline.geodesic = !route.isWalkingRoute
                 polyline.zIndex = 0

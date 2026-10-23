@@ -32,6 +32,10 @@ struct TripPlaceRowView: View {
     let number: Int?
     let badgeColor: Color
     var onTap: (() -> Void)? = nil
+    /// Highlights this row as the next stop to visit.
+    var isNext: Bool = false
+    /// Toggles visited state; nil hides the checkmark (read-only viewers).
+    var onToggleVisited: (() -> Void)? = nil
 
     @State private var isNoteExpanded = false
 
@@ -46,11 +50,19 @@ struct TripPlaceRowView: View {
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 4) {
+                if isNext {
+                    Text("NEXT")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.mesaAccent)
+                }
+
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(place.placeName ?? "Unknown Place")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(place.isVisited ? Color.secondary : Color.primary)
+                        .strikethrough(place.isVisited, color: .secondary)
                         .lineLimit(1)
 
                     Spacer(minLength: 4)
@@ -102,18 +114,37 @@ struct TripPlaceRowView: View {
             }
 
             photo
+                .opacity(place.isVisited ? 0.5 : 1)
+
+            if let onToggleVisited {
+                VisitedCheckButton(isVisited: place.isVisited, action: onToggleVisited)
+            }
         }
         .padding(.vertical, 10)
+        .padding(.horizontal, isNext ? 8 : 0)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.mesaAccent.opacity(isNext ? 0.6 : 0), lineWidth: 1.5)
+        )
         .contentShape(Rectangle())
         .onTapGesture { onTap?() }
     }
 
+    @ViewBuilder
     private var numberBadge: some View {
-        Text(number.map { "\($0)" } ?? "–")
-            .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 24, height: 24)
-            .background(Circle().fill(number == nil ? Color(.systemGray3) : badgeColor))
+        if place.isVisited {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(Color(.systemGray3)))
+        } else {
+            Text(number.map { "\($0)" } ?? "–")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(number == nil ? Color(.systemGray3) : badgeColor))
+        }
     }
 
     @ViewBuilder
@@ -127,5 +158,26 @@ struct TripPlaceRowView: View {
             .frame(width: 52, height: 52)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+    }
+}
+
+/// Circular check-off control shared by trip stop rows and cards.
+struct VisitedCheckButton: View {
+    let isVisited: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        } label: {
+            Image(systemName: isVisited ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(isVisited ? Color.mesaAccent : Color(.systemGray3))
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isVisited ? "Mark as not visited" : "Mark as visited")
     }
 }

@@ -47,7 +47,9 @@ struct TripMapView: View {
             ForEach(viewModel.routeSegments) { segment in
                 MapPolyline(coordinates: segment.coordinates)
                     .stroke(
-                        Color.mesaAccent.opacity(segment.isWalkingRoute ? 0.8 : 0.45),
+                        segment.isCompleted
+                            ? Color.gray.opacity(0.35)
+                            : Color.mesaAccent.opacity(segment.isWalkingRoute ? 0.8 : 0.45),
                         style: StrokeStyle(lineWidth: segment.isWalkingRoute ? 4 : 2.5, lineCap: .round, lineJoin: .round)
                     )
             }

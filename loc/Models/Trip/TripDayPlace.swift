@@ -37,6 +37,13 @@ struct TripDayPlace: Codable, Identifiable, Equatable {
     // Joined place category
     let placeType: String?
 
+    // Visit tracking (nil = not visited yet)
+    var visitedAt: String? = nil
+    var visitedBy: String? = nil
+
+    /// Whether a collaborator has checked this stop off.
+    var isVisited: Bool { visitedAt != nil }
+
     /// Converts to a LightweightPlace for use with PopupPlaceCard.
     var asLightweightPlace: LightweightPlace {
         LightweightPlace(
@@ -66,5 +73,7 @@ struct TripDayPlace: Codable, Identifiable, Equatable {
         case addedByPhotoUrl = "added_by_photo_url"
         case contentUrl = "tiktok_url"
         case placeType = "place_type"
+        case visitedAt = "visited_at"
+        case visitedBy = "visited_by"
     }
 }

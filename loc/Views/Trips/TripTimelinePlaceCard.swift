@@ -12,6 +12,9 @@ struct TripDayPlaceCard: View {
     let place: TripDayPlace
     let number: Int
     let onTap: () -> Void
+    var isNext: Bool = false
+    /// Toggles visited state; nil hides the checkmark (read-only viewers).
+    var onToggleVisited: (() -> Void)? = nil
 
     private let cardHeight: CGFloat = 150
 
@@ -21,7 +24,18 @@ struct TripDayPlaceCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             photoCard
-            metadataSection
+                .opacity(place.isVisited ? 0.55 : 1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.mesaAccent, lineWidth: isNext ? 2 : 0)
+                )
+            HStack(alignment: .top, spacing: 8) {
+                metadataSection
+                Spacer(minLength: 0)
+                if let onToggleVisited {
+                    VisitedCheckButton(isVisited: place.isVisited, action: onToggleVisited)
+                }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
@@ -103,13 +117,14 @@ struct TripDayPlaceCard: View {
 
     /// Numbered stop badge in the top-left corner.
     private var stopBadge: some View {
-        Text("\(number)")
+        Text(place.isVisited ? "✓" : (isNext ? "\(number) · Next" : "\(number)"))
             .font(.caption2)
             .fontWeight(.bold)
             .foregroundStyle(.white)
-            .frame(width: 22, height: 22)
-            .background(Color.black.opacity(0.55))
-            .clipShape(Circle())
+            .padding(.horizontal, isNext && !place.isVisited ? 8 : 0)
+            .frame(minWidth: 22, minHeight: 22)
+            .background(isNext && !place.isVisited ? Color.mesaAccent : Color.black.opacity(0.55))
+            .clipShape(Capsule())
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
