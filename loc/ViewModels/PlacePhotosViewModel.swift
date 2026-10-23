@@ -142,8 +142,15 @@ class PlacePhotosViewModel: ObservableObject {
 
     /// Combined photo items from both place gallery and external sources.
     var combinedPhotoItems: [PhotoItem] {
-        return photoItems + externalPhotoItems
+        // Photos first: TikTok + friends' photos ahead of gallery/Google photos.
+        let rest = photoItems + externalPhotoItems
+        let restURLs = Set(rest.map { $0.url })
+        let priority = priorityPhotoURLs.filter { !restURLs.contains($0) }.map { PhotoItem(url: $0, source: .userPost) }
+        return priority + rest
     }
+
+    /// TikTok thumbnails and friends' review photos shown before other photos.
+    @Published var priorityPhotoURLs: [String] = []
 
     /// URLs for combined photos only, excluding videos (for photo viewer).
     var combinedPhotoURLs: [String] {
@@ -152,7 +159,7 @@ class PlacePhotosViewModel: ObservableObject {
 
     /// Total count of all available photos.
     var totalPhotoCount: Int {
-        return photoItems.count + externalPhotoItems.count
+        return combinedPhotoItems.count
     }
 
     /// Whether any photo loading is in progress (includes waiting for posts to finish loading).
