@@ -19,6 +19,10 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
     /// Trip annotations currently shown on the main map.
     @Published var activeTripAnnotations: [TripMapAnnotation] = []
 
+    /// Route lines connecting consecutive trip stops on the main map.
+    @Published var activeTripRoutes: [TripRouteSegment] = []
+    private var tripRouteTask: Task<Void, Never>?
+
     /// The ID of the trip currently shown on the main map.
     @Published var activeTripId: String? = nil
 
@@ -182,12 +186,30 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
     func showTripOnMap(annotations: [TripMapAnnotation], tripId: String) {
         activeTripAnnotations = annotations
         activeTripId = tripId
+        refreshTripRoutes()
+    }
+
+    /// Recomputes trip route lines and fetches any missing walking routes.
+    private func refreshTripRoutes() {
+        tripRouteTask?.cancel()
+        let annotations = activeTripAnnotations
+        let service = TripRouteService.shared
+        activeTripRoutes = service.segments(for: annotations)
+        guard !annotations.isEmpty else { return }
+        tripRouteTask = Task { @MainActor [weak self] in
+            await service.loadMissingRoutes(for: annotations) {
+                guard let self, self.activeTripAnnotations == annotations else { return }
+                self.activeTripRoutes = service.segments(for: annotations)
+            }
+        }
     }
 
     /// Clears trip annotations from the main map.
     func clearTripAnnotations() {
         activeTripAnnotations = []
         activeTripId = nil
+        tripRouteTask?.cancel()
+        activeTripRoutes = []
         selectedTripAnnotationPlaceId = nil
     }
 

@@ -118,10 +118,19 @@ struct TripDayPlaceCard: View {
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let addedBy = place.addedByName {
-                Text("Added by \(addedBy)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                if let time = TripNoteTime.time(in: place.note) {
+                    Label(time, systemImage: "clock")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.mesaAccent)
+                }
+                if let addedBy = place.addedByName {
+                    Text("Added by \(addedBy)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if let note = place.note, !note.isEmpty {
