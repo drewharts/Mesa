@@ -19,6 +19,5 @@ jobs:
       - name: Run
         run: |
           python3 ci/asc_certs.py $(cat ci/cert-action.txt)
-          python3 ci/asc_certs.py create-dist ci/dist.csr
       - if: always()
         run: rm -rf /tmp/asc
