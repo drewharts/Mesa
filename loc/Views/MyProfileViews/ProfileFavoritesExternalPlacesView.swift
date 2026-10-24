@@ -39,7 +39,8 @@ struct ProfileFavoritesExternalPlacesView: View {
             myPlaces: myPlacesVM.lightweightMyPlaces,
             isLoadingExternalPlaces: externalContentVM.isLoadingExternalPlaces,
             isLoadingReviews: reviewsVM.isLoadingReviewedPlaces,
-            isLoadingMyPlaces: myPlacesVM.isMyPlacesLoading
+            isLoadingMyPlaces: myPlacesVM.isMyPlacesLoading,
+            isLoadingFavorites: favoritesVM.isLoadingFavorites
         )
     }
 

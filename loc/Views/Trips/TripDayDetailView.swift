@@ -15,6 +15,7 @@ struct TripDayDetailView: View {
     @State private var showAddPlaceSheet = false
     @State private var isEditing = false
     @State private var selectedPlaceId: String?
+    @State private var showInsertSheet = false
 
     private var places: [TripDayPlace] {
         viewModel.dayPlaces[dayIndex] ?? []
@@ -35,6 +36,17 @@ struct TripDayDetailView: View {
             onPlaceTap: { placeId in
                 viewModel.highlightTripAnnotation(placeId: placeId)
                 selectedPlaceId = placeId
+            },
+            nextStopId: viewModel.nextStopId(dayIndex: dayIndex),
+            onToggleVisited: { entryId in
+                viewModel.toggleVisited(entryId: entryId)
+            },
+            onInsertAfter: { entryId in
+                viewModel.requestInsert(dayIndex: dayIndex, afterEntryId: entryId, presentFromOverview: false)
+                showInsertSheet = true
+            },
+            onMoveBy: { entryId, offset in
+                viewModel.moveStop(entryId: entryId, by: offset)
             }
         )
         .navigationTitle(viewModel.dayLabel(for: dayIndex))
@@ -56,7 +68,20 @@ struct TripDayDetailView: View {
             }
         }
         .navigationDestination(item: $selectedPlaceId) { placeId in
-            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
+            // Map camera is driven by the trip pin highlight (avoids a double camera jump)
+            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: false)
+        }
+        .sheet(isPresented: $showInsertSheet, onDismiss: {
+            Task { await viewModel.completePendingInsert() }
+        }) {
+            if let userId = ServiceContainer.shared.authService.currentUserId {
+                AddPlaceToTripSheet(
+                    tripId: viewModel.tripId,
+                    targetDayIndex: dayIndex,
+                    existingPlaceIds: viewModel.allPlaceIdsInTrip,
+                    userId: userId
+                )
+            }
         }
         .sheet(isPresented: $showAddPlaceSheet, onDismiss: {
             Task { await viewModel.loadTrip() }

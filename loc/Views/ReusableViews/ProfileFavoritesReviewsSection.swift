@@ -43,6 +43,7 @@ struct ProfileFavoritesReviewsSectionData {
     let isLoadingExternalPlaces: Bool
     let isLoadingReviews: Bool
     let isLoadingMyPlaces: Bool
+    var isLoadingFavorites: Bool = false
 }
 
 /// Unified tab section for Favorites, External Places, and Reviews.
@@ -128,12 +129,18 @@ struct ProfileFavoritesReviewsSection: View {
 
     private var favoritesContent: some View {
         Group {
-            if data.favorites.isEmpty {
+            if data.isLoadingFavorites && data.favorites.isEmpty {
+                SkeletonProfilePreviewGrid()
+                    .loadFadeIn()
+            } else if data.favorites.isEmpty {
                 emptyFavoritesState
+                    .loadFadeIn()
             } else {
                 ProfilePlacesPreviewGrid(favorites: data.favorites)
+                    .loadFadeIn()
             }
         }
+        .animation(.easeOut(duration: 0.22), value: data.isLoadingFavorites)
         .contentShape(Rectangle())
         .onTapGesture {
             onFavoritesTap()

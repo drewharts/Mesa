@@ -12,13 +12,30 @@ struct TripDayPlaceCard: View {
     let place: TripDayPlace
     let number: Int
     let onTap: () -> Void
+    var isNext: Bool = false
+    /// Toggles visited state; nil hides the checkmark (read-only viewers).
+    var onToggleVisited: (() -> Void)? = nil
 
     private let cardHeight: CGFloat = 150
+
+    /// Whether the full note is shown (notes collapse to 3 lines by default).
+    @State private var isNoteExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             photoCard
-            metadataSection
+                .opacity(place.isVisited ? 0.55 : 1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.mesaAccent, lineWidth: isNext ? 2 : 0)
+                )
+            HStack(alignment: .top, spacing: 8) {
+                metadataSection
+                Spacer(minLength: 0)
+                if let onToggleVisited {
+                    VisitedCheckButton(isVisited: place.isVisited, action: onToggleVisited)
+                }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
@@ -100,13 +117,14 @@ struct TripDayPlaceCard: View {
 
     /// Numbered stop badge in the top-left corner.
     private var stopBadge: some View {
-        Text("\(number)")
+        Text(place.isVisited ? "✓" : (isNext ? "\(number) · Next" : "\(number)"))
             .font(.caption2)
             .fontWeight(.bold)
             .foregroundStyle(.white)
-            .frame(width: 22, height: 22)
-            .background(Color.black.opacity(0.55))
-            .clipShape(Circle())
+            .padding(.horizontal, isNext && !place.isVisited ? 8 : 0)
+            .frame(minWidth: 22, minHeight: 22)
+            .background(isNext && !place.isVisited ? Color.mesaAccent : Color.black.opacity(0.55))
+            .clipShape(Capsule())
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -115,10 +133,19 @@ struct TripDayPlaceCard: View {
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let addedBy = place.addedByName {
-                Text("Added by \(addedBy)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                if let time = TripNoteTime.time(in: place.note) {
+                    Label(time, systemImage: "clock")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.mesaAccent)
+                }
+                if let addedBy = place.addedByName {
+                    Text("Added by \(addedBy)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if let note = place.note, !note.isEmpty {
@@ -126,7 +153,22 @@ struct TripDayPlaceCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .italic()
-                    .lineLimit(2)
+                    .lineLimit(isNoteExpanded ? nil : 3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if note.count > 110 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isNoteExpanded.toggle()
+                        }
+                    } label: {
+                        Text(isNoteExpanded ? "less" : "more")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.mesaAccent)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .padding(.horizontal, 2)

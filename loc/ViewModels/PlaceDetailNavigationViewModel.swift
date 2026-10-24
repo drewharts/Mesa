@@ -29,10 +29,24 @@ class PlaceDetailNavigationViewModel: ObservableObject {
     // MARK: - Actions
 
     /// Fetches the full place details from the backend by place ID.
+    /// Uses a cached copy (e.g. prefetched from a trip) when available so the sheet opens instantly.
     func loadPlace() async {
+        if let cached = TripDataCache.shared.place(for: placeId) {
+            loadedPlace = cached
+            isLoading = false
+            // Quiet background refresh for next time
+            let id = placeId
+            Task { [placeService] in
+                if let fresh = try? await placeService.fetchPlace(withId: id) {
+                    TripDataCache.shared.storePlace(fresh, id: id)
+                }
+            }
+            return
+        }
         do {
             let place = try await placeService.fetchPlace(withId: placeId)
             loadedPlace = place
+            TripDataCache.shared.storePlace(place, id: placeId)
             isLoading = false
         } catch {
             loadError = error

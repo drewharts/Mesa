@@ -194,11 +194,14 @@ struct MapContainerView: View {
             .onChange(of: mapDisplayCoordinatorViewModel.selectedTripAnnotationPlaceId) { _, placeId in
                 guard let placeId,
                       let annotation = mapDisplayCoordinatorViewModel.activeTripAnnotations.first(where: { $0.placeId == placeId }) else { return }
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    mapPosition = .region(MKCoordinateRegion(
-                        center: annotation.coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
-                    ))
+                // Offset south so the pin sits in the visible map area above the sheet
+                let span = MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
+                let center = CLLocationCoordinate2D(
+                    latitude: annotation.coordinate.latitude - span.latitudeDelta * 0.25,
+                    longitude: annotation.coordinate.longitude
+                )
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    mapPosition = .region(MKCoordinateRegion(center: center, span: span))
                 }
             }
             .onChange(of: mapDisplayCoordinatorViewModel.activeTripAnnotations) { _, annotations in

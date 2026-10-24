@@ -58,7 +58,7 @@ final class MapMarkerImageFactory {
     /// Trip itinerary pin, colored per day with a numbered stop badge.
     func tripPinImage(annotation: TripMapAnnotation, isSelected: Bool) -> UIImage {
         let colorKey = annotation.color.description
-        let key = "trip_\(annotation.placeType ?? "")_\(colorKey)_\(annotation.stopNumber)_\(isSelected)"
+        let key = "trip_\(annotation.placeType ?? "")_\(colorKey)_\(annotation.stopNumber)_\(annotation.isVisited)_\(isSelected)"
         if let cached = cache[key] { return cached }
         let image = render(TripItineraryPinView(annotation: annotation, isSelected: isSelected, onTap: {}))
         cache[key] = image

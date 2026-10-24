@@ -13,6 +13,8 @@ struct PlaceInfoSection: View {
     var isRefreshing: Bool = false
     var onRefresh: (() -> Void)? = nil
     var onAddPost: (() -> Void)? = nil
+    /// Short AI take (vibe + tips); replaces the generic description when available.
+    var takeText: String? = nil
 
     @State private var showingMenu = false
     @State private var showingWebsite = false
@@ -87,7 +89,7 @@ struct PlaceInfoSection: View {
             }
 
             // Description sourced directly from place data (e.g. Google's editorial summary)
-            Text(place.description ?? "No description available")
+            Text(takeText ?? place.description ?? "No description available")
                 .font(.footnote)
                 .foregroundColor(.black)
                 .fixedSize(horizontal: false, vertical: true)

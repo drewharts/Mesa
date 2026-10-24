@@ -13,6 +13,8 @@ struct ListCoverCollage: View {
     let previewPhotos: [String]?
     let places: [LightweightPlace]
     @Binding var placeColors: [UUID: Color]
+    var seed: String = ""
+    var listName: String? = nil
 
     @ObservedObject private var failures = ImageLoadFailureRegistry.shared
     @ObservedObject private var metadataCache = ExternalMetadataCache.shared
@@ -31,7 +33,11 @@ struct ListCoverCollage: View {
         switch urls.count {
         case 0:
             // Every image failed (or none exist): keep the colored place tiles.
-            ListPhotoCollage(places: Array(places.prefix(3)), placeColors: $placeColors)
+            if places.isEmpty {
+                ListCoverPlaceholder(seed: seed, name: listName)
+            } else {
+                ListPhotoCollage(places: Array(places.prefix(3)), placeColors: $placeColors)
+            }
         case 1:
             ListCoverCollageCell(urlString: urls[0])
         case 2:

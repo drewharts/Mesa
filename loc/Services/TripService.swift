@@ -142,7 +142,9 @@ class TripService {
                 addedByName: row.addedByName,
                 addedByPhotoUrl: row.addedByPhotoUrl,
                 contentUrl: row.contentUrl,
-                placeType: row.placeType
+                placeType: row.placeType,
+                visitedAt: row.visitedAt,
+                visitedBy: row.visitedBy
             )
         }
 
@@ -183,6 +185,15 @@ class TripService {
         try await supabase.client
             .from("trip_day_places")
             .insert(record)
+            .execute()
+    }
+
+    /// Marks a trip stop visited (or clears it). RLS allows trip owner/collaborators.
+    func setVisited(entryId: String, visitedAt: String?, visitedBy: String?) async throws {
+        try await supabase.client
+            .from("trip_day_places")
+            .update(VisitedUpdate(visitedAt: visitedAt, visitedBy: visitedBy))
+            .eq("id", value: entryId)
             .execute()
     }
 
@@ -385,6 +396,8 @@ private extension TripService {
         let externalPlaceId: String?
         let contentUrl: String?
         let placeType: String?
+        let visitedAt: String?
+        let visitedBy: String?
 
         enum CodingKeys: String, CodingKey {
             case tripId = "trip_id"
@@ -409,6 +422,25 @@ private extension TripService {
             case externalPlaceId = "external_place_id"
             case contentUrl = "tiktok_url"
             case placeType = "place_type"
+            case visitedAt = "visited_at"
+            case visitedBy = "visited_by"
+        }
+    }
+
+    /// Update payload for visit tracking; encodes explicit nulls so unchecking clears the columns.
+    struct VisitedUpdate: Encodable {
+        let visitedAt: String?
+        let visitedBy: String?
+
+        enum CodingKeys: String, CodingKey {
+            case visitedAt = "visited_at"
+            case visitedBy = "visited_by"
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(visitedAt, forKey: .visitedAt)
+            try container.encode(visitedBy, forKey: .visitedBy)
         }
     }
 }

@@ -18,7 +18,7 @@ struct FavoritesPopupView: View {
         PlaceListPopupView(
             title: "Favorites",
             count: favoritesVM.lightweightFavorites.count,
-            isLoading: false, // Favorites are loaded with profile
+            isLoading: favoritesVM.isLoadingFavorites,
             isLoadingMore: false, // No pagination for favorites
             places: favoritesVM.favoritesAsLightweight,
             hasMore: false, // No pagination for favorites

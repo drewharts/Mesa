@@ -100,7 +100,9 @@ class TripMapViewModel: ObservableObject {
 
             for (stopIndex, place) in placesWithCoords.enumerated() {
                 guard let lat = place.placeLatitude, let lon = place.placeLongitude else { continue }
-                let color = colorForStop(dayIndex: dayIndex, stopIndex: stopIndex, totalStops: totalStops)
+                let color = place.isVisited
+                    ? Color(.systemGray3)
+                    : colorForStop(dayIndex: dayIndex, stopIndex: stopIndex, totalStops: totalStops)
                 let annotation = TripMapAnnotation(
                     id: place.id,
                     coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
@@ -111,13 +113,37 @@ class TripMapViewModel: ObservableObject {
                     totalStopsInDay: totalStops,
                     color: color,
                     placeId: place.placeId,
-                    placeType: place.placeType
+                    placeType: place.placeType,
+                    isVisited: place.isVisited
                 )
                 result.append(annotation)
             }
         }
 
         return result
+    }
+
+    // MARK: - Routes
+
+    /// Bumped when new route geometry arrives so SwiftUI redraws.
+    @Published private var routeRevision = 0
+    private var routeTask: Task<Void, Never>?
+
+    /// Lines connecting stops in order (walking route when available, else straight).
+    var routeSegments: [TripRouteSegment] {
+        _ = routeRevision
+        return TripRouteService.shared.segments(for: annotations)
+    }
+
+    /// Fetches walking routes for all days' stop pairs not cached yet.
+    func loadRoutes() {
+        routeTask?.cancel()
+        let all = Self.buildAnnotations(dayPlaces: dayPlaces, dayIndices: dayIndices)
+        routeTask = Task { @MainActor [weak self] in
+            await TripRouteService.shared.loadMissingRoutes(for: all) {
+                self?.routeRevision += 1
+            }
+        }
     }
 
     // MARK: - Camera

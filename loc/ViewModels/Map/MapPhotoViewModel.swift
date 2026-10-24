@@ -66,7 +66,7 @@ class MapPhotoViewModel: ObservableObject {
                     }
                     do {
                         let (data, _) = try await URLSession.shared.data(from: url)
-                        return (photo.userId, UIImage(data: data))
+                        return (photo.userId, ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 512))
                     } catch {
                         print("⚠️ Failed to load image for user \(photo.userId)")
                         return (photo.userId, nil)
@@ -88,7 +88,7 @@ class MapPhotoViewModel: ObservableObject {
 
         do {
             let (data, _) = try await URLSession.shared.data(from: photoUrl)
-            if let image = UIImage(data: data) {
+            if let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 512) {
                 self.userProfilePictures[userId] = image
             }
         } catch {

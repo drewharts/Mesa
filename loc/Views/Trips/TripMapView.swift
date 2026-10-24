@@ -36,12 +36,24 @@ struct TripMapView: View {
         }
         .onAppear {
             viewModel.fitMapToAnnotations()
+            viewModel.loadRoutes()
         }
     }
 
     /// The map with annotated pins.
     private var mapContent: some View {
         Map(position: $viewModel.mapPosition) {
+            // Route lines between consecutive stops (drawn beneath the pins)
+            ForEach(viewModel.routeSegments) { segment in
+                MapPolyline(coordinates: segment.coordinates)
+                    .stroke(
+                        segment.isCompleted
+                            ? Color.gray.opacity(0.35)
+                            : Color.mesaAccent.opacity(segment.isWalkingRoute ? 0.8 : 0.45),
+                        style: StrokeStyle(lineWidth: segment.isWalkingRoute ? 4 : 2.5, lineCap: .round, lineJoin: .round)
+                    )
+            }
+
             ForEach(viewModel.annotations) { annotation in
                 Annotation(
                     "",

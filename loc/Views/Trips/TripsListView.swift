@@ -79,13 +79,7 @@ struct TripsListView: View {
     // MARK: - Loading State
 
     private var loadingState: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-            Text("Loading trips...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        TripsListSkeletonView()
     }
 
     // MARK: - Empty State

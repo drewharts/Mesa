@@ -25,16 +25,24 @@ class TripsListViewModel: ObservableObject {
 
     /// Fetches all trips owned by or shared with the given user.
     func loadTrips(userId: String) async {
+        // Show last-known trips instantly, refresh in the background
+        if trips.isEmpty, let cached = TripDataCache.shared.trips(forUser: userId) {
+            trips = cached
+        }
         isLoading = true
         error = nil
 
         do {
-            trips = try await tripService.fetchUserTrips(userId: userId)
+            let fresh = try await tripService.fetchUserTrips(userId: userId)
+            trips = fresh
+            TripDataCache.shared.storeTrips(fresh, forUser: userId)
         } catch is CancellationError {
             // Expected when SwiftUI cancels the task (view disappear, refresh restart)
+            isLoading = false
             return
         } catch let urlError as URLError where urlError.code == .cancelled {
             // Expected when the underlying URLSession request is cancelled
+            isLoading = false
             return
         } catch {
             self.error = error.localizedDescription
@@ -49,6 +57,7 @@ class TripsListViewModel: ObservableObject {
         do {
             try await tripService.deleteTrip(tripId: tripId)
             trips.removeAll { $0.tripId == tripId }
+            TripDataCache.shared.removeTrip(tripId)
         } catch {
             self.error = error.localizedDescription
             print("[TripsListVM] Failed to delete trip: \(error)")

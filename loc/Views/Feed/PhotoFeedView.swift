@@ -83,8 +83,8 @@ struct PhotoFeedView: View {
     @ViewBuilder
     private var feedContent: some View {
         if viewModel.isLoading {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            SkeletonList(rows: 6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } else if viewModel.hasLoaded && viewModel.feedItems.isEmpty {
             emptyFeedContent
         } else {
@@ -166,8 +166,7 @@ struct PhotoFeedView: View {
                 }
 
                 if viewModel.isLoadingMore {
-                    ProgressView()
-                        .padding()
+                    InlineLoadingIndicator()
                 }
             }
         }

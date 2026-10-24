@@ -92,6 +92,13 @@ struct ProfileContentView: View {
                         }
 
                     // Favorites/Videos (tabbed) & Lists — hidden for curated profiles
+                    if listsVM.isLoadingInitialLists && listsVM.filteredPlaceLists.isEmpty
+                        && myPlacesVM.isMyPlacesLoading && myPlacesVM.myPlaces.isEmpty {
+                        // Same placeholder as other people's profiles while first load is in flight.
+                        ExternalProfileLoadingSkeleton()
+                            .padding(.top, 16)
+                            .transition(.opacity)
+                    } else {
                     if !profile.isCuratedProfile {
                         ProfileFavoritesExternalPlacesView(
                             favoritesVM: favoritesVM,
@@ -101,12 +108,15 @@ struct ProfileContentView: View {
                         )
                     }
                     ProfileViewListsView(listsVM: listsVM)
+                        .transition(.opacity)
+                    }
 
                     // Account actions (logout/delete) moved to toolbar AccountMenuView
                 }
                 .padding(.top, 20)
                 .padding(.bottom, 40)
             }
+            .animation(.easeOut(duration: 0.22), value: listsVM.isLoadingInitialLists)
             .refreshable {
                 await profile.refreshProfile()
             }

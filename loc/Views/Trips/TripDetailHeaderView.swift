@@ -7,42 +7,61 @@
 
 import SwiftUI
 
-/// Displays trip header info: name, date range, collaborator avatars, and day count.
+/// Displays trip header info: name, date range, stop/day counts, and collaborator avatars.
 struct TripDetailHeaderView: View {
     let trip: Trip
     let collaborators: [LightweightCollaborator]
+    var stopCount: Int = 0
 
     private let maxAvatarsShown = 4
-    private let avatarSize: CGFloat = 28
+    private let avatarSize: CGFloat = 30
     private let avatarOverlap: CGFloat = -8
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(formattedDateRange)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(trip.name)
+                .font(.title2)
+                .fontWeight(.bold)
+                .lineLimit(2)
 
-                Text("\(trip.numberOfDays) day\(trip.numberOfDays == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(formattedDateRange, systemImage: "calendar")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
 
-            Spacer()
+                    Text(summaryText)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
 
-            if !collaborators.isEmpty {
-                collaboratorAvatars
+                Spacer()
+
+                if !collaborators.isEmpty {
+                    collaboratorAvatars
+                }
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Formats the trip date range for display.
+    private var summaryText: String {
+        let days = "\(trip.numberOfDays) day\(trip.numberOfDays == 1 ? "" : "s")"
+        let stops = "\(stopCount) stop\(stopCount == 1 ? "" : "s")"
+        return "\(days) · \(stops)"
+    }
+
+    /// Formats the trip date range for display (single date for one-day trips).
     private var formattedDateRange: String {
+        if trip.numberOfDays <= 1 {
+            return Trip.utcDateFormatter(format: "EEE, MMM d, yyyy").string(from: trip.startDate)
+        }
         let start = Trip.utcDateFormatter(format: "MMM d").string(from: trip.startDate)
         let end = Trip.utcDateFormatter(format: "MMM d, yyyy").string(from: trip.endDate)
-        return "\(start) - \(end)"
+        return "\(start) – \(end)"
     }
 
     /// Overlapping avatar circles for trip collaborators.

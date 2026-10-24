@@ -21,15 +21,16 @@ struct TripDetailView: View {
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.trip == nil {
-                ProgressView("Loading trip...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                TripDetailSkeletonView(seed: viewModel.seedSummary)
+                    .transition(.opacity)
             } else if let trip = viewModel.trip {
                 TripDetailContentView(trip: trip, viewModel: viewModel)
             } else if viewModel.error != nil {
                 errorContent
             }
         }
-        .navigationTitle(viewModel.trip?.name ?? "Trip")
+        .animation(.easeOut(duration: 0.2), value: viewModel.trip == nil)
+        .navigationTitle(viewModel.trip?.name ?? viewModel.seedSummary?.name ?? "Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if viewModel.canEdit {
@@ -42,7 +43,12 @@ struct TripDetailView: View {
             TripDayDetailView(viewModel: viewModel, dayIndex: dayIndex)
         }
         .navigationDestination(item: $viewModel.selectedPlaceIdForDetail) { placeId in
-            PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
+            // Map camera is driven by the trip pin highlight (avoids a double camera jump)
+            PlaceDetailViewInNavigation(
+                placeId: placeId,
+                minSheetHeight: 250,
+                shouldAnimateMap: !mapDisplayCoordinatorVM.activeTripAnnotations.contains { $0.placeId == placeId }
+            )
         }
         .onChange(of: mapDisplayCoordinatorVM.tappedTripPlaceId) { _, placeId in
             viewModel.handleMapPlaceTap(placeId)

@@ -1,5 +1,7 @@
 import Foundation
 import SwiftUI
+import UIKit
+import ImageIO
 
 /// Deduplicates concurrent image download requests for the same URL.
 private actor ImageDownloadCoordinator {
@@ -31,8 +33,8 @@ class ImageCacheService {
     
     private init() {
         // Set up cache configuration
-        imageCache.countLimit = 100 // Max number of objects
-        imageCache.totalCostLimit = 50 * 1024 * 1024 // Max 50MB of memory
+        imageCache.countLimit = 300 // Max number of objects
+        imageCache.totalCostLimit = 150 * 1024 * 1024 // ~150MB of decoded bitmap memory (cost = decoded bytes)
         
         // Create disk cache directory
         let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -46,11 +48,20 @@ class ImageCacheService {
                 print("Error creating image cache directory: \(error)")
             }
         }
+
+        // Drop in-memory images when the system is low on memory (disk cache is kept)
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.imageCache.removeAllObjects()
+        }
     }
     
     // Get image from cache
-    func getImage(for url: URL) -> UIImage? {
-        let key = cacheKey(for: url)
+    func getImage(for url: URL, targetSize: CGSize? = nil) -> UIImage? {
+        let key = cacheKey(for: url, targetSize: targetSize)
         
         // Check memory cache first
         if let cachedImage = imageCache.object(forKey: key as NSString) {
@@ -63,7 +74,7 @@ class ImageCacheService {
            let data = try? Data(contentsOf: fileURL),
            let image = UIImage(data: data) {
             // Store in memory cache for faster access next time
-            imageCache.setObject(image, forKey: key as NSString)
+            imageCache.setObject(image, forKey: key as NSString, cost: Self.decodedCost(of: image))
             return image
         }
         
@@ -71,11 +82,11 @@ class ImageCacheService {
     }
     
     // Store image in cache
-    func storeImage(_ image: UIImage, for url: URL) {
-        let key = cacheKey(for: url)
+    func storeImage(_ image: UIImage, for url: URL, targetSize: CGSize? = nil) {
+        let key = cacheKey(for: url, targetSize: targetSize)
         
         // Store in memory cache
-        imageCache.setObject(image, forKey: key as NSString)
+        imageCache.setObject(image, forKey: key as NSString, cost: Self.decodedCost(of: image))
         
         // Also store in disk cache
         let fileURL = cacheDirectory.appendingPathComponent(key)
@@ -85,8 +96,23 @@ class ImageCacheService {
     }
     
     // Generate a cache key from URL
-    private func cacheKey(for url: URL) -> String {
-        return url.absoluteString.replacingOccurrences(of: "/", with: "_")
+    /// Keyed by display size so a small thumbnail never gets served to a full-resolution viewer.
+    private func cacheKey(for url: URL, targetSize: CGSize? = nil) -> String {
+        var key = url.absoluteString.replacingOccurrences(of: "/", with: "_")
+        if let size = targetSize {
+            key += "@\(Int(size.width))x\(Int(size.height))"
+        }
+        return key
+    }
+
+    /// Approximate decoded bitmap size in bytes, used as the NSCache cost.
+    private static func decodedCost(of image: UIImage) -> Int {
+        if let cg = image.cgImage {
+            return cg.bytesPerRow * cg.height
+        }
+        let w = image.size.width * image.scale
+        let h = image.size.height * image.scale
+        return Int(w * h * 4)
     }
     
     // Clear memory cache (but keep disk cache)
@@ -114,11 +140,11 @@ class ImageCacheService {
 
     /// Fetches an image with cache lookup, request deduplication, and optional downsampling.
     func fetchImage(for url: URL, targetSize: CGSize? = nil) async -> UIImage? {
-        if let cached = getImage(for: url) { return cached }
+        if let cached = getImage(for: url, targetSize: targetSize) { return cached }
 
-        return await downloadCoordinator.fetch(url: url) { [self] in
+        return await downloadCoordinator.fetch(url: Self.coordinatorURL(url, targetSize)) { [self] in
             // Re-check cache (another task may have populated it)
-            if let cached = self.getImage(for: url) { return cached }
+            if let cached = self.getImage(for: url, targetSize: targetSize) { return cached }
 
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
@@ -129,13 +155,37 @@ class ImageCacheService {
                     image = UIImage(data: data)
                 }
                 if let image = image {
-                    self.storeImage(image, for: url)
+                    self.storeImage(image, for: url, targetSize: targetSize)
                 }
                 return image
             } catch {
                 return nil
             }
         }
+    }
+
+    /// Separate in-flight dedup entries per display size.
+    private static func coordinatorURL(_ url: URL, _ targetSize: CGSize?) -> URL {
+        guard let size = targetSize else { return url }
+        return url.appendingPathComponent("__size_\(Int(size.width))x\(Int(size.height))")
+    }
+
+    /// Decodes image data downsampled so its longest side is at most `maxPixelSize` pixels.
+    /// Safe to call off the main thread. Falls back to a full decode if ImageIO can't thumbnail the data.
+    static func decodeDownsampled(data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        if let source = CGImageSourceCreateWithData(data as CFData, options) {
+            let downsampleOptions: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceShouldCacheImmediately: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+            ]
+            if let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions as CFDictionary) {
+                return UIImage(cgImage: cgImage)
+            }
+        }
+        return UIImage(data: data)
     }
 
     /// Downsamples image data to fit within targetSize without loading full resolution into memory.
