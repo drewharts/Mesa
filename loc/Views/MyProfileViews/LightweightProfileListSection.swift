@@ -49,9 +49,9 @@ private struct ListCardImage: View {
     var body: some View {
         ZStack {
             if list.preview_photos?.isEmpty == false || !places.isEmpty {
-                ListCoverCollage(previewPhotos: list.preview_photos, places: places, placeColors: $placeColors)
+                ListCoverCollage(previewPhotos: list.preview_photos, places: places, placeColors: $placeColors, seed: list.list_id, listName: list.name)
             } else {
-                EmptyListCard()
+                ListCoverPlaceholder(seed: list.list_id, name: list.name)
             }
         }
         .aspectRatio(3.0/4.0, contentMode: .fit)
@@ -123,7 +123,7 @@ struct ListPhotoCollage: View {
         Group {
             switch places.count {
             case 0:
-                Color.gray.opacity(0.1)
+                ListCoverPlaceholder(seed: "empty", showsGlyph: false)
                 
             case 1:
                 CollagePhotoView(place: places[0], placeColors: $placeColors)

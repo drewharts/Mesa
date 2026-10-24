@@ -159,14 +159,8 @@ struct ProfileViewListsView: View {
     }
 
     private var initialLoadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-            Text("Loading lists...")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        SkeletonCardGrid(count: 4, height: 120)
+            .padding(.vertical, 8)
     }
 
     private var createListTile: some View {

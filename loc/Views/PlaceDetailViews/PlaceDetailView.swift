@@ -100,7 +100,8 @@ struct PlaceDetailView: View {
 
     /// Loading indicator shown when no place is selected yet.
     private var loadingView: some View {
-        ProgressView("Loading Place Details...")
+        SkeletonList(rows: 4)
+            .padding(.top, 16)
     }
 
     /// Loading view that shows place name while full details are loading.

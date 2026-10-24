@@ -90,17 +90,7 @@ struct ListSelectionRowView: View {
         }) {
             HStack {
                 // Display list image, place image, or colored rectangle
-                Group {
-                    Rectangle()
-                        .foregroundColor(backgroundColor)
-                        .onAppear {
-                            backgroundColor = Color(
-                                red: Double.random(in: 0.5...0.9),
-                                green: Double.random(in: 0.5...0.9),
-                                blue: Double.random(in: 0.5...0.9)
-                            )
-                        }
-                }
+                ListCoverPlaceholder(seed: list.id.uuidString, name: list.name, emoji: list.emoji)
                 .frame(width: 75, height: 75)
                 .clipped()
                 .cornerRadius(4)
