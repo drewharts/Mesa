@@ -173,12 +173,12 @@ struct CollagePhotoView: View {
     private var photoOverlay: some View {
         if let contentUrl = place.content_url,
            let thumbnailURL = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) {
-            CachedAsyncImage(url: URL(string: thumbnailURL), targetSize: nil) {
+            CachedAsyncImage(url: URL(string: thumbnailURL), targetSize: CGSize(width: 160, height: 160)) {
                 Color.gray.opacity(0.3)
             }
             .aspectRatio(contentMode: .fill)
         } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-            CachedAsyncImage(url: url, targetSize: nil) {
+            CachedAsyncImage(url: url, targetSize: CGSize(width: 160, height: 160)) {
                 Color.gray.opacity(0.3)
             }
             .aspectRatio(contentMode: .fill)
@@ -193,7 +193,7 @@ struct CollagePhotoView: View {
                     }
                 }
         } else if let thumbUrl = place.thumbnail_url, let url = URL(string: thumbUrl) {
-            CachedAsyncImage(url: url, targetSize: nil) {
+            CachedAsyncImage(url: url, targetSize: CGSize(width: 160, height: 160)) {
                 Color.gray.opacity(0.3)
             }
             .aspectRatio(contentMode: .fill)

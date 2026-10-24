@@ -35,7 +35,7 @@ class ProfilePhotoCache: ObservableObject {
         let task = Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: photoURL)
-                if let image = UIImage(data: data) {
+                if let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 512) {
                     await MainActor.run {
                         self.photos[userId] = image
                     }

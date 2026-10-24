@@ -324,21 +324,20 @@ class ProfileReviewsViewModel: ObservableObject {
         // Collect all image URLs first
         var imageUrlsToLoad: [(placeId: String, imageUrl: String)] = []
 
-        // Fetch posts for these places to get images
-        for placeId in placeIds {
-            do {
-                // Get the most recent post for this place by this user
-                let (posts, _) = try await postService.fetchPosts(placeId: placeId, latestOnly: false)
-                let userPosts = posts.filter { $0.userId == userId }
-
-                if let mostRecentPost = userPosts.first(where: { !$0.images.isEmpty }),
-                   let imageUrl = mostRecentPost.images.first,
-                   hasPlaceImage?(placeId) != true {
-                    imageUrlsToLoad.append((placeId: placeId, imageUrl: imageUrl))
+        // One batched query for this user's posts across all places (was one request per place)
+        do {
+            let posts = try await postService.fetchUserPosts(userId: userId, placeIds: placeIds)
+            var seen = Set<String>()
+            for post in posts { // newest first
+                guard !seen.contains(post.placeId),
+                      let imageUrl = post.images.first else { continue }
+                seen.insert(post.placeId)
+                if hasPlaceImage?(post.placeId) != true {
+                    imageUrlsToLoad.append((placeId: post.placeId, imageUrl: imageUrl))
                 }
-            } catch {
-                print("⚠️ [ProfileReviewsViewModel] Failed to fetch post images for place \(placeId): \(error.localizedDescription)")
             }
+        } catch {
+            print("⚠️ [ProfileReviewsViewModel] Failed to fetch post images: \(error.localizedDescription)")
         }
 
         // Load all images in parallel
@@ -356,15 +355,10 @@ class ProfileReviewsViewModel: ObservableObject {
     /// Loads an image from URL and stores it as a place image.
     private func loadImageFromURL(imageUrl: String, placeId: String) async {
         guard let url = URL(string: imageUrl) else { return }
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            if let image = UIImage(data: data) {
-                await MainActor.run {
-                    onPlaceImageUpdate?(placeId, image)
-                }
+        if let image = await ImageCacheService.shared.fetchImage(for: url, targetSize: CGSize(width: 400, height: 400)) {
+            await MainActor.run {
+                onPlaceImageUpdate?(placeId, image)
             }
-        } catch {
-            print("⚠️ [ProfileReviewsViewModel] Failed to load image from URL: \(error.localizedDescription)")
         }
     }
 }
