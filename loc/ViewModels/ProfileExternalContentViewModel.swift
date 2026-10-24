@@ -612,7 +612,7 @@ class ProfileExternalContentViewModel: ObservableObject {
             DispatchQueue.main.async {
                 if let error = error {
                     print("❌ [ProfileExternalContentViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
-                } else if let data = data, let image = UIImage(data: data) {
+                } else if let data = data, let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 1000) {
                     self?.onPlaceImageLoaded?(placeId, image)
                 } else {
                     print("⚠️ [ProfileExternalContentViewModel] No image data returned for place \(placeId)")
@@ -630,7 +630,7 @@ class ProfileExternalContentViewModel: ObservableObject {
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            if let image = UIImage(data: data) {
+            if let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 1000) {
                 await MainActor.run {
                     self.onPlaceImageLoaded?(placeId, image)
                 }
@@ -649,7 +649,7 @@ class ProfileExternalContentViewModel: ObservableObject {
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            if let image = UIImage(data: data) {
+            if let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 1000) {
                 await MainActor.run {
                     self.onPlaceImageLoaded?(placeId, image)
                 }

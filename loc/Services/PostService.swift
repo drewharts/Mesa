@@ -26,6 +26,11 @@ class PostService: ObservableObject {
     func fetchUserPosts(userId: String) async throws -> [PlacePost] {
         return try await supabase.fetchUserPosts(userId: userId)
     }
+
+    /// Fetches one user's posts for a set of places (single batched query).
+    func fetchUserPosts(userId: String, placeIds: [String]) async throws -> [PlacePost] {
+        return try await supabase.fetchUserPosts(userId: userId, placeIds: placeIds)
+    }
     
     // MARK: - Save Post
     

@@ -316,7 +316,7 @@ class DetailPlaceViewModel: ObservableObject {
                     self.placeImages[placeId] = UIImage()
                 } else if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200, let data = data, !data.isEmpty {
-                        if let image = UIImage(data: data) {
+                        if let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 1000) {
                             self.placeImages[placeId] = image
                         } else {
                             print("❌ [DetailPlaceViewModel] Failed to create UIImage from data for place \(placeId)")
@@ -467,7 +467,7 @@ class DetailPlaceViewModel: ObservableObject {
         Task.detached(priority: .background) {
             do {
                 let (data, _) = try await URLSession.shared.data(from: photoURL)
-                if let image = UIImage(data: data) {
+                if let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 512) {
                     await MainActor.run {
                         self.userProfilePicture[profile.id] = image
                     }

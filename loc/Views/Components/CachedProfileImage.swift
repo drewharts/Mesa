@@ -79,7 +79,7 @@ struct CachedProfileImage: View {
         }
         
         // Check cache first (fast path)
-        if let cachedImage = imageCache.getImage(for: imageURL) {
+        if let cachedImage = imageCache.getImage(for: imageURL, targetSize: CGSize(width: 512, height: 512)) {
             loadedImage = cachedImage
             return
         }
@@ -94,13 +94,13 @@ struct CachedProfileImage: View {
             // Validate response
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200,
-                  let image = UIImage(data: data) else {
+                  let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 512) else {
                 hasFailed = true
                 return
             }
             
             // Cache and display
-            imageCache.storeImage(image, for: imageURL)
+            imageCache.storeImage(image, for: imageURL, targetSize: CGSize(width: 512, height: 512))
             
             await MainActor.run {
                 loadedImage = image

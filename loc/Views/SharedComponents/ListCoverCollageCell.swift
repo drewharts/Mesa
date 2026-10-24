@@ -16,7 +16,7 @@ struct ListCoverCollageCell: View {
             .overlay(
                 CachedAsyncImage(
                     url: URL(string: urlString),
-                    targetSize: nil,
+                    targetSize: CGSize(width: 300, height: 300),
                     placeholder: { Color(.systemGray6) },
                     onFailure: { ImageLoadFailureRegistry.shared.markFailed(urlString) }
                 )

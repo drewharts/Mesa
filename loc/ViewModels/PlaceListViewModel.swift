@@ -71,7 +71,7 @@ class PlaceListViewModel: ObservableObject, Identifiable {
 
     private func fetchImage(from url: URL, completion: @escaping (UIImage?) -> Void) {
         URLSession.shared.dataTask(with: url) { data, response, error in
-            if let data = data, let image = UIImage(data: data) {
+            if let data = data, let image = ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 1000) {
                 DispatchQueue.main.async {
                     completion(image)
                 }

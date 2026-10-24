@@ -169,6 +169,46 @@ class SupabasePostService: ObservableObject {
         }
     }
     
+    /// Fetches a user's posts limited to the given places in one query per chunk of 100 place IDs.
+    func fetchUserPosts(userId: String, placeIds: [String]) async throws -> [PlacePost] {
+        guard !placeIds.isEmpty else { return [] }
+        let unique = Array(Set(placeIds))
+        let chunkSize = 100
+        var all: [PlacePost] = []
+        var start = 0
+        while start < unique.count {
+            let chunk = Array(unique[start..<min(start + chunkSize, unique.count)])
+            start += chunkSize
+            let response: [PostRecord] = try await supabase.client
+                .from("reviews")
+                .select()
+                .eq("user_id", value: userId)
+                .in("place_id", values: chunk)
+                .order("timestamp", ascending: false)
+                .execute()
+                .value
+            all.append(contentsOf: response.map { record in
+                PlacePost(
+                    id: record.id,
+                    userId: record.user_id,
+                    profilePhotoUrl: record.profile_photo_url ?? "",
+                    userFirstName: record.user_first_name ?? "",
+                    userLastName: record.user_last_name ?? "",
+                    placeId: record.place_id,
+                    placeName: record.place_name ?? "",
+                    text: record.review_text ?? "",
+                    timestamp: record.timestamp,
+                    images: record.images ?? [],
+                    videoUrls: record.video_urls ?? [],
+                    videoThumbnailUrls: record.video_thumbnail_urls ?? [],
+                    likes: record.likes ?? 0,
+                    wouldReturn: record.would_return
+                )
+            })
+        }
+        return all.sorted { $0.timestamp > $1.timestamp }
+    }
+
     // MARK: - Likes
     
     func likePost(postId: String, userId: String, completion: @escaping (Error?) -> Void) {
