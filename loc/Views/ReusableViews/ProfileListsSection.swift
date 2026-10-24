@@ -88,14 +88,9 @@ struct ProfileListsSection: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-            Text("Loading lists...")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        SkeletonCardGrid(count: 4, height: 120)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
     }
 
     // MARK: - Empty State View
@@ -163,11 +158,6 @@ struct ProfileListsSection: View {
     // MARK: - Pagination Loading View
 
     private var paginationLoadingView: some View {
-        HStack {
-            Spacer()
-            ProgressView()
-                .padding()
-            Spacer()
-        }
+        InlineLoadingIndicator()
     }
 }

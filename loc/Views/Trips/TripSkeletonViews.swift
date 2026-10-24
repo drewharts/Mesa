@@ -8,19 +8,7 @@
 
 import SwiftUI
 
-/// A rounded shimmer block.
-struct SkeletonBlock: View {
-    var width: CGFloat? = nil
-    var height: CGFloat
-    var cornerRadius: CGFloat = 6
-
-    var body: some View {
-        ShimmerView()
-            .frame(width: width, height: height)
-            .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-    }
-}
+// SkeletonBlock lives in Components/ShimmerView.swift (shared skeleton system).
 
 /// Placeholder matching TripCardView rows in TripsListView.
 struct TripsListSkeletonView: View {

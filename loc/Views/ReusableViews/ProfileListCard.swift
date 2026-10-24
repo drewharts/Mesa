@@ -46,9 +46,9 @@ struct ProfileListCard: View {
     private var listCardImage: some View {
         ZStack {
             if list.preview_photos?.isEmpty == false || !places.isEmpty {
-                ListCoverCollage(previewPhotos: list.preview_photos, places: places, placeColors: $placeColors)
+                ListCoverCollage(previewPhotos: list.preview_photos, places: places, placeColors: $placeColors, seed: list.list_id, listName: list.name)
             } else {
-                emptyListCard
+                ListCoverPlaceholder(seed: list.list_id, name: list.name)
             }
         }
         .aspectRatio(3.0/4.0, contentMode: .fit)

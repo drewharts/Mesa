@@ -253,31 +253,27 @@ struct ExternalProfileEmptyStateCard: View {
     }
 }
 
-/// Lightweight placeholder shown while a profile's content is loading.
+/// Placeholder shown while a profile's content is loading (own and other profiles).
 struct ExternalProfileLoadingSkeleton: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            RoundedRectangle(cornerRadius: 8)
-                
-                .fill(Color.clear).overlay(ShimmerView()).clipShape(RoundedRectangle(cornerRadius: 12))
-                .frame(width: 140, height: 14)
-            HStack(spacing: 12) {
-                ForEach(0..<3, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 12)
-                        
-                .fill(Color.clear).overlay(ShimmerView()).clipShape(RoundedRectangle(cornerRadius: 12))
-                        .frame(height: 90)
+        DelayedAppear {
+            VStack(alignment: .leading, spacing: 16) {
+                SkeletonBlock(width: 140, height: 14, cornerRadius: 7)
+                HStack(spacing: 12) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        SkeletonBlock(height: 90, cornerRadius: 14)
+                    }
+                }
+                SkeletonBlock(width: 110, height: 14, cornerRadius: 7)
+                HStack(spacing: 12) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        SkeletonBlock(height: 140, cornerRadius: 16)
+                    }
                 }
             }
-            HStack(spacing: 12) {
-                ForEach(0..<2, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 12)
-                        
-                .fill(Color.clear).overlay(ShimmerView()).clipShape(RoundedRectangle(cornerRadius: 12))
-                        .frame(height: 140)
-                }
-            }
+            .padding(.horizontal, 20)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Loading profile")
         }
-        .padding(.horizontal, 20)
     }
 }

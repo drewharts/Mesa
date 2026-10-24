@@ -84,14 +84,7 @@ struct SearchResultsView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .scaleEffect(1.2)
-            Text("Searching...")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        }
-        .padding()
+        SkeletonList(rows: 5)
         .frame(maxWidth: .infinity)
     }
 }

@@ -12,12 +12,12 @@ struct ListCoverCollageCell: View {
     let urlString: String
 
     var body: some View {
-        Color(.systemGray6)
+        ListCoverPlaceholder(seed: urlString, showsGlyph: false)
             .overlay(
                 CachedAsyncImage(
                     url: URL(string: urlString),
                     targetSize: CGSize(width: 300, height: 300),
-                    placeholder: { Color(.systemGray6) },
+                    placeholder: { ShimmerView() },
                     onFailure: { ImageLoadFailureRegistry.shared.markFailed(urlString) }
                 )
                 .scaledToFill()
