@@ -57,6 +57,20 @@ class ExternalUserProfileViewModel: ObservableObject {
     @Published var followingCount: Int = 0
     @Published var totalPlacesCount: Int = 0
 
+    /// True once the first full load (lists, favorites, counts) has finished.
+    @Published var hasLoadedInitialData = false
+
+    /// True when the user has nothing to show (no lists, favorites, reviews or places).
+    /// Only meaningful after the initial load, so we never flash the empty state while loading.
+    var isEmptyProfile: Bool {
+        hasLoadedInitialData
+            && listSearchText.isEmpty
+            && userLists.isEmpty
+            && userFavorites.isEmpty
+            && lightweightReviewedPlaces.isEmpty
+            && totalPlacesCount == 0
+    }
+
     // MARK: - Followers/Following for Nested Navigation
     @Published var externalUserFollowers: [ProfileData] = []
     @Published var externalUserFollowing: [ProfileData] = []
@@ -188,8 +202,15 @@ class ExternalUserProfileViewModel: ObservableObject {
             async let favoritesLoad: () = fetchProfileFavorites()
             async let followingCountLoad: () = fetchFollowingCount()
             async let placesCountLoad: () = fetchTotalPlacesCount()
-            _ = await (followingCheck, listsLoad, followersLoad, favoritesLoad, followingCountLoad, placesCountLoad)
+            async let reviewsLoad: () = loadReviewsIfNeeded()
+            _ = await (followingCheck, listsLoad, followersLoad, favoritesLoad, followingCountLoad, placesCountLoad, reviewsLoad)
         }
+        hasLoadedInitialData = true
+    }
+
+    private func loadReviewsIfNeeded() async {
+        guard lightweightReviewedPlaces.isEmpty, !isLoadingReviewedPlaces else { return }
+        await loadUserReviewedPlacesWithPagination()
     }
 
     /// Refreshes the user profile data to ensure all fields (including social links) are current.

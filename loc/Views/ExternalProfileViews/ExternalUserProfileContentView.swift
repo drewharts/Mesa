@@ -92,18 +92,34 @@ struct ExternalUserProfileContentView: View {
 
                 // Content section
                 VStack(spacing: 20) {
-                    // Favorites & Reviews (hidden for curated/brand profiles)
-                    if !viewModel.isCuratedProfile {
-                        ExternalUserProfileFavoritesReviewsView(viewModel: viewModel)
+                    if viewModel.isEmptyProfile {
+                        ExternalProfileEmptyStateCard(
+                            firstName: viewModel.user.firstName,
+                            isFollowing: viewModel.isFollowing,
+                            onShare: {
+                                ServiceContainer.shared.placeShareService.shareProfile(viewModel.user)
+                            }
+                        )
+                        .padding(.top, 24)
+                        .transition(.opacity)
+                    } else if !viewModel.hasLoadedInitialData && viewModel.userLists.isEmpty && viewModel.userFavorites.isEmpty {
+                        ExternalProfileLoadingSkeleton()
                             .padding(.top, 16)
-                    }
+                    } else {
+                        // Favorites & Reviews (hidden for curated/brand profiles)
+                        if !viewModel.isCuratedProfile {
+                            ExternalUserProfileFavoritesReviewsView(viewModel: viewModel)
+                                .padding(.top, 16)
+                        }
 
-                    // Place Lists
-                    ExternalUserProfileListsView(viewModel: viewModel, placeLists: viewModel.userLists)
-                        .padding(.top, viewModel.isCuratedProfile ? 16 : 0)
+                        // Place Lists
+                        ExternalUserProfileListsView(viewModel: viewModel, placeLists: viewModel.userLists)
+                            .padding(.top, viewModel.isCuratedProfile ? 16 : 0)
+                    }
 
                     Spacer(minLength: 50)
                 }
+                .animation(.easeInOut(duration: 0.2), value: viewModel.hasLoadedInitialData)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -159,5 +175,109 @@ struct ExternalUserProfileContentView: View {
         } message: {
             Text(profileVM.socialViewModel.followErrorMessage)
         }
+    }
+}
+
+// MARK: - Empty state
+
+/// Friendly card shown when another user's profile has nothing saved yet,
+/// so the page feels intentional instead of a stack of empty containers.
+struct ExternalProfileEmptyStateCard: View {
+    let firstName: String
+    let isFollowing: Bool
+    let onShare: () -> Void
+
+    private var name: String { firstName.isEmpty ? "They" : firstName }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color.blue.opacity(0.08))
+                    .frame(width: 72, height: 72)
+                Image(systemName: "map")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundColor(.blue)
+            }
+
+            VStack(spacing: 6) {
+                Text("\(name) is just getting started")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+                Text(isFollowing
+                     ? "You'll see their favorite spots and lists here as soon as they save some."
+                     : "No saved places yet. Follow \(firstName.isEmpty ? "them" : firstName) to see their spots and lists as soon as they add them.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                emptyHint(icon: "heart", text: "Favorites")
+                emptyHint(icon: "list.bullet", text: "Lists")
+                emptyHint(icon: "star", text: "Reviews")
+            }
+            .padding(.top, 2)
+
+            Button(action: onShare) {
+                Label("Share profile", systemImage: "square.and.arrow.up")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Capsule().stroke(Color.blue.opacity(0.4), lineWidth: 1))
+            }
+            .padding(.top, 4)
+        }
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemGray6))
+        )
+        .padding(.horizontal, 20)
+    }
+
+    private func emptyHint(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 11))
+            Text(text).font(.caption)
+        }
+        .foregroundColor(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(Color(.systemBackground)))
+    }
+}
+
+/// Lightweight placeholder shown while a profile's content is loading.
+struct ExternalProfileLoadingSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            RoundedRectangle(cornerRadius: 8)
+                
+                .fill(Color.clear).overlay(ShimmerView()).clipShape(RoundedRectangle(cornerRadius: 12))
+                .frame(width: 140, height: 14)
+            HStack(spacing: 12) {
+                ForEach(0..<3, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 12)
+                        
+                .fill(Color.clear).overlay(ShimmerView()).clipShape(RoundedRectangle(cornerRadius: 12))
+                        .frame(height: 90)
+                }
+            }
+            HStack(spacing: 12) {
+                ForEach(0..<2, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 12)
+                        
+                .fill(Color.clear).overlay(ShimmerView()).clipShape(RoundedRectangle(cornerRadius: 12))
+                        .frame(height: 140)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
     }
 }
