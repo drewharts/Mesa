@@ -40,7 +40,8 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             myPlaces: [],  // External profiles don't show My Places tab
             isLoadingExternalPlaces: false,
             isLoadingReviews: viewModel.isLoadingReviewedPlaces,
-            isLoadingMyPlaces: false
+            isLoadingMyPlaces: false,
+            isLoadingFavorites: viewModel.isLoadingFavorites
         )
     }
 

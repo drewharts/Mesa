@@ -207,15 +207,12 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack {
-            Spacer()
-            ProgressView()
-            Text("Loading \(title)...")
-                .font(.caption)
-                .foregroundColor(.gray)
+        ScrollView {
+            SkeletonCardGrid(count: 6)
+                .padding(.horizontal, 16)
                 .padding(.top, 8)
-            Spacer()
         }
+        .scrollDisabled(true)
     }
 
     // MARK: - Empty View

@@ -18,6 +18,9 @@ class ProfileFavoritesViewModel: ObservableObject {
     /// Lightweight favorites data for display
     @Published var lightweightFavorites: [FavoritePlace] = []
 
+    /// True until the first favorites fetch finishes (drives the skeleton, hides empty state).
+    @Published var isLoadingFavorites: Bool = true
+
 
     // MARK: - Callbacks for Cross-Cutting Concerns
 
@@ -155,6 +158,7 @@ class ProfileFavoritesViewModel: ObservableObject {
     func resetAllData() {
         userFavorites.removeAll()
         lightweightFavorites.removeAll()
+        isLoadingFavorites = true
     }
 
     // MARK: - Private Methods

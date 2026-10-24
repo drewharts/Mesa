@@ -118,15 +118,12 @@ struct ProfileFavoritesPopupView: View {
     }
 
     private var loadingView: some View {
-        VStack {
-            Spacer()
-            ProgressView()
-            Text("Loading Favorites...")
-                .font(.caption)
-                .foregroundColor(.gray)
+        ScrollView {
+            SkeletonCardGrid(count: 6)
+                .padding(.horizontal, 16)
                 .padding(.top, 8)
-            Spacer()
         }
+        .scrollDisabled(true)
     }
 
     private var emptyView: some View {
