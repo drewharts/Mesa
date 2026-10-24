@@ -705,6 +705,7 @@ class ProfileViewModel: ObservableObject {
             addCurrentUserToPlaceSavers(for: favoritePlaces, userId: userId)
         }
 
+        favoritesViewModel.isLoadingFavorites = false
         profileCountsLoadingState = .loaded
     }
 

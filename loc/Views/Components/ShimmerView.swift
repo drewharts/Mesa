@@ -210,6 +210,24 @@ struct SkeletonCardGrid: View {
     }
 }
 
+/// Skeleton for the profile tab preview grid (3 columns x 2 rows of 90pt tiles),
+/// mirroring ProfilePlacesPreviewGrid so the swap to real content doesn't jump.
+struct SkeletonProfilePreviewGrid: View {
+    var count: Int = 6
+    var body: some View {
+        DelayedAppear {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(0..<count, id: \.self) { _ in
+                    SkeletonBlock(height: 90, cornerRadius: 8)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Loading")
+        }
+        .frame(minHeight: 188, alignment: .top)
+    }
+}
+
 #Preview {
     VStack(spacing: 16) {
         SkeletonRow()
