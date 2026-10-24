@@ -35,15 +35,6 @@ class ImageCacheService {
         // Set up cache configuration
         imageCache.countLimit = 300 // Max number of objects
         imageCache.totalCostLimit = 150 * 1024 * 1024 // ~150MB of decoded bitmap memory (cost = decoded bytes)
-
-        // Drop in-memory images when the system is low on memory (disk cache is kept)
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.didReceiveMemoryWarningNotification,
-            object: nil,
-            queue: nil
-        ) { [weak self] _ in
-            self?.imageCache.removeAllObjects()
-        }
         
         // Create disk cache directory
         let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -56,6 +47,15 @@ class ImageCacheService {
             } catch {
                 print("Error creating image cache directory: \(error)")
             }
+        }
+
+        // Drop in-memory images when the system is low on memory (disk cache is kept)
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.imageCache.removeAllObjects()
         }
     }
     
