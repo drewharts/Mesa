@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration: Tonight + Group Picks   (NOT YET APPLIED - needs Drew's approval)
+-- Migration: Tonight + Group Picks   (applied to posfruqvibklcyfxmdbq 2026-10-26, approved by Drew)
 -- ============================================================================
 -- Creates:
 --   * group_picks         one row per "where should we go?" poll (places pre-filled)
@@ -50,11 +50,15 @@ CREATE TABLE IF NOT EXISTS public.group_pick_votes (
 
 CREATE INDEX IF NOT EXISTS idx_group_picks_creator ON public.group_picks (lower(creator_id));
 CREATE INDEX IF NOT EXISTS idx_group_pick_members_user ON public.group_pick_members (lower(user_id));
+-- user ids are mixed-case text: enforce one membership / one vote per place case-insensitively
+CREATE UNIQUE INDEX IF NOT EXISTS uq_group_pick_members_lower ON public.group_pick_members (pick_id, lower(user_id));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_group_pick_votes_lower ON public.group_pick_votes (pick_id, lower(user_id), place_id);
 
 -- ---------------------------------------------------------------- RLS
 ALTER TABLE public.group_picks        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_pick_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_pick_votes   ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.group_picks, public.group_pick_members, public.group_pick_votes FROM anon;
 
 CREATE OR REPLACE FUNCTION public.is_group_pick_member(p_pick_id UUID)
 RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
