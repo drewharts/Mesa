@@ -72,7 +72,7 @@ BEGIN
     WITH feats AS (
         SELECT t.uid, 'cat' AS kind, lower(pt) AS k
         FROM _tm_sets t JOIN places p ON p.id = t.place_id, unnest(p.categories) pt
-        WHERE lower(pt) NOT IN ('point_of_interest','establishment','food','store','premise','place')
+        WHERE lower(pt) NOT IN ('point_of_interest','establishment','food','store','premise','place','restaurant','restaurants','meal_takeaway','meal_delivery')
         UNION ALL
         SELECT t.uid, 'area', round(ST_Y(p.location::geometry)::numeric, 2)::text || ',' || round(ST_X(p.location::geometry)::numeric, 2)::text
         FROM _tm_sets t JOIN places p ON p.id = t.place_id
@@ -98,7 +98,7 @@ BEGIN
     SELECT lower(pt) INTO v_top
     FROM _tm_sets a JOIN _tm_sets b ON a.place_id = b.place_id AND a.uid = v_me AND b.uid = v_other
     JOIN places p ON p.id = a.place_id, unnest(p.categories) pt
-    WHERE lower(pt) NOT IN ('point_of_interest','establishment','food','store','premise','place')
+    WHERE lower(pt) NOT IN ('point_of_interest','establishment','food','store','premise','place','restaurant','restaurants','meal_takeaway','meal_delivery')
     GROUP BY lower(pt) ORDER BY COUNT(*) DESC LIMIT 1;
 
     RETURN QUERY SELECT

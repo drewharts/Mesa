@@ -23,9 +23,16 @@ struct TasteMatch: Codable, Equatable {
         case topSharedCategory = "top_shared_category"
     }
 
+    /// Categories too generic to be a meaningful "taste" label.
+    static let genericCategories: Set<String> = [
+        "restaurant", "restaurants", "food", "point_of_interest", "establishment",
+        "store", "premise", "place", "meal_takeaway", "meal_delivery"
+    ]
+
     /// Human-readable shared category, e.g. "wine_bar" -> "wine bars".
     var sharedCategoryLabel: String? {
-        guard let raw = topSharedCategory, !raw.isEmpty else { return nil }
+        guard let raw = topSharedCategory?.lowercased(), !raw.isEmpty,
+              !Self.genericCategories.contains(raw) else { return nil }
         let words = raw.replacingOccurrences(of: "_", with: " ")
         return words.hasSuffix("s") ? words : words + "s"
     }
