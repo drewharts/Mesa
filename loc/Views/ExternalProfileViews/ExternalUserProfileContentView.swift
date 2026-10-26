@@ -56,6 +56,14 @@ struct ExternalUserProfileContentView: View {
                                 onFollowingTap: { showFollowing = true },
                                 hideFollowing: viewModel.isCuratedProfile
                             )
+
+                            if !viewModel.isCuratedProfile {
+                                TasteMatchBadge(
+                                    match: viewModel.tasteMatch,
+                                    isLoading: viewModel.isLoadingTasteMatch
+                                )
+                                .padding(.top, 4)
+                            }
                         }
 
                         Spacer(minLength: 0)

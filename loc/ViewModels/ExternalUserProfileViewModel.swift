@@ -53,6 +53,8 @@ class ExternalUserProfileViewModel: ObservableObject {
 
     // MARK: - Social State
     @Published var isFollowing: Bool = false
+    @Published var tasteMatch: TasteMatch?
+    @Published var isLoadingTasteMatch: Bool = false
     @Published var followers: Int = 0
     @Published var followingCount: Int = 0
     @Published var totalPlacesCount: Int = 0
@@ -203,9 +205,18 @@ class ExternalUserProfileViewModel: ObservableObject {
             async let followingCountLoad: () = fetchFollowingCount()
             async let placesCountLoad: () = fetchTotalPlacesCount()
             async let reviewsLoad: () = loadReviewsIfNeeded()
-            _ = await (followingCheck, listsLoad, followersLoad, favoritesLoad, followingCountLoad, placesCountLoad, reviewsLoad)
+            async let tasteLoad: () = loadTasteMatch(currentUserId: currentUserId)
+            _ = await (followingCheck, listsLoad, followersLoad, favoritesLoad, followingCountLoad, placesCountLoad, reviewsLoad, tasteLoad)
         }
         hasLoadedInitialData = true
+    }
+
+    /// Taste match % vs the signed-in user (pure SQL RPC, cached per session).
+    func loadTasteMatch(currentUserId: String) async {
+        guard !userId.isEmpty, userId != currentUserId, tasteMatch == nil else { return }
+        isLoadingTasteMatch = true
+        tasteMatch = await TasteMatchService.shared.fetchTasteMatch(otherUserId: userId)
+        isLoadingTasteMatch = false
     }
 
     private func loadReviewsIfNeeded() async {
