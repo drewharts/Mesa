@@ -16,6 +16,9 @@ class UserSession: ObservableObject {
     @Published var needsPhoneOnboarding: Bool = false
     @Published var needsProfilePhoto: Bool = false
     @Published var needsListOnboarding: Bool = false
+    /// Invite gate: anything but .approved shows WaitingListView instead of the app.
+    @Published var approvalStatus: ApprovalStatus = .approved
+    var isAwaitingApproval: Bool { approvalStatus != .approved }
 
     private static let hasCompletedPhoneOnboardingKey = "hasCompletedPhoneOnboarding"
     private static let hasCompletedPhotoOnboardingKey = "hasCompletedProfilePhotoOnboarding"
@@ -132,6 +135,8 @@ class UserSession: ObservableObject {
                 isUserLoggedIn = false
                 profileViewModel = nil
                 currentUserId = nil
+                approvalStatus = .approved
+                ApprovalService.clearCache()
                 print("👋 User logged out successfully from Supabase")
             } catch {
                 print("❌ Error signing out: \(error.localizedDescription)")
@@ -144,6 +149,7 @@ class UserSession: ObservableObject {
     func beginSession(uid: String) async {
         let status = await OnboardingStatusService.shared.resolveStatus(userId: uid)
         applyOnboardingStatus(status)
+        approvalStatus = await ApprovalService.shared.fetchMyStatus()
         setUserLoggedIn(uid: uid)
     }
 
@@ -153,6 +159,17 @@ class UserSession: ObservableObject {
         if status.needsPhone { needsPhoneOnboarding = true } else { completePhoneOnboarding() }
         if status.needsProfilePhoto { needsProfilePhoto = true } else { completeProfilePhotoOnboarding() }
         if status.needsList { needsListOnboarding = true } else { completeListOnboarding() }
+    }
+
+    /// Re-checks approval (called by WaitingListView on a timer and on foreground).
+    @MainActor
+    func refreshApprovalStatus() async {
+        guard isUserLoggedIn else { return }
+        let newStatus = await ApprovalService.shared.fetchMyStatus()
+        if approvalStatus != .approved && newStatus == .approved {
+            Analytics.track(.waitlistApproved)
+        }
+        approvalStatus = newStatus
     }
 
     func setUserLoggedIn(uid: String) {
