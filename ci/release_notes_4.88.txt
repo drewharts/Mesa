@@ -1,0 +1,10 @@
+What's new in Mesa 4.88:
+
+• Trips got a big upgrade: a cleaner overview, full stop notes, and walking routes drawn on the map.
+• Check off stops as you visit them, and see what's next.
+• Easily reorder stops or add a new one between existing stops.
+• Richer place pages with photos, popular dishes, and what friends think.
+• Faster loading everywhere, with smooth previews instead of blank screens.
+• Profiles with nothing saved yet now look welcoming instead of empty.
+• Lists without a photo get a colorful cover.
+• Smoother scrolling and fewer photo reloads.
