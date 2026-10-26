@@ -82,6 +82,7 @@ class FavoritesService {
             switch response {
             case "success":
                 print("✅ [FavoritesService] Successfully added favorite for place: \(placeId)")
+                Analytics.track(.placeSaved, ["place_id": placeId])
                 return .success
             case "duplicate":
                 print("⚠️ [FavoritesService] Place already favorited: \(placeId)")

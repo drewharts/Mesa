@@ -72,6 +72,8 @@ struct TripDetailView: View {
         .task {
             viewModel.setMapCoordinator(mapDisplayCoordinatorVM)
             await viewModel.loadTripAndShowAnnotations()
+            Analytics.track(.tripOpened, ["trip_id": viewModel.tripId])
+            Analytics.screen("Trip Detail")
         }
         .onDisappear {
             guard viewModel.selectedDayForDetail == nil

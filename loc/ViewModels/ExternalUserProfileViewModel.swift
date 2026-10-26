@@ -192,6 +192,8 @@ class ExternalUserProfileViewModel: ObservableObject {
     func loadInitialData(currentUserId: String) async {
         // Refresh profile first so isCuratedProfile is accurate
         await refreshUserProfile()
+        Analytics.track(.profileViewed, ["profile_user_id": userId.lowercased(), "is_curated": isCuratedProfile])
+        Analytics.screen("Other User Profile")
 
         // Now load remaining data in parallel
         async let followingCheck: () = checkIfFollowing(currentUserId: currentUserId)
@@ -216,6 +218,9 @@ class ExternalUserProfileViewModel: ObservableObject {
         guard !userId.isEmpty, userId != currentUserId, tasteMatch == nil else { return }
         isLoadingTasteMatch = true
         tasteMatch = await TasteMatchService.shared.fetchTasteMatch(otherUserId: userId)
+        if let match = tasteMatch {
+            Analytics.track(.tasteMatchShown, ["score": match.score ?? -1, "enough_data": match.enoughData, "shared_places": match.sharedPlaces])
+        }
         isLoadingTasteMatch = false
     }
 

@@ -34,11 +34,13 @@ class SupabaseAuthService: ObservableObject {
                     self.session = session
                     self.currentUser = session.user
                     print("✅ [SupabaseAuth] User signed in: \(session.user.id)")
+                    Analytics.identify(userId: session.user.id.uuidString)
                 }
                 
             case .signedOut:
                 self.session = nil
                 self.currentUser = nil
+                Analytics.reset()
                 print("🔓 [SupabaseAuth] User signed out")
                 
             case .userUpdated:
@@ -54,6 +56,11 @@ class SupabaseAuthService: ObservableObject {
                     // Token refreshed silently
                 }
                 
+            case .initialSession:
+                if let session = state.session {
+                    Analytics.identify(userId: session.user.id.uuidString)
+                }
+
             default:
                 break
             }
