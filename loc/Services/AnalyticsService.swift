@@ -57,7 +57,11 @@ enum Analytics {
         case placeShared = "place_shared"
         case profileShared = "profile_shared"
         case profileViewed = "profile_viewed"
-        case tasteMatchShown = "taste_match_shown"
         case tripOpened = "trip_opened"
+        case tonightOpened = "tonight_opened"
+        case tonightResultsShown = "tonight_results_shown"
+        case groupPickCreated = "group_pick_created"
+        case groupPickVoted = "group_pick_voted"
+        case groupPickDecided = "group_pick_decided"
     }
 }

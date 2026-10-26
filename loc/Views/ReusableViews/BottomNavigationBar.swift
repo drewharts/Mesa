@@ -8,7 +8,7 @@
 
 import SwiftUI
 
-/// Translucent bottom navigation bar with profile, search, and trips buttons.
+/// Translucent bottom navigation bar with profile, search, Tonight, and trips buttons.
 struct BottomNavigationBar: View {
     // MARK: - Dependencies
 
@@ -24,6 +24,7 @@ struct BottomNavigationBar: View {
     var body: some View {
         HStack(spacing: 16) {
             feedButton
+            tonightButton
             tripsButton
             searchCapsule
             profileButton
@@ -98,6 +99,22 @@ struct BottomNavigationBar: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Tonight Button
+
+    private var tonightButton: some View {
+        Button {
+            PresentationService.shared.present(.tonight)
+        } label: {
+            Image(systemName: "sparkles")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 36, height: 36)
+                .background(Color(.systemGray5).opacity(0.6))
+                .clipShape(Circle())
+        }
+        .accessibilityLabel("Tonight")
     }
 
     // MARK: - Trips Button

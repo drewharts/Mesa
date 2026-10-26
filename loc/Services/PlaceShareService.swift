@@ -167,7 +167,7 @@ class PlaceShareService: ObservableObject {
     // MARK: - Activity Sheet Presentation
     
     @MainActor
-    private func presentShareSheet(with items: [Any]) {
+    func presentShareSheet(with items: [Any]) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first,
               let rootViewController = window.rootViewController else {
