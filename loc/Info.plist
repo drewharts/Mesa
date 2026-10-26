@@ -52,6 +52,10 @@
 	</array>
 	<key>MBXAccessToken</key>
 	<string>pk.eyJ1IjoiZHJld2hhcnRzIiwiYSI6ImNtNnNpbnBrdjA4aXcyaXE0aDV3Y25qZTQifQ.3TUkiF3r3mHx44dyywy2JQ</string>
+	<key>PostHogApiKey</key>
+	<string>$(POSTHOG_API_KEY)</string>
+	<key>PostHogHost</key>
+	<string>$(POSTHOG_HOST)</string>
 	<key>GMSApiKey</key>
 	<string>$(GMS_API_KEY)</string>
 	<!-- Substituted at build time from Secrets.xcconfig (gitignored — see

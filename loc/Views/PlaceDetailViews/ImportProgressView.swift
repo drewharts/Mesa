@@ -32,10 +32,23 @@ struct ImportProgressView: View {
             viewModel.start()
             profile.listsViewModel.ensureListsLoaded()
         }
+        .onChange(of: viewModel.isFinished) { _, finished in
+            if finished && !viewModel.savedPlaces.isEmpty {
+                refreshProfileAfterImport()
+            }
+        }
         .onDisappear {
             viewModel.stop()
             confirmationDismissTask?.cancel()
+            refreshProfileAfterImport()
         }
+    }
+
+    /// Reloads the Videos tab, profile counts, and map pins so new imports appear.
+    private func refreshProfileAfterImport() {
+        profile.externalContentViewModel.refreshExternalPlacesAfterImport()
+        profile.invalidateProfileCounts()
+        profile.mapViewModel?.invalidateAnnotations()
     }
 
     /// Toast shown after all places were added to a list.

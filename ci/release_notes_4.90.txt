@@ -1,0 +1,5 @@
+What's new in Mesa 4.90:
+
+• Taste match: see how much your taste overlaps with anyone's when you visit their profile.
+• Places you import from TikTok now show up in your Videos tab right away.
+• Faster loading and general polish throughout the app.

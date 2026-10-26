@@ -30,6 +30,7 @@ struct locApp: App {
     
     init() {
         // Supabase is initialized via SupabaseManager.shared
+        Analytics.setup()
         
         // Get services from container
         let services = ServiceContainer.shared

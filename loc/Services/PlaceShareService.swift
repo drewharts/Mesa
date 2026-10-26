@@ -44,6 +44,7 @@ class PlaceShareService: ObservableObject {
     
     @MainActor
     private func sharePlace(_ shareablePlace: ShareablePlace) {
+        Analytics.track(.placeShared)
         guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else {
             print("❌ Failed to generate Universal Link URL for place: \(shareablePlace.name)")
             return
@@ -60,6 +61,7 @@ class PlaceShareService: ObservableObject {
     
     @MainActor
     func shareList(_ placeList: PlaceList, userId: String) {
+        Analytics.track(.listShared)
         let shareableList = ShareableList(from: placeList, userId: userId)
         
         guard let universalLink = generateUniversalLinkURL(for: shareableList) else {
@@ -76,6 +78,7 @@ class PlaceShareService: ObservableObject {
     
     @MainActor
     func shareLightweightList(_ lightweightList: LightweightPlaceList, userId: String) {
+        Analytics.track(.listShared)
         let shareableList = ShareableLightweightList(from: lightweightList, userId: userId)
 
         guard let universalLink = generateUniversalLinkURL(for: shareableList) else {
@@ -105,6 +108,7 @@ class PlaceShareService: ObservableObject {
 
     @MainActor
     private func shareProfile(_ shareableProfile: ShareableProfile) {
+        Analytics.track(.profileShared)
         guard let universalLink = generateUniversalLinkURL(for: shareableProfile) else {
             print("❌ Failed to generate Universal Link URL for profile: \(shareableProfile.fullName)")
             return

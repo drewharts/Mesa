@@ -49,6 +49,7 @@ class ImportProgressViewModel: ObservableObject {
 
     /// Starts the job, then polls until it reaches a terminal state.
     private func run() async {
+        Analytics.track(.importStarted, ["url_host": URL(string: contentUrl)?.host ?? ""])
         switch await contentService.startImport(contentUrl) {
         case .failure(let error):
             finish(error: error.localizedDescription)
@@ -91,6 +92,7 @@ class ImportProgressViewModel: ObservableObject {
             } else {
                 statusText = "Added \(savedCount) of \(job.totalFound) places"
                 isFinished = true
+                Analytics.track(.importFinished, ["success": true, "places_found": job.totalFound, "places_saved": savedCount])
             }
         }
     }
@@ -108,6 +110,7 @@ class ImportProgressViewModel: ObservableObject {
         }
         statusText = "Added \(detailPlaces.count) place\(detailPlaces.count == 1 ? "" : "s")"
         isFinished = true
+        Analytics.track(.importFinished, ["success": true, "places_found": detailPlaces.count, "places_saved": detailPlaces.count])
     }
 
     /// Marks the import as finished with an error.
@@ -115,6 +118,7 @@ class ImportProgressViewModel: ObservableObject {
         errorMessage = error
         statusText = ImportJobStatus.failed.displayText
         isFinished = true
+        Analytics.track(.importFinished, ["success": false])
     }
 
     // MARK: - Actions

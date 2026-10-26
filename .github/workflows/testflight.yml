@@ -34,7 +34,8 @@ jobs:
       - name: Write Secrets.xcconfig
         env:
           GMS_API_KEY: ${{ secrets.GMS_API_KEY }}
-        run: printf 'GMS_API_KEY = %s\n' "$GMS_API_KEY" > Secrets.xcconfig
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: printf 'GMS_API_KEY = %s\nPOSTHOG_API_KEY = %s\n' "$GMS_API_KEY" "$POSTHOG_API_KEY" > Secrets.xcconfig
 
       - name: Write App Store Connect API key
         env:

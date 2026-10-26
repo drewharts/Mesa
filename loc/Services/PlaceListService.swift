@@ -231,6 +231,7 @@ class PlaceListService {
                 .value
             
             let placeList = convertToPlaceList(record)
+            Analytics.track(.listCreated, ["list_id": listId.uuidString])
             return placeList
         } catch {
             throw error
