@@ -70,11 +70,11 @@ enum TonightVibe: String, CaseIterable, Identifiable, Codable {
     /// Strong category keywords (lowercased substrings) for this vibe.
     var strongKeywords: [String] {
         switch self {
-        case .coffee: return ["coffee", "cafe", "café", "espresso", "tea house", "bakery"]
-        case .lunch: return ["sandwich", "deli", "lunch", "salad", "taco", "burrito", "noodle", "ramen", "pho", "pizza", "bagel", "fast casual"]
-        case .dinner: return ["restaurant", "steak", "sushi", "italian", "bistro", "trattoria", "omakase", "brasserie", "tasting"]
-        case .drinks: return ["bar", "cocktail", "wine", "pub", "brewery", "beer", "speakeasy", "lounge", "tavern"]
-        case .lateNight: return ["bar", "club", "pizza", "diner", "taco", "late", "karaoke", "lounge", "night"]
+        case .coffee: return ["coffee", "cafe", "café", "espresso", "tea house", "teahouse", "tea", "bakery", "coffee shop", "pastry", "espresso bar"]
+        case .lunch: return ["sandwich", "deli", "lunch", "salad", "taco", "burrito", "noodle", "ramen", "pho", "pizza", "bagel", "fast casual", "takeout", "hamburger", "burger"]
+        case .dinner: return ["restaurant", "restaurants", "steakhouse", "steak house", "steak", "sushi", "italian", "bistro", "trattoria", "omakase", "brasserie", "tasting"]
+        case .drinks: return ["bar", "bars", "cocktail", "cocktails", "wine bar", "taproom", "brewpub", "wine", "pub", "brewery", "beer", "speakeasy", "lounge", "tavern"]
+        case .lateNight: return ["bar", "nightclub", "night club", "pizza", "diner", "taco", "late", "karaoke", "lounge", "night"]
         }
     }
 
@@ -82,18 +82,21 @@ enum TonightVibe: String, CaseIterable, Identifiable, Codable {
     var weakKeywords: [String] {
         switch self {
         case .coffee: return ["brunch", "breakfast", "dessert", "patisserie", "juice"]
-        case .lunch: return ["restaurant", "cafe", "bakery", "brunch", "food"]
-        case .dinner: return ["bar", "wine", "pizza", "ramen", "taco", "food"]
+        case .lunch: return ["restaurant", "restaurants", "cafe", "café", "bakery", "brunch", "food", "sushi", "burger", "dumpling", "poke", "kitchen", "grill", "eatery", "diner", "meal takeaway", "fast food", "bistro"]
+        case .dinner: return ["bar", "wine", "pizza", "ramen", "taco", "food", "kitchen", "grill", "eatery", "seafood", "izakaya", "tapas", "gastropub", "burger", "noodle"]
         case .drinks: return ["restaurant", "bistro", "club", "rooftop"]
-        case .lateNight: return ["restaurant", "burger", "ramen", "food"]
+        case .lateNight: return ["restaurant", "burger", "ramen", "food", "pub", "kebab", "shawarma"]
         }
     }
+
+    /// True when bars-only / nightlife places are never eligible for this vibe.
+    var excludesBarsOnly: Bool { self == .lunch || self == .coffee }
 
     /// Keywords that make a place a poor fit for this vibe.
     var mismatchKeywords: [String] {
         switch self {
-        case .coffee: return ["bar", "pub", "club", "steak", "cocktail"]
-        case .lunch: return ["club", "cocktail", "speakeasy"]
+        case .coffee: return ["bar", "pub", "club", "nightclub", "night club", "steak", "steakhouse", "cocktail", "karaoke"]
+        case .lunch: return ["club", "nightclub", "night club", "cocktail", "cocktails", "speakeasy", "karaoke", "lounge"]
         case .dinner: return ["coffee shop", "espresso", "juice"]
         case .drinks: return ["coffee", "cafe", "bakery", "juice", "breakfast"]
         case .lateNight: return ["coffee", "cafe", "bakery", "breakfast", "brunch"]

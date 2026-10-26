@@ -8,8 +8,9 @@
 
 import SwiftUI
 
-/// Translucent bottom navigation bar: search, Tonight (primary action), profile avatar.
-/// Feed and Trips live in the profile (ProfileShortcutsRow) since 4.92.
+/// Translucent bottom navigation bar: Search · Tonight (primary action) · Trips · Profile.
+/// Feed is hidden since 4.93 (no outside engagement); PhotoFeedView and `.feed` remain
+/// in the codebase so it can be brought back by re-adding a button here.
 struct BottomNavigationBar: View {
     // MARK: - Dependencies
 
@@ -23,9 +24,10 @@ struct BottomNavigationBar: View {
     // MARK: - Body
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             searchCapsule
             tonightButton
+            tripsButton
             profileButton
         }
         .padding(.horizontal, 16)
@@ -102,13 +104,31 @@ struct BottomNavigationBar: View {
                     .font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .frame(height: 40)
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .fixedSize()
             .background(Color.mesaAccent)
             .clipShape(Capsule())
             .shadow(color: Color.mesaAccent.opacity(0.35), radius: 6, y: 2)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Tonight")
+    }
+
+    // MARK: - Trips Button
+
+    private var tripsButton: some View {
+        Button {
+            Analytics.track(.navTapped, ["item": "trips", "from": "map"])
+            PresentationService.shared.present(.tripsList)
+        } label: {
+            Image(systemName: "airplane")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: 36, height: 36)
+                .background(Color(.systemGray5).opacity(0.6))
+                .clipShape(Circle())
+        }
+        .accessibilityLabel("Trips")
     }
 }

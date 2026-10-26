@@ -11,11 +11,13 @@ import SwiftUI
 struct AccountMenuView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var serviceContainer: ServiceContainer
     @State private var showEditProfile = false
     @State private var showFeedback = false
 
     var body: some View {
         Menu {
+            shareProfileButton
             editProfileButton
             feedbackButton
             logoutButton
@@ -36,6 +38,22 @@ struct AccountMenuView: View {
     }
 
     // MARK: - Menu Items
+
+    /// Shares the user's own profile link (moved here from the toolbar in 4.93).
+    @ViewBuilder
+    private var shareProfileButton: some View {
+        if let user = profile.user {
+            Button {
+                serviceContainer.placeShareService.shareProfile(
+                    userId: user.id,
+                    fullName: user.fullName,
+                    profilePhotoURL: user.profilePhotoURL?.absoluteString
+                )
+            } label: {
+                Label("Share Profile", systemImage: "square.and.arrow.up")
+            }
+        }
+    }
 
     /// Opens the edit profile sheet.
     private var editProfileButton: some View {
