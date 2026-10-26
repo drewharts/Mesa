@@ -8,7 +8,8 @@
 
 import SwiftUI
 
-/// Translucent bottom navigation bar with profile, search, Tonight, and trips buttons.
+/// Translucent bottom navigation bar: search, Tonight (primary action), profile avatar.
+/// Feed and Trips live in the profile (ProfileShortcutsRow) since 4.92.
 struct BottomNavigationBar: View {
     // MARK: - Dependencies
 
@@ -22,11 +23,9 @@ struct BottomNavigationBar: View {
     // MARK: - Body
 
     var body: some View {
-        HStack(spacing: 16) {
-            feedButton
-            tonightButton
-            tripsButton
+        HStack(spacing: 12) {
             searchCapsule
+            tonightButton
             profileButton
         }
         .padding(.horizontal, 16)
@@ -42,24 +41,11 @@ struct BottomNavigationBar: View {
         .padding(.bottom, 16)
     }
 
-    // MARK: - Feed Button
-
-    private var feedButton: some View {
-        Button {
-            PresentationService.shared.present(.feed)
-        } label: {
-            Image("MesaLogo")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 36, height: 36)
-                .clipShape(Circle())
-        }
-    }
-
     // MARK: - Profile Button
 
     private var profileButton: some View {
         Button {
+            Analytics.track(.navTapped, ["item": "profile", "from": "map"])
             shouldNavigateToProfile = true
         } label: {
             Group {
@@ -82,13 +68,14 @@ struct BottomNavigationBar: View {
 
     private var searchCapsule: some View {
         Button {
+            Analytics.track(.navTapped, ["item": "search", "from": "map"])
             showSearchPage = true
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text("Search places...")
+                Text("Search")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -105,30 +92,23 @@ struct BottomNavigationBar: View {
 
     private var tonightButton: some View {
         Button {
+            Analytics.track(.navTapped, ["item": "tonight", "from": "map"])
             PresentationService.shared.present(.tonight)
         } label: {
-            Image(systemName: "sparkles")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 36, height: 36)
-                .background(Color(.systemGray5).opacity(0.6))
-                .clipShape(Circle())
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Tonight")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(Color.mesaAccent)
+            .clipShape(Capsule())
+            .shadow(color: Color.mesaAccent.opacity(0.35), radius: 6, y: 2)
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Tonight")
-    }
-
-    // MARK: - Trips Button
-
-    private var tripsButton: some View {
-        Button {
-            PresentationService.shared.present(.tripsList)
-        } label: {
-            Image(systemName: "airplane")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 36, height: 36)
-                .background(Color(.systemGray5).opacity(0.6))
-                .clipShape(Circle())
-        }
     }
 }

@@ -120,6 +120,12 @@ struct ProfileView: View {
     private var mainContent: some View {
         ZStack {
             // Main Content
+            VStack(spacing: 0) {
+            ProfileShortcutsRow { sheet, item in
+                Analytics.track(.navTapped, ["item": item, "from": "profile"])
+                profile.pendingSheet = sheet
+                presentationMode.wrappedValue.dismiss()
+            }
             ProfileContentView(
                 socialVM: profile.socialViewModel,
                 myPlacesVM: profile.myPlacesViewModel,
@@ -130,6 +136,7 @@ struct ProfileView: View {
                 photoImportVM: photoImportVM,
                 navigationPath: $navigationPath
             )
+            }
             
             // Content Processing Overlay
             if externalContentVM.isProcessingContent || externalContentVM.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {

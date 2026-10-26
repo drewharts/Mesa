@@ -35,6 +35,8 @@ class ProfileViewModel: ObservableObject {
         case externalPlaces, reviews, favorites, myPlaces
     }
     @Published var pendingMapFilter: PendingMapFilter? = nil
+    /// Sheet to present on the map once the profile cover has dismissed (Feed / Trips shortcuts).
+    @Published var pendingSheet: AppSheetType? = nil
 
     // MARK: - Child ViewModels (Composition)
 
