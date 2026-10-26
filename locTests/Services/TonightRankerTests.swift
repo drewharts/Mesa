@@ -108,6 +108,89 @@ final class TonightRankerTests: XCTestCase {
         XCTAssertEqual(Set(names), ["Near", "Mid", "Far"])
     }
 
+    // MARK: - Per-vibe rules (4.94)
+
+    private func fit(_ vibe: TonightVibe, _ categories: [String], name: String = "X",
+                     lunch: Bool? = nil, dinner: Bool? = nil) -> Double {
+        var p = place(name: name, categories: categories)
+        p.serversLunch = lunch
+        p.serversDinner = dinner
+        return TonightCategoryClassifier.fit(p, vibe: vibe)
+    }
+
+    /// Regression: a cafe was recommended for Dinner.
+    func testCafeNeverForDinner() {
+        XCTAssertEqual(fit(.dinner, ["cafe", "food", "point_of_interest", "establishment"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Coffee shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Bakery", "Cafe", "Pastry shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Ice cream shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Juice shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Tea house"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Dessert restaurant"]), 0)
+        // Cafe with only a plain "restaurant" tag is still a cafe...
+        XCTAssertEqual(fit(.dinner, ["cafe", "restaurant", "food"]), 0)
+        // ...unless it is known to serve dinner, or has a cuisine-type restaurant category.
+        XCTAssertGreaterThan(fit(.dinner, ["cafe", "restaurant"], dinner: true), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["Coffee shop", "Italian restaurant", "Restaurant"]), 0)
+        let cafe = place(name: "Corner Cafe", categories: ["Cafe"], dLat: 0.0005)
+        let bistro = place(name: "Bistro", categories: ["French restaurant"], dLat: 0.02)
+        XCTAssertEqual(rank(.dinner, [cafe, bistro]).map(\.place.name), ["Bistro"])
+    }
+
+    func testDinnerRules() {
+        XCTAssertGreaterThan(fit(.dinner, ["Japanese restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["Steak house", "Bar"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Breakfast restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["Breakfast restaurant"], dinner: true), 0)
+        XCTAssertEqual(fit(.dinner, ["Cocktail bar"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Japanese restaurant"], dinner: false), 0)
+    }
+
+    func testCoffeeIsCafesOnly() {
+        XCTAssertGreaterThan(fit(.coffee, ["Coffee shop"]), 0)
+        XCTAssertGreaterThan(fit(.coffee, ["Espresso bar"]), 0)
+        XCTAssertGreaterThan(fit(.coffee, ["cafe"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Bakery"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Ice cream shop"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Italian restaurant"]), 0)
+        XCTAssertEqual(fit(.coffee, ["indian_restaurant", "cafe"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Wine bar"]), 0)
+    }
+
+    func testLunchRules() {
+        XCTAssertGreaterThan(fit(.lunch, ["Sandwich shop"]), 0)
+        XCTAssertGreaterThan(fit(.lunch, ["Bakery"]), 0)
+        XCTAssertGreaterThan(fit(.lunch, ["Thai restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.lunch, ["cafe", "food"]), 0)          // cafe that serves food
+        XCTAssertEqual(fit(.lunch, ["Coffee shop"]), 0)                 // coffee only
+        XCTAssertEqual(fit(.lunch, ["Wine bar"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Pub"]), 0)
+        XCTAssertEqual(fit(.lunch, ["night_club"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Ice cream shop"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Dessert restaurant"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Gourmet grocery store", "Deli", "Grocery store"]), 0)
+    }
+
+    func testDrinksAndLateNightRules() {
+        XCTAssertGreaterThan(fit(.drinks, ["Cocktail bar"]), fit(.drinks, ["Steak house", "Bar"]))
+        XCTAssertGreaterThan(fit(.drinks, ["Pub"]), 0)
+        XCTAssertGreaterThan(fit(.drinks, ["wine_bar"]), 0)
+        XCTAssertEqual(fit(.drinks, ["Italian restaurant"]), 0)
+        XCTAssertEqual(fit(.drinks, ["Espresso bar"]), 0)
+        XCTAssertEqual(fit(.drinks, ["Juice shop"]), 0)
+        XCTAssertGreaterThan(fit(.lateNight, ["Pizza restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.lateNight, ["Diner"]), 0)
+        XCTAssertGreaterThan(fit(.lateNight, ["Night club"]), 0)
+        XCTAssertEqual(fit(.lateNight, ["Coffee shop"]), 0)
+        XCTAssertEqual(fit(.lateNight, ["French restaurant"]), 0)
+    }
+
+    func testLodgingAndWholesaleAreNotFood() {
+        XCTAssertFalse(TonightRanker.isFoodOrDrink(place(name: "Inn", categories: ["Bed & breakfast"])))
+        XCTAssertFalse(TonightRanker.isFoodOrDrink(place(name: "Fish Co", categories: ["Seafood wholesaler"])))
+    }
+
     func testWholeWordMatching() {
         XCTAssertTrue(TonightRanker.matches(TonightRanker.tokenText(["wine_bar"]), "bar"))
         XCTAssertFalse(TonightRanker.matches(TonightRanker.tokenText(["barber_shop"]), "bar"))

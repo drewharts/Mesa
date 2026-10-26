@@ -6,15 +6,15 @@
 //  passed in, so it is cheap to re-run when the user changes the vibe chip
 //  and easy to unit test.
 //
-//  score = 0.35 * vibe fit      (place categories vs. the vibe's keywords)
+//  score = 0.35 * vibe fit      (TonightCategoryClassifier.fit: 0.7...1.0)
 //        + 0.30 * proximity     (1 / (1 + meters / 1200))
 //        + 0.15 * open now      (open 1.0, unknown hours 0.6, closing soon 0.5)
 //        + 0.20 * social proof  (you saved it +0.4, each friend who saved it +0.35, capped at 1)
 //  Eligibility (hard rules, never relaxed to fill slots):
 //    * Only food & drink places (by category; names only rescue places whose
 //      categories are missing or generic). Shops, parks, museums, services: out.
-//    * Must actually match the vibe (strong/weak keyword or serves_* flag).
-//      Mismatches are dropped (e.g. bars-only / nightlife for lunch or coffee).
+//    * Must fit the vibe per TonightCategoryClassifier (Dinner = restaurants only,
+//      Coffee = cafes/coffee shops only, Drinks = bars, Lunch = no bars/nightlife...).
 //    * Closed right now, temporarily/permanently closed, or > 50 km: out.
 //  If fewer than 3 eligible places are nearby the radius widens
 //  (3 km -> 8 km -> 20 km -> 50 km); if still fewer, fewer picks are shown.
@@ -33,12 +33,6 @@ struct TonightRanker {
     static let genericCategories: Set<String> = [
         "restaurant", "restaurants", "food", "point_of_interest", "point of interest",
         "establishment", "store", "premise", "place", "meal takeaway", "meal delivery"
-    ]
-
-    /// Labels that carry no food/drink signal on their own (used for eligibility).
-    /// Unlike `genericCategories`, "restaurant" and takeaway are real food signals here.
-    static let eligibilityGenericCategories: Set<String> = [
-        "food", "point of interest", "establishment", "store", "premise", "place", "building", "locality", "political", "route"
     ]
 
     let vibe: TonightVibe
@@ -103,121 +97,30 @@ struct TonightRanker {
         if case .temporarilyClosed = status { return (pick, .excluded) }
         if let distance, distance > Self.maxDistanceMeters { return (pick, .excluded) }
         if !Self.isFoodOrDrink(place) { return (pick, .excluded) }
-        if vibe.excludesBarsOnly && Self.isDrinksOnly(place) { return (pick, .excluded) }
         if hardClosed || vibeFit <= 0 { return (pick, .excluded) }
         return (pick, .preferred)
     }
 
-    /// Returns 0...1 for how well the place's categories fit the vibe (0 = no match / mismatch).
+    /// Returns 0...1 for how well the place fits the vibe (0 = not eligible). See TonightCategoryClassifier.
     func vibeScore(for place: DetailPlace) -> Double {
-        let text = Self.tokenText(Self.categoryPieces(for: place))
-        let hasStrong = vibe.strongKeywords.contains { Self.matches(text, $0) }
-        let hasMismatch = vibe.mismatchKeywords.contains { Self.matches(text, $0) }
-        var score: Double
-        if hasStrong {
-            score = 1.0
-        } else if hasMismatch {
-            return 0
-        } else if vibe.weakKeywords.contains(where: { Self.matches(text, $0) }) {
-            score = 0.55
-        } else {
-            score = 0
-        }
-        switch vibe {
-        case .dinner where place.serversDinner == true: score = max(score, 0.75)
-        case .lunch where place.serversLunch == true: score = max(score, 0.75)
-        case .coffee where place.servesBreakfast == true: score = max(score, 0.5)
-        default: break
-        }
-        // Places with only generic categories but a clearly food/drink name ("Joe's Pizza").
-        if score == 0, Self.hasOnlyGenericCategories(place) {
-            let name = Self.tokenText([place.name])
-            if vibe.strongKeywords.contains(where: { Self.matches(name, $0) }) { score = 0.6 }
-            else if vibe.weakKeywords.contains(where: { Self.matches(name, $0) }) { score = 0.4 }
-        }
-        return score
+        TonightCategoryClassifier.fit(place, vibe: vibe)
     }
 
     // MARK: - Food & drink eligibility
 
-    /// Category words that mark a place as food or drink.
-    static let mealTokens: Set<String> = [
-        "restaurant", "restaurants", "cafe", "café", "coffee", "espresso", "tea", "teahouse", "bakery", "bistro",
-        "diner", "deli", "delicatessen", "pizzeria", "pizza", "taqueria", "taco", "tacos", "burrito", "sushi",
-        "ramen", "pho", "noodle", "noodles", "steakhouse", "steak", "bagel", "sandwich", "sandwiches", "burger",
-        "burgers", "dessert", "desserts", "donut", "doughnut", "creamery", "gelato", "brunch", "breakfast",
-        "cafeteria", "bbq", "barbecue", "eatery", "kitchen", "grill", "trattoria", "brasserie", "omakase",
-        "izakaya", "boba", "juice", "patisserie", "creperie", "takeaway", "salad", "dumpling", "dumplings",
-        "seafood", "oyster", "chophouse", "gastropub", "food court", "ice cream", "fast food", "fast casual",
-        "meal takeaway", "meal delivery", "takeout", "pastry", "hamburger", "steak house", "dim sum", "poke", "bao", "falafel", "kebab", "shawarma", "tapas"
-    ]
-    /// Category words for drink / nightlife places.
-    static let drinkTokens: Set<String> = [
-        "bar", "bars", "pub", "brewery", "brewpub", "winery", "cocktail", "cocktails", "speakeasy", "lounge",
-        "tavern", "taproom", "nightclub", "night club", "karaoke", "wine bar", "beer", "saloon"
-    ]
-    /// Words that make a category retail / grocery rather than a place to eat or drink.
-    static let retailTokens: Set<String> = ["store", "supermarket", "grocery", "market", "mart", "liquor", "wholesale"]
-
     /// True when the place is a restaurant, cafe, bar, bakery, etc. Shops, services, parks and
     /// museums are excluded. Places with only generic categories qualify by name only.
     static func isFoodOrDrink(_ place: DetailPlace) -> Bool {
-        let pieces = categoryPieces(for: place)
-        let specific = pieces.filter { !eligibilityGenericCategories.contains($0) }
-        if specific.contains(where: { categoryIsFoodOrDrink($0) }) { return true }
-        if specific.isEmpty {
-            let name = tokenText([place.name])
-            return (mealTokens.union(drinkTokens)).contains { matches(name, $0) }
-        }
-        return false
+        !TonightCategoryClassifier.kinds(for: place).isEmpty
     }
 
-    /// True when a single normalized category names a food or drink venue (not a store).
-    static func categoryIsFoodOrDrink(_ category: String) -> Bool {
-        let text = tokenText([category])
-        if retailTokens.contains(where: { matches(text, $0) }) { return false }
-        return mealTokens.union(drinkTokens).contains { matches(text, $0) }
-    }
-
-    /// True when every food/drink category is a bar or nightlife one (no meal/cafe category).
-    static func isDrinksOnly(_ place: DetailPlace) -> Bool {
-        if place.serversLunch == true || place.servesBreakfast == true { return false }
-        let foodCats = categoryPieces(for: place).filter { categoryIsFoodOrDrink($0) }
-        guard !foodCats.isEmpty else { return false }
-        return !foodCats.contains { cat in
-            let text = tokenText([cat])
-            return mealTokens.contains { matches(text, $0) }
-        }
-    }
-
-    static func hasOnlyGenericCategories(_ place: DetailPlace) -> Bool {
-        categoryPieces(for: place).allSatisfy { eligibilityGenericCategories.contains($0) }
-    }
-
-    /// Lowercased categories (plus the user's corrected category) with underscores as spaces.
-    static func categoryPieces(for place: DetailPlace) -> [String] {
-        var pieces = place.categories ?? []
-        if let corrected = place.userCorrectedCategory { pieces.append(corrected) }
-        return pieces
-            .map { $0.lowercased().replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-    }
-
-    /// Joins strings into " word word | word " form so keywords match whole words only
-    /// ("bar" matches "wine bar" but not "barber shop").
+    /// Joins strings into whole-word form (" wine bar | barber shop ").
     static func tokenText(_ pieces: [String]) -> String {
-        let words = pieces.map { piece in
-            piece.lowercased()
-                .components(separatedBy: CharacterSet.letters.inverted.subtracting(CharacterSet(charactersIn: "é")))
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
-        }
-        return " " + words.joined(separator: " | ") + " "
+        pieces.map { TonightCategoryClassifier.tokenText($0) }.joined(separator: "|")
     }
 
-    /// Whole-word / whole-phrase match against `tokenText` output.
     static func matches(_ tokenText: String, _ keyword: String) -> Bool {
-        tokenText.contains(" " + keyword.lowercased() + " ")
+        TonightCategoryClassifier.matches(tokenText, keyword)
     }
 
     /// Returns 0...1 social proof: the user's own save counts, each friend who saved it counts more.
@@ -271,7 +174,7 @@ struct TonightRanker {
 
     /// Returns lowercased, joined category text (kept for callers/debugging).
     static func categoryText(for place: DetailPlace) -> String {
-        categoryPieces(for: place).joined(separator: " | ")
+        TonightCategoryClassifier.categoryPieces(for: place).joined(separator: " | ")
     }
 
     /// Returns the first non-generic category, human-cased ("wine_bar" -> "Wine bar").
