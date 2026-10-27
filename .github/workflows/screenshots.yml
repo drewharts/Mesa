@@ -64,7 +64,7 @@ jobs:
       - name: Build for testing
         run: |
           xcodebuild build-for-testing -project loc.xcodeproj -scheme loc -configuration Debug \
-            -destination "id=$UDID" -derivedDataPath /tmp/dd CODE_SIGNING_ALLOWED=NO | tail -n 40
+            -destination "id=$UDID" -derivedDataPath /tmp/dd CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= PROVISIONING_PROFILE= | tail -n 40
           test ${PIPESTATUS[0]} -eq 0
 
       - name: Install app and pre-grant permissions
