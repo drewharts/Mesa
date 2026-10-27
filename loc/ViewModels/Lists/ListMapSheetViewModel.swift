@@ -129,10 +129,9 @@ final class ListMapSheetViewModel: ObservableObject {
     func focus(place: LightweightPlace, source: FocusSource) {
         focusedPlaceId = place.place_id
 
-        // Keep both the row and the pin visible: expand from peek, and drop from full to half.
+        // Keep both the tile and the pin visible. The peek detent shows a tile row, so it stays put;
+        // a tile tap at full drops to half so the pin is visible.
         switch (source, detent) {
-        case (.pin, .peek):
-            applyDetent(.half, trigger: "pin_tap")
         case (.row, .full):
             applyDetent(.half, trigger: "row_tap")
         default:
