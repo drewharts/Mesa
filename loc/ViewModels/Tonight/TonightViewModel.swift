@@ -23,6 +23,10 @@ final class TonightViewModel: ObservableObject {
     @Published private(set) var vibe: TonightVibe = .inferred()
     @Published private(set) var hasLocation = false
     @Published private(set) var isSharing = false
+    /// Active and recently decided group picks (empty if the server doesn't have my_group_picks yet).
+    @Published private(set) var myPicks: [GroupPickSummary] = []
+    /// True when more than one page of picks is available ("More options").
+    @Published private(set) var canShowMore = false
 
     private let userSession: UserSession
     private let locationManager: LocationManager
@@ -35,6 +39,9 @@ final class TonightViewModel: ObservableObject {
     private var friendNames: [String: String] = [:]
     private var origin: CLLocation?
     private var hasLoaded = false
+    /// Page 0 is the default top 3; later pages are the next best candidates, 3 at a time.
+    private var pages: [[TonightPick]] = []
+    private var pageIndex = 0
 
     init(
         userSession: UserSession,
@@ -60,7 +67,36 @@ final class TonightViewModel: ObservableObject {
         guard !hasLoaded else { return }
         hasLoaded = true
         Analytics.track(.tonightOpened, ["vibe": vibe.rawValue])
+        async let picksLoad: Void = loadMyPicks()
         await load()
+        await picksLoad
+    }
+
+    /// Loads the user's active/decided group picks for the "Your picks" row. Failure just hides the row.
+    func loadMyPicks() async {
+        let picks = await groupPickService.fetchMyPicks()
+        myPicks = Array(picks.prefix(3))
+        if !picks.isEmpty {
+            Analytics.track(.tonightPicksRowShown, [
+                "count": picks.count,
+                "needs_vote": picks.filter(\.needsMyVote).count,
+                "decided": picks.filter(\.isDecided).count
+            ])
+        }
+    }
+
+    /// Opens a group pick from the row.
+    func openPick(_ summary: GroupPickSummary) {
+        Analytics.track(.tonightPicksRowTapped, ["decided": summary.isDecided, "needs_vote": summary.needsMyVote])
+        PresentationService.shared.present(.groupPick(pickId: summary.id))
+    }
+
+    /// Swaps in the next best 3 places from the same ranked list, wrapping back to the top picks.
+    func showMoreOptions() {
+        guard pages.count > 1 else { return }
+        pageIndex = (pageIndex + 1) % pages.count
+        state = .loaded(pages[pageIndex])
+        Analytics.track(.tonightMoreOptions, ["page": pageIndex, "vibe": vibe.rawValue])
     }
 
     /// Fetches saves from the user's circle (no Google calls) and ranks them.
@@ -93,6 +129,12 @@ final class TonightViewModel: ObservableObject {
         guard let userId = userSession.currentUserId else { return }
         let ranker = TonightRanker(vibe: vibe, origin: origin, currentUserId: userId, friendNames: friendNames)
         let picks = ranker.rank(candidates: candidates, places: details)
+        // Default stays the top 3; extra pages come from a wider ranking, minus what's already shown.
+        let shown = Set(picks.map(\.placeId))
+        let extras = ranker.rank(candidates: candidates, places: details, limit: 12).filter { !shown.contains($0.placeId) }
+        pages = picks.isEmpty ? [] : [picks] + extras.chunked(into: 3)
+        pageIndex = 0
+        canShowMore = pages.count > 1
         if picks.isEmpty {
             state = .empty(candidates.isEmpty
                 ? "Save a few places (or follow friends) and Mesa will pick for you."

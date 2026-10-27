@@ -22,9 +22,16 @@ struct TonightSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            TonightVibeChipRow(selected: viewModel.vibe) { viewModel.selectVibe($0) }
-            content
-            Spacer(minLength: 0)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if !viewModel.myPicks.isEmpty {
+                        myPicksSection
+                    }
+                    TonightVibeChipRow(selected: viewModel.vibe) { viewModel.selectVibe($0) }
+                    content
+                }
+                .padding(.bottom, 24)
+            }
         }
         .padding(.top, 16)
         .task { await viewModel.loadIfNeeded() }
@@ -75,11 +82,63 @@ struct TonightSheet: View {
                 ForEach(Array(picks.enumerated()), id: \.element.id) { index, pick in
                     TonightPickCard(pick: pick, rank: index + 1) { onOpenPlace(pick.place) }
                 }
+                if viewModel.canShowMore {
+                    moreOptionsButton
+                }
                 groupButton
-                    .padding(.top, 6)
+                    .padding(.top, 2)
             }
             .padding(.horizontal, 20)
         }
+    }
+
+    // MARK: - Your picks
+
+    /// Active and decided group picks, so a result is never lost.
+    private var myPicksSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Your group picks")
+                .font(.subheadline.weight(.semibold))
+            ForEach(viewModel.myPicks) { summary in
+                Button { viewModel.openPick(summary) } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: summary.hasWinner ? "party.popper.fill" : (summary.needsMyVote ? "hand.thumbsup.fill" : "clock.fill"))
+                            .font(.system(size: 18))
+                            .foregroundColor(summary.hasWinner ? .green : (summary.needsMyVote ? .orange : .secondary))
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(summary.headline)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.primary)
+                            Text(summary.statusLine)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.secondarySystemBackground)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var moreOptionsButton: some View {
+        Button { viewModel.showMoreOptions() } label: {
+            Label("More options", systemImage: "arrow.triangle.2.circlepath")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .foregroundColor(.primary)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.systemGray5)))
+        }
+        .buttonStyle(.plain)
     }
 
     private var groupButton: some View {

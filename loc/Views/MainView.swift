@@ -567,7 +567,7 @@ struct MainView: View {
 
     /// Group pick sheet: live one-tap voting with an automatic winner.
     private func groupPickSheet(pickId: String) -> some View {
-        GroupPickSheet(pickId: pickId, onOpenPlace: openPlaceFromSheet)
+        GroupPickSheet(pickId: pickId, userId: userSession.currentUserId, locationManager: locationManager, onOpenPlace: openPlaceFromSheet)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
     }

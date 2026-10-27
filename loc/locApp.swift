@@ -408,8 +408,14 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let userInfo = notification.request.content.userInfo
         // Don't pop a banner for an import the user is already watching finish.
+        // ...or for a group pick update the user is already looking at (the sheet refreshes itself).
+        let pushType = userInfo["type"] as? String
+        let pushPickId = userInfo["pickId"] as? String
         Task { @MainActor in
             if ImportTracker.shared.shouldSuppressForegroundNotification(userInfo: userInfo) {
+                completionHandler([])
+            } else if let pushType, pushType.hasPrefix("group_pick_"), let pushPickId,
+                      PresentationService.shared.isPresenting(.groupPick(pickId: pushPickId)) {
                 completionHandler([])
             } else {
                 completionHandler([.banner, .sound, .badge])
@@ -427,6 +433,13 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
             Task { @MainActor in
                 Analytics.track(.importNotificationOpened)
                 ImportTracker.shared.openResult(jobId: jobId)
+            }
+        }
+        // Group pick: decided, invited, waiting on you, or new options. Open the pick (result screen if decided).
+        else if let type, type.hasPrefix("group_pick_"), let pickId = userInfo["pickId"] as? String {
+            Task { @MainActor in
+                Analytics.track(.groupPickPushOpened, ["type": type])
+                PresentationService.shared.present(.groupPick(pickId: pickId))
             }
         }
         // Handle follow notifications
