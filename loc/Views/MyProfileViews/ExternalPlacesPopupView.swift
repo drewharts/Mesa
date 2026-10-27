@@ -49,7 +49,11 @@ struct ExternalPlacesPopupView: View {
                 if showNearbyFilter {
                     nearbyFilterToggle
                 }
-            }
+            },
+            onRemove: { place in
+                profile.externalContentViewModel.deleteExternalPlace(place)
+            },
+            fitsMapToPlaces: !externalContentVM.isNearbyFilterEnabled
         )
         .onAppear {
             externalContentVM.currentMapRegion = appCoordinator.currentMapRegion

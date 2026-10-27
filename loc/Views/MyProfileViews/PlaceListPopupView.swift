@@ -40,6 +40,10 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     let onViewOnMap: (() -> Void)?  // Optional: Shows "Map" button when provided
     @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
     @ViewBuilder let headerAccessory: () -> HeaderAccessory
+    /// Optional destructive action offered on each tile's long-press menu.
+    let onRemove: ((LightweightPlace) -> Void)?
+    /// Whether opening the sheet fits the map to the places' pins (off for region-driven filters like "Nearby").
+    let fitsMapToPlaces: Bool
 
     @Environment(\.presentationMode) var presentationMode
 
@@ -61,8 +65,12 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
         onBackToProfile: (() -> Void)? = nil,
         onViewOnMap: (() -> Void)? = nil,
         @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView,
-        @ViewBuilder headerAccessory: @escaping () -> HeaderAccessory
+        @ViewBuilder headerAccessory: @escaping () -> HeaderAccessory,
+        onRemove: ((LightweightPlace) -> Void)? = nil,
+        fitsMapToPlaces: Bool = true
     ) {
+        self.onRemove = onRemove
+        self.fitsMapToPlaces = fitsMapToPlaces
         self.title = title
         self.count = count
         self.isLoading = isLoading
@@ -82,11 +90,12 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     // Navigation state for place detail navigation
     @State private var navigationPath = NavigationPath()
 
-    // Grid layout matching ProfileView lists (consistent spacing)
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
+    /// Shared map-first sheet state (detent, focused pin, camera), same as list sheets.
+    @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
+    @ObservedObject private var placeMeta = ListPlaceMetaStore.shared
+
+    /// Session key for analytics / sheet state (sections are not real lists).
+    private var sessionId: String { "section:\(title)" }
 
     // MARK: - Body
 
@@ -94,9 +103,8 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
         NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 header
-                ScrollView {
-                    content
-                }
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { placeId in
@@ -105,14 +113,17 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
             }
         }
         .onReceive(presentationService.$pendingPlaceNavigation.compactMap { $0 }) { placeId in
-            // When map annotation is tapped while sheet is open, replace the current place detail.
-            // Uses onReceive (Combine) instead of onChange for reliable delivery even when
-            // a navigation destination is pushed on the stack.
-            var newPath = NavigationPath()
-            newPath.append(placeId)
-            navigationPath = newPath
+            // Map pin tapped while the sheet is open: highlight/scroll to its tile;
+            // a second tap (or a tap while a place page is open) opens that place.
             presentationService.pendingPlaceNavigation = nil
+            handleMapPinTap(placeId)
         }
+        .onAppear {
+            sheetVM.beginSession(listId: sessionId, placeCount: count ?? places.count, isExternal: false, source: "profile_section")
+            fitMapIfNeeded()
+        }
+        .onChange(of: places.count) { _, _ in fitMapIfNeeded() }
+        .onDisappear { sheetVM.endSession() }
     }
 
     // MARK: - Header
@@ -133,134 +144,143 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
                     .frame(width: 44, height: 44)
                 }
 
-                // Title
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.black)
+                    .foregroundColor(.primary)
 
                 Spacer()
 
                 // Header accessory inline (e.g. filter buttons)
                 headerAccessory()
 
-                // Action buttons
-                HStack(alignment: .center, spacing: 12) {
-                    // View on Map button (profile popups only)
-                    if let viewOnMap = onViewOnMap {
-                        Button(action: viewOnMap) {
-                            Image(systemName: "map")
-                                .font(.system(size: 20, weight: .regular))
-                                .foregroundColor(.primary)
-                        }
-                        .frame(width: 44, height: 44)
+                // Close button on right (current user popups only)
+                if onBackToProfile == nil {
+                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundColor(.primary)
                     }
-
-                    // Close button on right (current user popups only)
-                    if onBackToProfile == nil {
-                        Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 20, weight: .regular))
-                                .foregroundColor(.primary)
-                        }
-                        .frame(width: 44, height: 44)
-                    }
+                    .frame(width: 44, height: 44)
                 }
             }
 
-            // Place count below the title row
             if let count = count {
                 Text("\(count) place\(count == 1 ? "" : "s")")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .padding(.top, -8)
             }
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
-        .padding(.bottom, 28)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Content
 
     @ViewBuilder
     private var content: some View {
-        if isLoading && places.isEmpty {
-            loadingView
-        } else if places.isEmpty {
+        if !isLoading && places.isEmpty {
             emptyView
         } else {
-            gridView
-
-            // Pagination loading indicator
-            if isLoadingMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .padding()
-                    Spacer()
-                }
-            }
+            ListPlacesScrollView(
+                places: places,
+                isLoadingInitial: isLoading && places.isEmpty,
+                isLoadingMore: isLoadingMore && !places.isEmpty,
+                showAddedBy: false,
+                focusedPlaceId: sheetVM.focusedPlaceId,
+                scrollRequest: sheetVM.scrollRequest,
+                locationText: { placeMeta.location(for: $0) },
+                onRowAppear: { placeMeta.requestNeighborhood(for: $0) },
+                onLoadMore: {
+                    guard hasMore && !isLoadingMore else { return }
+                    Task { await loadMore() }
+                },
+                onSelect: { handleTileTap($0) },
+                onOpenDetail: { openPlaceDetail($0) },
+                onRemove: removeHandler
+            )
         }
     }
 
-    // MARK: - Loading View
-
-    private var loadingView: some View {
-        ScrollView {
-            SkeletonCardGrid(count: 6)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+    /// Adapts the place-based remove action to the id-based tile menu.
+    private var removeHandler: ((String) -> Void)? {
+        guard let onRemove else { return nil }
+        return { placeId in
+            if let place = place(withId: placeId) { onRemove(place) }
         }
-        .scrollDisabled(true)
     }
 
     // MARK: - Empty View
 
     private var emptyView: some View {
-        VStack(spacing: 16) {
-            Spacer()
+        VStack(spacing: 12) {
             Image(systemName: emptyIcon)
-                .font(.system(size: 50))
+                .font(.system(size: 40))
                 .foregroundColor(.gray.opacity(0.5))
             Text(emptyTitle)
-                .font(.title3)
-                .fontWeight(.medium)
-                .foregroundColor(.gray)
+                .font(.headline)
+                .foregroundColor(.secondary)
             Text(emptyMessage)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
+
+    // MARK: - Map-First Actions
+
+    private func place(withId placeId: String) -> LightweightPlace? {
+        places.first { $0.place_id.caseInsensitiveCompare(placeId) == .orderedSame }
+    }
+
+    private func hasCoordinate(_ place: LightweightPlace) -> Bool {
+        guard let lat = place.latitude, let lon = place.longitude else { return false }
+        return !(lat == 0 && lon == 0)
+    }
+
+    private func fitMapIfNeeded() {
+        guard fitsMapToPlaces, !places.isEmpty else { return }
+        sheetVM.fitToPlaces(places)
+        placeMeta.prefetchCities(for: places)
+    }
+
+    /// Tile tap: select and center its pin; a second tap opens the place.
+    /// Places without coordinates (e.g. some videos) have no pin, so they open directly.
+    private func handleTileTap(_ place: LightweightPlace) {
+        if sheetVM.isFocused(place.place_id) || !hasCoordinate(place) {
+            openPlaceDetail(place)
+        } else {
+            sheetVM.focus(place: place, source: .row)
         }
     }
 
-    // MARK: - Grid View
-
-    private var gridView: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                cardBuilder(place, { placeId in
-                    navigationPath.append(placeId)
-                })
-                .onAppear {
-                    triggerPaginationIfNeeded(index: index)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+    private func openPlaceDetail(_ place: LightweightPlace) {
+        replaceDetail(with: place.place_id)
     }
 
-    // MARK: - Pagination Helper
+    private func handleMapPinTap(_ placeId: String) {
+        guard navigationPath.isEmpty, let tapped = place(withId: placeId) else {
+            if let tapped = place(withId: placeId) { sheetVM.focus(place: tapped, source: .pin) }
+            replaceDetail(with: placeId)
+            return
+        }
+        if sheetVM.isFocused(tapped.place_id) {
+            replaceDetail(with: tapped.place_id)
+        } else {
+            sheetVM.focus(place: tapped, source: .pin)
+        }
+    }
 
-    /// Triggers pagination when scrolling near the end of the list.
-    private func triggerPaginationIfNeeded(index: Int) {
-        // Trigger at exactly the 3rd-to-last item (matches LightweightListPopupView pattern)
-        // Exact match prevents auto-re-triggering after loads complete
-        guard index == places.count - 3 && hasMore && !isLoadingMore else { return }
-        Task { await loadMore() }
+    private func replaceDetail(with placeId: String) {
+        sheetVM.ensureAtLeastHalf()
+        var newPath = NavigationPath()
+        newPath.append(placeId)
+        navigationPath = newPath
     }
 }
 
@@ -281,7 +301,8 @@ extension PlaceListPopupView where HeaderAccessory == EmptyView {
         loadMore: @escaping () async -> Void,
         onBackToProfile: (() -> Void)? = nil,
         onViewOnMap: (() -> Void)? = nil,
-        @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView
+        @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView,
+        onRemove: ((LightweightPlace) -> Void)? = nil
     ) {
         self.init(
             title: title,
@@ -297,7 +318,8 @@ extension PlaceListPopupView where HeaderAccessory == EmptyView {
             onBackToProfile: onBackToProfile,
             onViewOnMap: onViewOnMap,
             cardBuilder: cardBuilder,
-            headerAccessory: { EmptyView() }
+            headerAccessory: { EmptyView() },
+            onRemove: onRemove
         )
     }
 }
