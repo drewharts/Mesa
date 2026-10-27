@@ -35,7 +35,7 @@ class TripsListViewModel: ObservableObject {
     func togglePastExpanded() {
         isPastExpanded.toggle()
         if isPastExpanded {
-            AnalyticsService.track(.pastTripsExpanded, ["past_count": pastTrips.count])
+            Analytics.track(.pastTripsExpanded, ["past_count": pastTrips.count])
         }
     }
 
