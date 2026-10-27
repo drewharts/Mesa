@@ -409,7 +409,7 @@ struct MainView: View {
     private var externalPlacesSheet: some View {
         ExternalPlacesPopupView(externalContentVM: profileViewModel.externalContentViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -417,7 +417,7 @@ struct MainView: View {
     private var reviewsSheet: some View {
         ReviewsListPopupView(reviewsVM: profileViewModel.reviewsViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -425,7 +425,7 @@ struct MainView: View {
     private var favoritesSheet: some View {
         FavoritesPopupView(favoritesVM: profileViewModel.favoritesViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -433,7 +433,7 @@ struct MainView: View {
     private var myPlacesSheet: some View {
         MyPlacesListView(myPlacesVM: profileViewModel.myPlacesViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -443,7 +443,7 @@ struct MainView: View {
             mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -474,7 +474,7 @@ struct MainView: View {
             mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 

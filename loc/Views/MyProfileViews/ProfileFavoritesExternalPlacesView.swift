@@ -97,22 +97,29 @@ struct ProfileFavoritesExternalPlacesView: View {
 
     /// Handles tap on favorites section - shows popup over profile.
     private func handleFavoritesTap() {
-        activePopupSheet = .favorites
+        openOnMap(.favorites)
     }
 
     /// Handles tap on external content section - shows popup over profile.
     private func handleExternalContentTap() {
-        activePopupSheet = .externalPlaces
+        openOnMap(.externalPlaces)
     }
 
     /// Handles tap on reviews section - shows popup over profile.
     private func handleReviewsTap() {
-        activePopupSheet = .reviews
+        openOnMap(.reviews)
     }
 
     /// Handles tap on My Places section - shows popup over profile.
     private func handleMyPlacesTap() {
-        activePopupSheet = .myPlaces
+        openOnMap(.myPlaces)
+    }
+
+    /// Opens a section map-first, like lists: the profile closes and the map shows the section's
+    /// pins with the photo-tile sheet.
+    private func openOnMap(_ sheet: ProfilePopupSheet) {
+        pendingMapNavigation = sheet
+        handlePopupDismiss()
     }
 
     /// Sets pending map navigation and dismisses the popup sheet.
