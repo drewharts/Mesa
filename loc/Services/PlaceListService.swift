@@ -21,6 +21,37 @@ class PlaceListService {
     
     private init() {}
     
+    // MARK: - Place Location Metadata
+
+    /// Fetches the city for each place id (lowercased id -> city). Used for the list row location line.
+    func fetchPlaceCities(placeIds: [String]) async throws -> [String: String] {
+        struct CityRow: Decodable {
+            let id: String
+            let city: String?
+        }
+        guard !placeIds.isEmpty else { return [:] }
+
+        var result: [String: String] = [:]
+        let chunkSize = 80
+        var start = 0
+        while start < placeIds.count {
+            let chunk = Array(placeIds[start..<min(start + chunkSize, placeIds.count)])
+            let rows: [CityRow] = try await supabase.client
+                .from("places")
+                .select("id, city")
+                .in("id", values: chunk)
+                .execute()
+                .value
+            for row in rows {
+                if let city = row.city?.trimmingCharacters(in: .whitespacesAndNewlines), !city.isEmpty {
+                    result[row.id.lowercased()] = city
+                }
+            }
+            start += chunkSize
+        }
+        return result
+    }
+
     // MARK: - Fetch Place Lists
     
     /// Fetch user's place lists sorted by proximity to a location

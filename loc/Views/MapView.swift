@@ -19,6 +19,9 @@ struct MapView: View {
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
 
+    /// Map-first list sheet: which list row/pin is focused and where the camera should go.
+    @ObservedObject private var listSheetVM = ListMapSheetViewModel.shared
+
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
     @Binding var isCreatePlacePopupActive: Bool
@@ -123,6 +126,12 @@ struct MapView: View {
     private func isAnnotationSelected(_ item: MapAnnotationItem) -> Bool {
         switch item.layer {
         case .network, .community:
+            // A place focused from the list sheet (row tap or pin tap) gets the selected-pin styling.
+            if let focusedId = listSheetVM.focusedPlaceId,
+               let itemPlaceId = item.placeId,
+               itemPlaceId.caseInsensitiveCompare(focusedId) == .orderedSame {
+                return true
+            }
             guard let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString else { return false }
             return item.placeId == selectedId
         case .trip(let trip):
@@ -432,6 +441,36 @@ struct MapView: View {
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, shouldAnimate in
             if shouldAnimate, let place = selectedPlaceVM.selectedPlace {
                 mapViewModel.setPreservedAnnotation(for: place)
+            }
+        }
+        // Map-first list sheet: fit to the list's pins, or center a focused pin above the sheet.
+        .onChange(of: listSheetVM.cameraRequest) { _, request in
+            guard let request else { return }
+            applyListCameraRequest(request)
+        }
+    }
+
+    /// Applies a camera request from the list sheet through the existing mapPosition binding.
+    private func applyListCameraRequest(_ request: ListMapSheetViewModel.CameraRequest) {
+        switch request.target {
+        case .region(let region):
+            withAnimation(.easeInOut(duration: 0.45)) {
+                mapPosition = .region(region)
+            }
+        case .point(let coordinate, let sheetFraction):
+            // Keep the current zoom when sensible; zoom in if the whole list is in view.
+            let currentSpan = currentMapRegion?.span ?? MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+            let latitudeDelta = min(max(currentSpan.latitudeDelta, 0.004), 0.03)
+            let scale = currentSpan.latitudeDelta > 0 ? latitudeDelta / currentSpan.latitudeDelta : 1
+            let longitudeDelta = max(currentSpan.longitudeDelta * scale, 0.004)
+            // Shift the center south so the pin sits in the middle of the map area above the sheet.
+            let centerLatitude = coordinate.latitude - latitudeDelta * Double(sheetFraction) / 2
+            let region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: centerLatitude, longitude: coordinate.longitude),
+                span: MKCoordinateSpan(latitudeDelta: latitudeDelta, longitudeDelta: longitudeDelta)
+            )
+            withAnimation(.easeInOut(duration: 0.35)) {
+                mapPosition = .region(region)
             }
         }
     }
