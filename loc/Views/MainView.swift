@@ -153,7 +153,10 @@ struct MainView: View {
             }
             .fullScreenCover(isPresented: $shouldNavigateToProfile, onDismiss: {
                 // Present pending map sheets after profile is fully dismissed
-                if let listId = profileViewModel.selectedListIdForMap {
+                if let sheet = profileViewModel.pendingSheet {
+                    profileViewModel.pendingSheet = nil
+                    PresentationService.shared.present(sheet)
+                } else if let listId = profileViewModel.selectedListIdForMap {
                     PresentationService.shared.present(.list(listId: listId))
                 } else if let pending = profileViewModel.pendingMapFilter {
                     profileViewModel.pendingMapFilter = nil
