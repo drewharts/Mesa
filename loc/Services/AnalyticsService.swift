@@ -51,6 +51,11 @@ enum Analytics {
     enum Event: String {
         case importStarted = "import_started"
         case importFinished = "import_finished"
+        case importBackgrounded = "import_backgrounded"
+        case importNotificationShown = "import_notification_shown"
+        case importNotificationOpened = "import_notification_opened"
+        case importSavedToList = "import_saved_to_list"
+        case notificationPermissionPrompted = "notification_permission_prompted"
         case placeSaved = "place_saved"
         case listCreated = "list_created"
         case listShared = "list_shared"

@@ -248,6 +248,15 @@ struct MainView: View {
                 ImportProgressView(contentUrl: contentUrl)
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(profileViewModel)
+                    .environmentObject(userSession)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+
+            case .importJob(let jobId):
+                ImportProgressView(jobId: jobId)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(userSession)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
 

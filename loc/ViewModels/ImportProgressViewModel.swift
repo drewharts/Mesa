@@ -3,20 +3,28 @@
 //  loc
 //
 //  ViewModel for the live import progress sheet.
-//  Single Responsibility: Starts an async import job and polls it until it finishes.
+//  Single Responsibility: Starts an async import job (or attaches to an existing one, e.g. from a
+//  notification tap) and polls it until it finishes. Closing the sheet hands a running job to
+//  ImportTracker so the import still completes and the user gets notified.
 //
 
 import Foundation
 
 @MainActor
 class ImportProgressViewModel: ObservableObject {
-    let contentUrl: String
+    /// The video URL. For a job opened by id it is filled in once the job is fetched.
+    @Published private(set) var contentUrl: String
+    /// Set when attaching to an already-running/finished job instead of starting a new import.
+    private let existingJobId: String?
+    private var jobId: String?
 
     @Published private(set) var statusText: String = ImportJobStatus.queued.displayText
     @Published private(set) var places: [ImportJobPlace] = []
     @Published private(set) var isFinished: Bool = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var savedPlaces: [DetailPlace] = []
+    /// Whether the user can leave the app and still be told when the import is done.
+    @Published private(set) var notificationsEnabled: Bool = false
 
     private let contentService: ExternalContentService
     private var pollTask: Task<Void, Never>?
@@ -26,6 +34,15 @@ class ImportProgressViewModel: ObservableObject {
     /// Initializes with the shared content URL to import.
     init(contentUrl: String, contentService: ExternalContentService = ExternalContentService()) {
         self.contentUrl = contentUrl
+        self.existingJobId = nil
+        self.contentService = contentService
+    }
+
+    /// Attaches to an existing import job (opened from a notification or on resume).
+    init(jobId: String, contentService: ExternalContentService = ExternalContentService()) {
+        self.contentUrl = ""
+        self.existingJobId = jobId
+        self.jobId = jobId
         self.contentService = contentService
     }
 
@@ -40,6 +57,10 @@ class ImportProgressViewModel: ObservableObject {
     /// Cancels polling (e.g. when the sheet is dismissed).
     func stop() {
         pollTask?.cancel()
+        // Still running? Let the tracker keep following it so the user gets notified when it's done.
+        if let jobId, !isFinished {
+            ImportTracker.shared.handOff(jobId: jobId)
+        }
     }
 
     /// Number of places saved so far.
@@ -49,6 +70,10 @@ class ImportProgressViewModel: ObservableObject {
 
     /// Starts the job, then polls until it reaches a terminal state.
     private func run() async {
+        if let existingJobId {
+            await poll(jobId: existingJobId)
+            return
+        }
         Analytics.track(.importStarted, ["url_host": URL(string: contentUrl)?.host ?? ""])
         switch await contentService.startImport(contentUrl) {
         case .failure(let error):
@@ -56,6 +81,14 @@ class ImportProgressViewModel: ObservableObject {
         case .success(.places(let detailPlaces)):
             applySyncResult(detailPlaces)
         case .success(.job(let jobId)):
+            self.jobId = jobId
+            // Remember the job so it survives closing the sheet / the app, then ask for notification
+            // permission now — the user has just started an import they can walk away from.
+            ImportTracker.shared.track(jobId: jobId, contentUrl: contentUrl)
+            Task { [weak self] in
+                let allowed = await NotificationPermissionService.shared.requestIfNeeded(context: "import_started")
+                self?.notificationsEnabled = allowed
+            }
             await poll(jobId: jobId)
         }
     }
@@ -63,13 +96,25 @@ class ImportProgressViewModel: ObservableObject {
     /// Polls the job every pollInterval until done, failed, or timed out.
     private func poll(jobId: String) async {
         let startedAt = Date()
+        var consecutiveFailures = 0
         while !Task.isCancelled {
-            if case .success(let job) = await contentService.fetchImportJob(id: jobId) {
+            switch await contentService.fetchImportJob(id: jobId) {
+            case .success(let job):
+                consecutiveFailures = 0
                 apply(job)
                 if job.status.isTerminal { return }
+            case .failure:
+                consecutiveFailures += 1
+                if consecutiveFailures >= 5 {
+                    ImportTracker.shared.finished(jobId: jobId)
+                    finish(error: "We couldn't load this import.")
+                    return
+                }
             }
             if Date().timeIntervalSince(startedAt) > maxPollDuration {
-                finish(error: "The import is taking too long. Your places may still appear shortly.")
+                // The server may still be working: keep following it in the background.
+                ImportTracker.shared.handOff(jobId: jobId)
+                finish(error: "The import is taking too long. We'll let you know when it's done.")
                 return
             }
             try? await Task.sleep(nanoseconds: pollInterval)
@@ -78,6 +123,8 @@ class ImportProgressViewModel: ObservableObject {
 
     /// Applies a job snapshot to the published state.
     private func apply(_ job: ImportJob) {
+        if contentUrl.isEmpty, let url = job.url { contentUrl = url }
+        if job.status.isTerminal { ImportTracker.shared.finished(jobId: job.id) }
         places = job.places
         savedPlaces = job.savedPlaces
         statusText = job.status.displayText

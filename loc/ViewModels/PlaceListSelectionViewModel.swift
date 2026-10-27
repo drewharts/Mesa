@@ -539,24 +539,32 @@ class PlaceListSelectionViewModel: ObservableObject {
 
     /// Adds every place to the list, skipping ones already in it (checked against the DB).
     func addAll(_ places: [DetailPlace], to list: LightweightPlaceList) {
+        Task { @MainActor in
+            _ = await addAllAndWait(places, to: list)
+        }
+    }
+
+    /// Same as `addAll`, but suspends until every place was handled so callers (e.g. the one-tap
+    /// import screen) can react when it's done. Shows the usual confirmation toast.
+    @discardableResult
+    func addAllAndWait(_ places: [DetailPlace], to list: LightweightPlaceList) async -> (added: Int, skipped: Int) {
         let currentList = lists.first(where: { $0.list_id == list.list_id }) ?? list
         Self.lastUsedListId = currentList.list_id
-        Task { @MainActor in
-            var added = 0
-            var skipped = 0
-            for place in places {
-                let exists = (try? await PlaceListService.shared.isPlaceInList(listId: currentList.list_id, placeId: place.id.uuidString)) ?? false
-                if exists { skipped += 1; continue }
-                profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place)
-                added += 1
-            }
-            updateLocalListCount(listId: currentList.list_id, delta: added)
-            placeMembership[currentList.list_id] = true
-            var message = "Added \(added) place\(added == 1 ? "" : "s") to \(currentList.name)"
-            if skipped > 0 { message += " (\(skipped) already there)" }
-            showConfirmation(message, type: .added)
-            profile.listsViewModel.clearRecentlyCreatedList()
+        var added = 0
+        var skipped = 0
+        for place in places {
+            let exists = (try? await PlaceListService.shared.isPlaceInList(listId: currentList.list_id, placeId: place.id.uuidString)) ?? false
+            if exists { skipped += 1; continue }
+            profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place)
+            added += 1
         }
+        updateLocalListCount(listId: currentList.list_id, delta: added)
+        placeMembership[currentList.list_id] = true
+        var message = "Added \(added) place\(added == 1 ? "" : "s") to \(currentList.name)"
+        if skipped > 0 { message += " (\(skipped) already there)" }
+        showConfirmation(message, type: .added)
+        profile.listsViewModel.clearRecentlyCreatedList()
+        return (added, skipped)
     }
 
     /// Toggles the favorite status for a place via ProfileViewModel.
