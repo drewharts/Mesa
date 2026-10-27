@@ -1,5 +1,5 @@
 //
-//  ListPlaceRow.swift
+//  ListPlaceRowView.swift
 //  loc
 //
 //  Place row for the map-first list sheet. Matches the profile tile design system:
@@ -12,7 +12,7 @@ import SwiftUI
 
 // MARK: - Row
 
-struct ListPlaceRow: View {
+struct ListPlaceRowView: View {
     let place: LightweightPlace
     /// Neighborhood (or city) for the category line; nil while unknown.
     let locationText: String?
@@ -178,11 +178,11 @@ struct ListPlaceThumbnail: View {
 
 // MARK: - Skeleton
 
-/// Shimmer skeleton shaped exactly like `ListPlaceRow` (same thumbnail, padding and line heights).
+/// Shimmer skeleton shaped exactly like `ListPlaceRowView` (same thumbnail, padding and line heights).
 struct ListPlaceRowSkeleton: View {
     var body: some View {
         HStack(spacing: 12) {
-            SkeletonBlock(width: ListPlaceRow.thumbnailSize, height: ListPlaceRow.thumbnailSize, cornerRadius: 10)
+            SkeletonBlock(width: ListPlaceRowView.thumbnailSize, height: ListPlaceRowView.thumbnailSize, cornerRadius: 10)
 
             VStack(alignment: .leading, spacing: 8) {
                 SkeletonBlock(width: 150, height: 14, cornerRadius: 6)

@@ -10,6 +10,7 @@
 
 import Foundation
 import MapKit
+import SwiftUI
 import CoreLocation
 
 @MainActor

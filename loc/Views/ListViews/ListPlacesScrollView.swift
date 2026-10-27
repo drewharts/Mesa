@@ -45,7 +45,7 @@ struct ListPlacesScrollView: View {
                             .padding(.vertical, 40)
                     } else {
                         ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                            ListPlaceRow(
+                            ListPlaceRowView(
                                 place: place,
                                 locationText: locationText(place.place_id),
                                 isSelected: isSelected(place),

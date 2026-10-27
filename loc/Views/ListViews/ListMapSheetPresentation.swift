@@ -9,15 +9,14 @@
 import SwiftUI
 
 struct ListMapSheetPresentationModifier: ViewModifier {
-    @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
 
     func body(content: Content) -> some View {
         content
             .presentationDetents(
                 ListSheetDetent.allPresentationDetents,
                 selection: Binding<PresentationDetent>(
-                    get: { sheetVM.detent.presentationDetent },
-                    set: { sheetVM.userChangedDetent($0) }
+                    get: { ListMapSheetViewModel.shared.detent.presentationDetent },
+                    set: { ListMapSheetViewModel.shared.userChangedDetent($0) }
                 )
             )
             .presentationDragIndicator(.visible)
