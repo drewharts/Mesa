@@ -48,8 +48,8 @@ struct ContentView: View {
                 dataManager: dataManager,
                 serviceContainer: serviceContainer
             )
-            .opacity(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding ? 1 : 0)
-            .allowsHitTesting(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding)
+            .opacity(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.isAwaitingApproval && !userSession.needsListOnboarding ? 1 : 0)
+            .allowsHitTesting(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.isAwaitingApproval && !userSession.needsListOnboarding)
             .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
                 handleNotificationNavigation(pendingNavigation)
             }
@@ -78,7 +78,13 @@ struct ContentView: View {
             }
 
             // List creation onboarding overlays after photo onboarding but before main app
-            if userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && userSession.needsListOnboarding {
+            // Invite gate: after phone + photo (so Drew sees who they are), before anything that needs app data
+            if userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && userSession.isAwaitingApproval {
+                WaitingListView()
+                    .transition(.opacity)
+            }
+
+            if userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.isAwaitingApproval && userSession.needsListOnboarding {
                 ListOnboardingView()
                     .transition(.opacity)
             }

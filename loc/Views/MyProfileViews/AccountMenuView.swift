@@ -14,9 +14,15 @@ struct AccountMenuView: View {
     @EnvironmentObject var serviceContainer: ServiceContainer
     @State private var showEditProfile = false
     @State private var showFeedback = false
+    @State private var showApprovals = false
 
     var body: some View {
         Menu {
+            if ApprovalService.isAdmin(userSession.currentUserId) {
+                Button { showApprovals = true } label: {
+                    Label("Approve Users", systemImage: "person.badge.shield.checkmark")
+                }
+            }
             shareProfileButton
             editProfileButton
             feedbackButton
@@ -31,6 +37,9 @@ struct AccountMenuView: View {
                     profile.user = updatedUser
                 }
             }
+        }
+        .sheet(isPresented: $showApprovals) {
+            AdminApprovalsView()
         }
         .sheet(isPresented: $showFeedback) {
             FeedbackSheet(userId: userSession.currentUserId ?? "")

@@ -69,5 +69,9 @@ enum Analytics {
         case groupPickCreated = "group_pick_created"
         case groupPickVoted = "group_pick_voted"
         case groupPickDecided = "group_pick_decided"
+        case waitlistShown = "waitlist_shown"
+        case waitlistApproved = "waitlist_approved"
+        case userApproved = "user_approved"
+        case userRejected = "user_rejected"
     }
 }
