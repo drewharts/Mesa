@@ -244,7 +244,8 @@ struct ImportProgressView: View {
     }
 
     private var selectedList: LightweightPlaceList? {
-        listViewModel?.lists.first { $0.list_id == selectedListId }
+        listViewModel?.allLists.first { $0.list_id == selectedListId }
+            ?? listViewModel?.lists.first { $0.list_id == selectedListId }
     }
 
     /// Inline list choices (smart default preselected) and the single save button.
@@ -283,7 +284,8 @@ struct ImportProgressView: View {
             await vm.loadInitialLists(for: first)
             // Smart default: `lists` is sorted last-used list first, then by proximity to the places.
             let lastUsed = PlaceListSelectionViewModel.lastUsedListId
-            selectedListId = vm.lists.first(where: { $0.list_id == lastUsed })?.list_id ?? vm.lists.first?.list_id
+            let all = vm.allLists.isEmpty ? vm.lists : vm.allLists
+            selectedListId = all.first(where: { $0.list_id == lastUsed })?.list_id ?? all.first?.list_id
         }
     }
 
@@ -351,7 +353,8 @@ struct ImportProgressView: View {
     }
 }
 
-/// Observes the list view model so chips appear as soon as the lists finish loading.
+/// One-screen list picker: search at top, then a compact scrollable list of EVERY list
+/// (owned + shared), last-used first then most recently updated, plus "New list".
 private struct ImportSaveSection: View {
     @ObservedObject var listViewModel: PlaceListSelectionViewModel
     @Binding var selectedListId: String?
@@ -361,24 +364,57 @@ private struct ImportSaveSection: View {
     let onSave: () -> Void
     let onChooseElsewhere: () -> Void
 
+    @State private var query = ""
+    @State private var showNewListSheet = false
+
+    private var sourceLists: [LightweightPlaceList] {
+        listViewModel.allLists.isEmpty ? listViewModel.lists : listViewModel.allLists
+    }
+
+    private var visibleLists: [LightweightPlaceList] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return sourceLists }
+        return sourceLists.filter { $0.name.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if !listViewModel.lists.isEmpty {
-                Text("Save to")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundColor(.secondary)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(listViewModel.lists, id: \.list_id) { list in
-                            chip(list)
+            if !sourceLists.isEmpty {
+                HStack {
+                    Text("Save to")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(sourceLists.count) lists")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                searchField
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        newListRow
+                        ForEach(visibleLists, id: \.list_id) { list in
+                            Divider().padding(.leading, 12)
+                            row(list)
+                        }
+                        if visibleLists.isEmpty {
+                            Text("No lists match \u{201C}\(query)\u{201D}")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         }
                     }
                 }
+                .frame(maxHeight: 260)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 Button(action: onSave) {
                     HStack(spacing: 8) {
                         if isSaving { ProgressView().tint(.white) }
                         Text(buttonTitle)
                             .font(.headline)
+                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -403,23 +439,73 @@ private struct ImportSaveSection: View {
                 }
             }
         }
+        .sheet(isPresented: $showNewListSheet) {
+            NewListSheetView(onSave: { listName in
+                let result = await listViewModel.addNewListToSelection(named: listName, city: "", emoji: "", image: "")
+                if case .success = result {
+                    query = ""
+                    selectedListId = listViewModel.allLists.first?.list_id ?? listViewModel.lists.first?.list_id
+                }
+            })
+            .presentationDetents([.height(200)])
+            .presentationDragIndicator(.visible)
+        }
     }
 
-    private func chip(_ list: LightweightPlaceList) -> some View {
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+            TextField("Search your lists", text: $query)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.secondarySystemBackground)))
+    }
+
+    private var newListRow: some View {
+        Button { showNewListSheet = true } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "plus.circle.fill").foregroundColor(.accentColor)
+                Text("New list").font(.subheadline.weight(.medium))
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func row(_ list: LightweightPlaceList) -> some View {
         let isSelected = list.list_id == selectedListId
         return Button {
             selectedListId = list.list_id
         } label: {
-            HStack(spacing: 4) {
-                if isSelected { Image(systemName: "checkmark").font(.caption.weight(.bold)) }
+            HStack(spacing: 10) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
                 Text(list.name)
-                    .font(.subheadline.weight(.medium))
+                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
                     .lineLimit(1)
+                if list.isCollaborative {
+                    Image(systemName: "person.2.fill").font(.caption2).foregroundColor(.secondary)
+                }
+                Spacer()
+                Text("\(list.place_count)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(isSelected ? Color.accentColor : Color(.secondarySystemBackground)))
-            .foregroundColor(isSelected ? .white : .primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
