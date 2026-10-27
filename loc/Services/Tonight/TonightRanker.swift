@@ -144,7 +144,7 @@ struct TonightRanker {
         var parts: [String] = []
         let me = currentUserId.lowercased()
         let friendIds = saverIds.filter { $0 != me }.sorted()
-        let names = friendIds.compactMap { friendNames[$0] }.filter { !$0.isEmpty }
+        let names = friendIds.compactMap { id in friendNames[id].map { ScreenshotPrivacy.name($0, userId: id) } }.filter { !$0.isEmpty }
         if let first = names.first {
             let others = friendIds.count - 1
             parts.append(others > 0 ? "\(first) + \(others) friend\(others == 1 ? "" : "s") saved this" : "\(first) saved this")

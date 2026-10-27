@@ -59,7 +59,7 @@ struct TripCardView: View {
 
     private var collaboratorAvatars: some View {
         HStack(spacing: -8) {
-            if let photos = trip.collaboratorPhotos {
+            if !ScreenshotPrivacy.isActive, let photos = trip.collaboratorPhotos {
                 ForEach(photos.prefix(3), id: \.self) { urlString in
                     AsyncImage(url: URL(string: urlString)) { image in
                         image

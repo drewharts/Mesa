@@ -388,7 +388,7 @@ struct MainView: View {
     /// User's list popup sheet content.
     private func listSheet(listId: String) -> some View {
         Group {
-            if let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
+            if let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id.caseInsensitiveCompare(listId) == .orderedSame }) {
                 LightweightListPopupView(
                     lists: profileViewModel.listsViewModel.lightweightPlaceLists,
                     initialListIndex: listIndex,

@@ -40,6 +40,7 @@ enum ScreenshotMode {
                         .or("supabase_uid.eq.\(authId),supabase_uid.eq.\(authId.lowercased())")
                         .limit(1).execute().value
                     let uid = rows.first?.id ?? authId
+                    ScreenshotPrivacy.currentUserId = uid
                     await userSession.beginSession(uid: uid)
                     await dataManager.initializeProfileData(userId: uid)
                 } catch {
@@ -50,6 +51,7 @@ enum ScreenshotMode {
             for _ in 0..<60 where !userSession.isUserLoggedIn {
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
+            ScreenshotPrivacy.currentUserId = userSession.currentUserId
             try? await Task.sleep(nanoseconds: 7_000_000_000)
             await open(scene: env["MESA_SCREENSHOT_SCENE"] ?? "map", userSession: userSession, deepLinkViewModel: deepLinkViewModel)
         }
@@ -92,3 +94,27 @@ enum ScreenshotMode {
     }
 }
 #endif
+
+/// Privacy masking for App Store screenshots. Always false outside DEBUG screenshot runs.
+enum ScreenshotPrivacy {
+    static let isActive: Bool = {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-MesaScreenshotMode")
+        #else
+        return false
+        #endif
+    }()
+
+    /// The signed-in account (its own name stays real).
+    static var currentUserId: String?
+
+    private static let neutral = ["Sam", "Alex", "Jordan", "Taylor", "Riley", "Casey"]
+
+    /// Replaces another person's name with a stable neutral one during screenshot runs.
+    static func name(_ real: String, userId: String?) -> String {
+        guard isActive else { return real }
+        if let me = currentUserId, let id = userId, me.lowercased() == id.lowercased() { return real }
+        let key = (userId ?? real).lowercased().unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+        return neutral[key % neutral.count]
+    }
+}

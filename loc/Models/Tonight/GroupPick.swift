@@ -56,7 +56,7 @@ struct GroupPickMember: Codable, Equatable, Identifiable {
     /// "Grace" (first name), falling back to "Someone".
     var displayName: String {
         let first = (firstName ?? "").trimmingCharacters(in: .whitespaces)
-        return first.isEmpty ? "Someone" : first
+        return ScreenshotPrivacy.name(first.isEmpty ? "Someone" : first, userId: userId)
     }
 
     /// This person's vote on a place, if any.

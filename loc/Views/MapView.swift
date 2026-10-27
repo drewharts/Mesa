@@ -147,7 +147,7 @@ struct MapView: View {
     private func annotationImage(for item: MapAnnotationItem, isSelected: Bool) -> UIImage? {
         switch item.layer {
         case .network(let annotation):
-            if mapViewModel.showEmojiAnnotations {
+            if mapViewModel.showEmojiAnnotations || ScreenshotPrivacy.isActive {
                 return MapMarkerImageFactory.shared.emojiCircleImage(placeType: annotation.placeType, isSelected: isSelected)
             }
             if let baked = mapViewModel.annotationImages[annotation.id] {
