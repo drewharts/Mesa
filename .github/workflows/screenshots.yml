@@ -87,7 +87,7 @@ jobs:
           if [ -z "$TEST_RUNNER_MESA_DEMO_EMAIL" ]; then echo "::warning::MESA_DEMO_EMAIL secret not set; only signed-out screens will be captured"; fi
           xcodebuild test-without-building -project loc.xcodeproj -scheme loc -destination "id=$UDID" \
             -derivedDataPath /tmp/dd -only-testing:locUITests/ScreenshotTests \
-            -parallel-testing-enabled NO -test-repetition-relaunch-enabled NO \
+            -parallel-testing-enabled NO \
             -resultBundlePath /tmp/shots.xcresult | tail -n 30 || true
 
       - name: Export attachments
@@ -106,6 +106,7 @@ jobs:
                   base = name.split("_0_")[0] if "_0_" in name else os.path.splitext(name)[0]
                   os.rename(src, base + ".png")
           PY
+          ls *.png >/dev/null 2>&1 || { echo "::error::no screenshots captured"; exit 1; }
           for f in *.png; do echo "$f $(sips -g pixelWidth -g pixelHeight "$f" | awk '/pixel/{printf $2" "}')"; done
 
       - uses: actions/upload-artifact@v4
