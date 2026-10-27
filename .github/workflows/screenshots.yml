@@ -5,6 +5,9 @@ name: App Store screenshots
 # captures each scene with locUITests/ScreenshotTests. Read-only against production:
 # the screenshot flow only signs in and views; it never writes app data.
 on:
+  # workflow_dispatch only works once this file is on main; until then push to 'screenshots'.
+  push:
+    branches: [screenshots]
   workflow_dispatch:
     inputs:
       pick_id:
@@ -77,9 +80,9 @@ jobs:
         env:
           TEST_RUNNER_MESA_DEMO_EMAIL: ${{ secrets.MESA_DEMO_EMAIL }}
           TEST_RUNNER_MESA_DEMO_PASSWORD: ${{ secrets.MESA_DEMO_PASSWORD }}
-          TEST_RUNNER_SCREENSHOT_PICK_ID: ${{ inputs.pick_id }}
-          TEST_RUNNER_SCREENSHOT_LIST_ID: ${{ inputs.list_id }}
-          TEST_RUNNER_SCREENSHOT_PLACE_ID: ${{ inputs.place_id }}
+          TEST_RUNNER_SCREENSHOT_PICK_ID: ${{ inputs.pick_id || vars.SCREENSHOT_PICK_ID }}
+          TEST_RUNNER_SCREENSHOT_LIST_ID: ${{ inputs.list_id || vars.SCREENSHOT_LIST_ID }}
+          TEST_RUNNER_SCREENSHOT_PLACE_ID: ${{ inputs.place_id || vars.SCREENSHOT_PLACE_ID }}
         run: |
           if [ -z "$TEST_RUNNER_MESA_DEMO_EMAIL" ]; then echo "::warning::MESA_DEMO_EMAIL secret not set; only signed-out screens will be captured"; fi
           xcodebuild test-without-building -project loc.xcodeproj -scheme loc -destination "id=$UDID" \
