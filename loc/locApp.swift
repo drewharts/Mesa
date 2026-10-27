@@ -213,6 +213,9 @@ struct locApp: App {
                     checkForSharedContentURL()
                     // Pick up imports that were still running when the app was closed
                     ImportTracker.shared.resumePending()
+                    #if DEBUG
+                    ScreenshotMode.start(userSession: userSession, deepLinkViewModel: deepLinkViewModel)
+                    #endif
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
                     // Check for shared content URLs when app becomes active

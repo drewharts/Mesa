@@ -49,6 +49,9 @@ final class NotificationPermissionService {
     /// notifications on success. Returns whether notifications are allowed afterwards.
     @discardableResult
     func requestIfNeeded(context: String) async -> Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-MesaScreenshotMode") { return false }
+        #endif
         switch await authorizationStatus() {
         case .authorized, .provisional, .ephemeral:
             UIApplication.shared.registerForRemoteNotifications()

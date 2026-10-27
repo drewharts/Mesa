@@ -1,0 +1,108 @@
+name: App Store screenshots
+
+# Manually triggered. Builds the DEBUG app for the iOS Simulator, signs in the demo
+# account (secrets MESA_DEMO_EMAIL / MESA_DEMO_PASSWORD) via -MesaScreenshotMode, and
+# captures each scene with locUITests/ScreenshotTests. Read-only against production:
+# the screenshot flow only signs in and views; it never writes app data.
+on:
+  workflow_dispatch:
+    inputs:
+      pick_id:
+        description: Group pick id for the pick-result shot (optional)
+        required: false
+      list_id:
+        description: List id for the list shot (optional)
+        required: false
+      place_id:
+        description: Place id for the place-page shot (optional)
+        required: false
+
+jobs:
+  capture:
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - size: "6.9"
+            device: "iPhone 17 Pro Max"
+          - size: "6.5"
+            device: "iPhone 11 Pro Max"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Write Secrets.xcconfig
+        env:
+          GMS_API_KEY: ${{ secrets.GMS_API_KEY }}
+        # PostHog left empty so screenshot runs don't pollute analytics.
+        run: printf 'GMS_API_KEY = %s\nPOSTHOG_API_KEY = \n' "$GMS_API_KEY" > Secrets.xcconfig
+
+      - name: Create and boot simulator
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "import json,sys;r=[x for x in json.load(sys.stdin)['runtimes'] if x['platform']=='iOS' and x['isAvailable']];print(sorted(r,key=lambda x:x['version'])[-1]['identifier'])")
+          TYPE=$(xcrun simctl list devicetypes -j | python3 -c "import json,sys;d=[x for x in json.load(sys.stdin)['devicetypes'] if x['name']=='${{ matrix.device }}'];print(d[0]['identifier'] if d else '')")
+          if [ -z "$TYPE" ]; then echo "Device type '${{ matrix.device }}' unavailable"; xcrun simctl list devicetypes | grep iPhone; exit 1; fi
+          UDID=$(xcrun simctl create "Shots ${{ matrix.size }}" "$TYPE" "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          # Union Square, NYC
+          xcrun simctl location "$UDID" set 40.7359,-73.9911
+          xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          xcrun simctl ui "$UDID" appearance light
+
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing -project loc.xcodeproj -scheme loc -configuration Debug \
+            -destination "id=$UDID" -derivedDataPath /tmp/dd CODE_SIGNING_ALLOWED=NO | tail -n 40
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Install app and pre-grant permissions
+        run: |
+          APP=$(ls -d /tmp/dd/Build/Products/Debug-iphonesimulator/loc.app)
+          BID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl privacy "$UDID" grant location "$BID"
+          xcrun simctl privacy "$UDID" grant location-always "$BID" || true
+          xcrun simctl privacy "$UDID" grant photos "$BID" || true
+
+      - name: Capture screenshots
+        env:
+          TEST_RUNNER_MESA_DEMO_EMAIL: ${{ secrets.MESA_DEMO_EMAIL }}
+          TEST_RUNNER_MESA_DEMO_PASSWORD: ${{ secrets.MESA_DEMO_PASSWORD }}
+          TEST_RUNNER_SCREENSHOT_PICK_ID: ${{ inputs.pick_id }}
+          TEST_RUNNER_SCREENSHOT_LIST_ID: ${{ inputs.list_id }}
+          TEST_RUNNER_SCREENSHOT_PLACE_ID: ${{ inputs.place_id }}
+        run: |
+          if [ -z "$TEST_RUNNER_MESA_DEMO_EMAIL" ]; then echo "::warning::MESA_DEMO_EMAIL secret not set; only signed-out screens will be captured"; fi
+          xcodebuild test-without-building -project loc.xcodeproj -scheme loc -destination "id=$UDID" \
+            -derivedDataPath /tmp/dd -only-testing:locUITests/ScreenshotTests \
+            -resultBundlePath /tmp/shots.xcresult | tail -n 30 || true
+
+      - name: Export attachments
+        run: |
+          mkdir -p "/tmp/out/${{ matrix.size }}"
+          xcrun xcresulttool export attachments --path /tmp/shots.xcresult --output-path "/tmp/out/${{ matrix.size }}"
+          cd "/tmp/out/${{ matrix.size }}"
+          python3 - <<'PY'
+          import json, os
+          m = json.load(open("manifest.json"))
+          for t in m:
+              for a in t.get("attachments", []):
+                  src = a["exportedFileName"]; name = a.get("suggestedHumanReadableName", src)
+                  base = name.split("_0_")[0] if "_0_" in name else os.path.splitext(name)[0]
+                  os.rename(src, base + ".png")
+          PY
+          for f in *.png; do echo "$f $(sips -g pixelWidth -g pixelHeight "$f" | awk '/pixel/{printf $2" "}')"; done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.size }}
+          path: /tmp/out/${{ matrix.size }}/*.png
