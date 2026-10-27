@@ -643,6 +643,7 @@ struct MainView: View {
                             .background(.ultraThinMaterial)
                             .clipShape(Circle())
                             .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .accessibilityIdentifier("recenterMapButton")
                             .shadow(radius: 4)
                     }
 

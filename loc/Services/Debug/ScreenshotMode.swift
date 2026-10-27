@@ -50,33 +50,44 @@ enum ScreenshotMode {
             for _ in 0..<60 where !userSession.isUserLoggedIn {
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            open(scene: env["MESA_SCREENSHOT_SCENE"] ?? "map", userSession: userSession, deepLinkViewModel: deepLinkViewModel)
+            try? await Task.sleep(nanoseconds: 7_000_000_000)
+            await open(scene: env["MESA_SCREENSHOT_SCENE"] ?? "map", userSession: userSession, deepLinkViewModel: deepLinkViewModel)
         }
     }
 
-    private static func open(scene: String, userSession: UserSession, deepLinkViewModel: DeepLinkViewModel) {
+    private static func open(scene: String, userSession: UserSession, deepLinkViewModel: DeepLinkViewModel) async {
         let parts = scene.split(separator: ":", maxSplits: 1).map(String.init)
         let kind = parts.first ?? "map"
         let arg = parts.count > 1 ? parts[1] : ""
         switch kind {
-        case "tonight":
-            NotificationManager.shared.pendingSheet = .tonight
-        case "trips":
-            NotificationManager.shared.pendingSheet = .tripsList
-        case "pick":
-            NotificationManager.shared.pendingSheet = .groupPick(pickId: arg)
-        case "place", "list":
-            if let url = URL(string: "loc://\(kind)/\(arg)") {
-                Task { await deepLinkViewModel.processIncomingURL(url) }
-            }
+        case "tonight": await present(.tonight)
+        case "trips": await present(.tripsList)
+        case "pick": await present(.groupPick(pickId: arg))
+        case "list": await present(.list(listId: arg))
+        case "place":
+            struct P: Decodable { let name: String }
+            let rows: [P] = (try? await SupabaseManager.shared.client
+                .from("places").select("name").eq("id", value: arg).limit(1).execute().value) ?? []
+            var c = URLComponents(string: "loc://place/\(arg)")!
+            c.queryItems = [URLQueryItem(name: "name", value: rows.first?.name ?? "Place")]
+            if let url = c.url { await deepLinkViewModel.processIncomingURL(url) }
         case "profile":
             let id = arg.isEmpty ? (userSession.currentUserId ?? "") : arg
             if let url = URL(string: "loc://profile/\(id)") {
-                Task { await deepLinkViewModel.processIncomingURL(url) }
+                await deepLinkViewModel.processIncomingURL(url)
             }
         default:
             break // "map": the home map / map-first list view
+        }
+    }
+
+    /// Presents a sheet and re-presents it if launch-time UI dismisses it.
+    private static func present(_ sheet: AppSheetType) async {
+        for _ in 0..<5 {
+            if PresentationService.shared.activeSheet != sheet {
+                PresentationService.shared.present(sheet)
+            }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
     }
 }

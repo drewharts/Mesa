@@ -77,6 +77,9 @@ final class ScreenshotTests: XCTestCase {
             app.launchEnvironment["MESA_DEMO_EMAIL"] = env["MESA_DEMO_EMAIL"] ?? ""
             app.launchEnvironment["MESA_DEMO_PASSWORD"] = env["MESA_DEMO_PASSWORD"] ?? ""
             app.launch()
+            // Center the map on the simulated location (Union Square) before any sheet opens.
+            let recenter = app.buttons["recenterMapButton"]
+            if recenter.waitForExistence(timeout: 40) { recenter.tap() }
             // Let sign-in, data load, sheet presentation and image loading settle.
             sleep(UInt32(env["SCREENSHOT_SETTLE_SECONDS"] ?? "20") ?? 20)
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
