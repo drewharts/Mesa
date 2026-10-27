@@ -99,6 +99,8 @@ final class GroupPickViewModel: ObservableObject {
     var waitingText: String? {
         guard let pick, !pick.isDecided else { return nil }
         if !pick.hasVotedOnAll(userId: userId) { return "Tap 👍 or 👎 on each place" }
+        // The members strip already says who it's waiting on.
+        if !pick.members.isEmpty { return nil }
         let pending = pick.pendingMembers(excluding: userId)
         guard !pending.isEmpty else { return "You've voted. Waiting for the others." }
         let names = pending.map(\.displayName)

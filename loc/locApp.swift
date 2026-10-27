@@ -410,7 +410,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         // Don't pop a banner for an import the user is already watching finish.
         // ...or for a group pick update the user is already looking at (the sheet refreshes itself).
         let pushType = userInfo["type"] as? String
-        let pushPickId = userInfo["pickId"] as? String
+        let pushPickId = (userInfo["pickId"] as? String) ?? (userInfo["pick_id"] as? String)
         Task { @MainActor in
             if ImportTracker.shared.shouldSuppressForegroundNotification(userInfo: userInfo) {
                 completionHandler([])
@@ -436,11 +436,12 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
             }
         }
         // Group pick: decided, invited, waiting on you, or new options. Open the pick (result screen if decided).
-        else if let type, type.hasPrefix("group_pick_"), let pickId = userInfo["pickId"] as? String {
+        else if let type, type.hasPrefix("group_pick_") {
+            let pickId = (userInfo["pickId"] as? String) ?? (userInfo["pick_id"] as? String)
             Task { @MainActor in
-                Analytics.track(.groupPickPushOpened, ["type": type])
-                PresentationService.shared.present(.groupPick(pickId: pickId))
+                Analytics.track(.groupPickPushOpened, ["type": type, "has_pick_id": pickId != nil])
             }
+            NotificationManager.shared.handleGroupPickNotificationTap(pickId: pickId)
         }
         // Handle follow notifications
         else if type == "follow", let userId = userInfo["userId"] as? String {
@@ -481,6 +482,10 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 placeId: placeId,
                 userId: reviewAuthorId
             )
+        }
+        // Any other push that carries an in-app link (newer server types): route it like a tapped link.
+        else if let link = userInfo["deepLink"] as? String, let url = URL(string: link) {
+            DispatchQueue.main.async { UIApplication.shared.open(url) }
         }
         
         completionHandler()

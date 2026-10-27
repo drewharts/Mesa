@@ -53,6 +53,12 @@ struct ContentView: View {
             .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
                 handleNotificationNavigation(pendingNavigation)
             }
+            .onReceive(notificationManager.$pendingSheet) { _ in
+                presentPendingSheetIfReady()
+            }
+            .onChange(of: isMainVisible) { _, _ in
+                presentPendingSheetIfReady()
+            }
             
             // LoginView overlays when not logged in
             if !userSession.isUserLoggedIn {
@@ -117,6 +123,21 @@ struct ContentView: View {
             }
         }    }
     
+    /// True once login and onboarding are done and the main screen is showing.
+    private var isMainVisible: Bool {
+        userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding
+    }
+
+    /// Opens a sheet queued by a push tap once the main screen is visible (cold start, session restore).
+    private func presentPendingSheetIfReady() {
+        guard isMainVisible, notificationManager.pendingSheet != nil else { return }
+        guard let sheet = notificationManager.takePendingSheet() else { return }
+        // Let MainView finish its first layout so the sheet isn't dropped during launch.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            PresentationService.shared.present(sheet)
+        }
+    }
+
     /// Processes a pending notification navigation by fetching the place and presenting its detail sheet.
     private func handleNotificationNavigation(_ pendingNavigation: PendingNavigation?) {
         guard let navigation = pendingNavigation else { return }
