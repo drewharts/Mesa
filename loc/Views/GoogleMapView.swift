@@ -105,6 +105,15 @@ struct GoogleMapView: UIViewRepresentable {
         /// a meaningless default location before the user's real location is even known yet.
         private var hasAppliedInitialCamera = false
         private var highlightedStableIds: Set<String> = []
+        private var clusterRenderer: GMUDefaultClusterRenderer?
+
+        /// The selected network/community pin is pulled OUT of the clusterer and drawn as its own
+        /// marker, so it can never be swallowed into a cluster badge, and gets the highlighted look.
+        private var selectionMarker: GMSMarker?
+        private var selectionStableId: String?
+        private var hasSelection = false
+        /// Opacity of every other pin while one place is selected.
+        private static let dimmedOpacity: Float = 0.5
 
         init(_ parent: GoogleMapView) {
             self.parent = parent
@@ -123,6 +132,7 @@ struct GoogleMapView: UIViewRepresentable {
             // (4) would leave 2-3 visually-overlapping pins rendered individually.
             renderer.minimumClusterSize = 2
             renderer.delegate = self
+            clusterRenderer = renderer
             clusterManager = GMUClusterManager(map: mapView, algorithm: algorithm, renderer: renderer)
             clusterManager.setMapDelegate(self)
         }
@@ -166,11 +176,59 @@ struct GoogleMapView: UIViewRepresentable {
         /// current item set is cheap (this is the same pattern Google's own sample code uses).
         /// Non-clusterable items (trip/userLocation) are still diffed precisely as plain markers.
         func syncAnnotations(_ newItems: [MapAnnotationItem], on mapView: GMSMapView) {
-            let newClusterable = newItems.filter(Self.isClusterable)
+            let selected = newItems.first { Self.isHighlightable($0) && parent.isAnnotationSelected($0) }
+            let newClusterable = newItems.filter { Self.isClusterable($0) && $0.stableId != selected?.stableId }
             let newDirect = newItems.filter { !Self.isClusterable($0) }
 
             syncClusterableItems(newClusterable)
             syncDirectMarkers(newDirect, on: mapView)
+            syncSelectionMarker(selected, on: mapView)
+        }
+
+        /// Layers that get the highlighted selected-pin treatment (trip pins have their own).
+        private static func isHighlightable(_ item: MapAnnotationItem) -> Bool {
+            switch item.layer {
+            case .network, .community: return true
+            case .city, .trip, .userLocation: return false
+            }
+        }
+
+        // MARK: Selected pin
+
+        /// Draws (or clears) the dedicated selected-pin marker and dims every other pin.
+        private func syncSelectionMarker(_ item: MapAnnotationItem?, on mapView: GMSMapView) {
+            let nowHasSelection = item != nil
+            if item?.stableId == selectionStableId, selectionMarker != nil || item == nil {
+                if let item, let marker = selectionMarker { marker.position = item.coordinate }
+                if nowHasSelection != hasSelection { hasSelection = nowHasSelection; applyDimming() }
+                return
+            }
+            selectionMarker?.map = nil
+            selectionMarker = nil
+            selectionStableId = item?.stableId
+
+            var created = false
+            if let item, let base = parent.annotationImageProvider(item, false) {
+                let marker = GMSMarker(position: item.coordinate)
+                marker.userData = item
+                let pin = SelectedPinView(base: base, bottomAnchored: { if case .network = item.layer { return true } else { return false } }())
+                marker.iconView = pin
+                marker.groundAnchor = pin.groundAnchor
+                marker.tracksViewChanges = true   // lets the pulse animation render; only one marker does this
+                marker.zIndex = 1000
+                marker.map = mapView
+                selectionMarker = marker
+                created = true
+            }
+            // Only dim the rest of the map if the selected pin was actually drawn.
+            hasSelection = created
+            applyDimming()
+        }
+
+        /// Fades every clustered pin/cluster badge while a place is selected so the selected pin stands out.
+        private func applyDimming() {
+            let opacity: Float = hasSelection ? Self.dimmedOpacity : 1
+            clusterRenderer?.markers.forEach { $0.opacity = opacity }
         }
 
         /// Whether this layer participates in GMUClusterManager's clustering.
@@ -400,6 +458,7 @@ struct GoogleMapView: UIViewRepresentable {
             }
             guard newHighlighted != highlightedStableIds else { return }
             highlightedStableIds = newHighlighted
+            applyDimming()
 
             clusterManager.cluster()
             for (_, marker) in directMarkersById {
@@ -417,6 +476,7 @@ struct GoogleMapView: UIViewRepresentable {
             if let cluster = marker.userData as? GMUCluster {
                 marker.icon = MapMarkerImageFactory.shared.clusterImage(count: Int(cluster.count))
                 marker.groundAnchor = CGPoint(x: 0.5, y: 0.5)
+                marker.opacity = hasSelection ? Self.dimmedOpacity : 1
                 marker.zIndex = 1
                 return
             }
@@ -437,6 +497,7 @@ struct GoogleMapView: UIViewRepresentable {
                 marker.groundAnchor = CGPoint(x: 0.5, y: 0.5)
             }
             marker.zIndex = isSelected ? 2 : 0
+            marker.opacity = hasSelection ? Self.dimmedOpacity : 1
         }
 
         // MARK: GMSMapViewDelegate — tap routing
