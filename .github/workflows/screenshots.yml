@@ -87,6 +87,7 @@ jobs:
           if [ -z "$TEST_RUNNER_MESA_DEMO_EMAIL" ]; then echo "::warning::MESA_DEMO_EMAIL secret not set; only signed-out screens will be captured"; fi
           xcodebuild test-without-building -project loc.xcodeproj -scheme loc -destination "id=$UDID" \
             -derivedDataPath /tmp/dd -only-testing:locUITests/ScreenshotTests \
+            -parallel-testing-enabled NO -test-repetition-relaunch-enabled NO \
             -resultBundlePath /tmp/shots.xcresult | tail -n 30 || true
 
       - name: Export attachments
@@ -100,6 +101,8 @@ jobs:
           for t in m:
               for a in t.get("attachments", []):
                   src = a["exportedFileName"]; name = a.get("suggestedHumanReadableName", src)
+                  if not src.lower().endswith(".png") or not name[:2].isdigit():
+                      os.remove(src); continue
                   base = name.split("_0_")[0] if "_0_" in name else os.path.splitext(name)[0]
                   os.rename(src, base + ".png")
           PY
