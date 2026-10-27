@@ -13,8 +13,8 @@ enum ListSheetDetent: String, CaseIterable {
     case half
     case full
 
-    /// Height of the collapsed sheet: drag handle, list title and place count.
-    static let peekHeight: CGFloat = 160
+    /// Height of the collapsed sheet: drag handle, list title and a horizontal row of square photo tiles.
+    static let peekHeight: CGFloat = 330
 
     /// Detent used when a list opens.
     static let `default`: ListSheetDetent = .half

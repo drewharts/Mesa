@@ -118,6 +118,8 @@ struct ListPlaceRowView: View {
 struct ListPlaceThumbnail: View {
     let place: LightweightPlace
     let size: CGFloat
+    var cornerRadius: CGFloat = 10
+    var showsShadow: Bool = true
 
     @ObservedObject private var externalMetadataCache = ExternalMetadataCache.shared
     @State private var failedUrls = Set<String>()
@@ -160,12 +162,12 @@ struct ListPlaceThumbnail: View {
             }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.gray.opacity(showsShadow ? 0.2 : 0), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+        .shadow(color: Color.black.opacity(showsShadow ? 0.08 : 0), radius: 6, x: 0, y: 3)
         .onAppear {
             // Kick off the external thumbnail fetch so it replaces the placeholder when ready.
             if let contentUrl = place.content_url,
