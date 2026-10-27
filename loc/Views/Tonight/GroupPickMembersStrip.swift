@@ -14,8 +14,16 @@ struct GroupPickMembersStrip: View {
 
     private var waiting: Set<String> { Set(pick.waitingOn.map { $0.lowercased() }) }
 
+    /// Once a pick is decided, anyone who voted counts as done: an early decision
+    /// (e.g. unanimous yes) can leave places nobody needed to vote on, and the server's
+    /// waiting_on still lists those members.
+    private func isDone(_ member: GroupPickMember) -> Bool {
+        if pick.isDecided { return member.votedCount > 0 || !waiting.contains(member.userId.lowercased()) }
+        return !waiting.contains(member.userId.lowercased())
+    }
+
     private var doneCount: Int {
-        pick.members.filter { !waiting.contains($0.userId.lowercased()) }.count
+        pick.members.filter(isDone).count
     }
 
     private var waitingLine: String? {
@@ -58,7 +66,7 @@ struct GroupPickMembersStrip: View {
     }
 
     private func avatar(_ member: GroupPickMember) -> some View {
-        let done = !waiting.contains(member.userId.lowercased())
+        let done = isDone(member)
         return Text(String(member.displayName.prefix(1)).uppercased())
             .font(.caption.weight(.bold))
             .foregroundColor(.white)
