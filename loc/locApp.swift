@@ -214,7 +214,7 @@ struct locApp: App {
                     // Pick up imports that were still running when the app was closed
                     ImportTracker.shared.resumePending()
                     #if DEBUG
-                    ScreenshotMode.start(userSession: userSession, deepLinkViewModel: deepLinkViewModel)
+                    ScreenshotMode.start(userSession: userSession, deepLinkViewModel: deepLinkViewModel, dataManager: dataManager)
                     #endif
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in

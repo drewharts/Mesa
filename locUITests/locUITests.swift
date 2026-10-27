@@ -78,7 +78,7 @@ final class ScreenshotTests: XCTestCase {
             app.launchEnvironment["MESA_DEMO_PASSWORD"] = env["MESA_DEMO_PASSWORD"] ?? ""
             app.launch()
             // Let sign-in, data load, sheet presentation and image loading settle.
-            sleep(UInt32(env["SCREENSHOT_SETTLE_SECONDS"] ?? "14") ?? 14)
+            sleep(UInt32(env["SCREENSHOT_SETTLE_SECONDS"] ?? "20") ?? 20)
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = name
             shot.lifetime = .keepAlways

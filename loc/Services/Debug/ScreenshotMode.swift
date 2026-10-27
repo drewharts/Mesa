@@ -24,14 +24,24 @@ enum ScreenshotMode {
     private static var env: [String: String] { ProcessInfo.processInfo.environment }
 
     /// Signs in the demo account (if no session) and opens the requested scene once the main screen is up.
-    static func start(userSession: UserSession, deepLinkViewModel: DeepLinkViewModel) {
+    static func start(userSession: UserSession, deepLinkViewModel: DeepLinkViewModel, dataManager: DataManager) {
         guard isActive else { return }
         Task { @MainActor in
             if !userSession.isUserLoggedIn,
                let email = env["MESA_DEMO_EMAIL"], !email.isEmpty,
                let password = env["MESA_DEMO_PASSWORD"], !password.isEmpty {
                 do {
-                    _ = try await ServiceContainer.shared.authService.signIn(email: email, password: password)
+                    let session = try await ServiceContainer.shared.authService.signIn(email: email, password: password)
+                    // Same post-auth step as LoginViewModel: resolve the app user row, then begin the session.
+                    struct Row: Decodable { let id: String }
+                    let authId = session.user.id.uuidString
+                    let rows: [Row] = try await SupabaseManager.shared.client
+                        .from("users").select("id")
+                        .or("supabase_uid.eq.\(authId),supabase_uid.eq.\(authId.lowercased())")
+                        .limit(1).execute().value
+                    let uid = rows.first?.id ?? authId
+                    await userSession.beginSession(uid: uid)
+                    await dataManager.initializeProfileData(userId: uid)
                 } catch {
                     print("[ScreenshotMode] demo sign-in failed")
                 }
