@@ -51,6 +51,8 @@ struct ImportJob {
     let totalFound: Int
     let places: [ImportJobPlace]
     let error: String?
+    /// The video URL this job imports (nil from older backends).
+    var url: String? = nil
 
     /// Places that were saved successfully and have full details.
     var savedPlaces: [DetailPlace] {

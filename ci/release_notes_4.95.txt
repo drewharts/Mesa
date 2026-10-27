@@ -1,0 +1,7 @@
+What's new in Mesa 4.95:
+
+• Tonight: three instant picks from your and your friends' saves, plus one-tap group picks.
+• A cleaner bottom bar: Search, Tonight, Trips and Profile.
+• TikTok imports now keep going in the background, and we'll notify you when your place is found.
+• Save imported places to a list from a single screen, in one tap.
+• The selected pin on the map is now much easier to spot.
