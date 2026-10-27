@@ -23,8 +23,6 @@ struct ProfileViewListsView: View {
     @State private var showingNewListSheet = false
     @State private var showingCreateTrip = false
     @State private var showingGoogleMapsImport = false
-    @State private var selectedListIndex: Int? = nil
-    @State private var pendingMapListId: String? = nil
 
     private let listColumns = [
         GridItem(.flexible(), spacing: 12),
@@ -84,26 +82,14 @@ struct ProfileViewListsView: View {
                 presentationMode.wrappedValue.dismiss()
             }
         }
-        .sheet(item: Binding<ListCardIndex?>(
-            get: { selectedListIndex.map { ListCardIndex(value: $0) } },
-            set: { selectedListIndex = $0?.value }
-        ), onDismiss: {
-            guard let listId = pendingMapListId else { return }
-            pendingMapListId = nil
-            profile.selectedListIdForMap = listId
-            presentationMode.wrappedValue.dismiss()
-        }) { item in
-            LightweightListPopupView(
-                lists: listsVM.filteredPlaceLists,
-                initialListIndex: item.value,
-                listsVM: listsVM,
-                reviewsVM: profile.reviewsViewModel,
-                onViewOnMap: {
-                    pendingMapListId = listsVM.filteredPlaceLists[item.value].list_id
-                    selectedListIndex = nil
-                }
-            )
-        }
+    }
+
+    // MARK: - Open List
+
+    /// Opens a list map-first: the profile closes and the map shows the list's pins with the list sheet.
+    private func openListOnMap(at index: Int) {
+        guard listsVM.filteredPlaceLists.indices.contains(index) else { return }
+        profile.selectedListIdForMap = listsVM.filteredPlaceLists[index].list_id
     }
 
     // MARK: - Search Bar Tap Target
@@ -151,7 +137,7 @@ struct ProfileViewListsView: View {
                 listsVM: listsVM,
                 placeColors: $placeColors,
                 userId: profile.user?.id ?? "",
-                onListTap: { index in selectedListIndex = index }
+                onListTap: { index in openListOnMap(at: index) }
             )
         } else {
             createListTile

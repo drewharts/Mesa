@@ -401,7 +401,7 @@ struct MainView: View {
             }
         }
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -464,7 +464,7 @@ struct MainView: View {
             }
         }
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 

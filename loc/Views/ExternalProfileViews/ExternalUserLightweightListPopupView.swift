@@ -26,6 +26,11 @@ struct ExternalUserLightweightListPopupView: View {
     /// Observed for pending place navigation when map annotation is tapped while sheet is open.
     @ObservedObject private var presentationService = PresentationService.shared
 
+    /// Map-first coordination: sheet height, focused place, camera requests.
+    @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
+    /// Category/neighborhood line data for rows.
+    @ObservedObject private var placeMeta = ListPlaceMetaStore.shared
+
     @State private var navigationPath = NavigationPath()
     @State private var hasInitiallyAppeared = false
 
@@ -42,23 +47,82 @@ struct ExternalUserLightweightListPopupView: View {
             }
         }
         .onReceive(presentationService.$pendingPlaceNavigation.compactMap { $0 }) { placeId in
-            // When map annotation is tapped while list sheet is open, replace the current place detail.
+            // When a map pin is tapped while the list sheet is open, highlight and scroll to its row.
             // Uses onReceive (Combine) instead of onChange for reliable delivery even when
             // a navigation destination is pushed on the stack.
-            var newPath = NavigationPath()
-            newPath.append(placeId)
-            navigationPath = newPath
             presentationService.pendingPlaceNavigation = nil
+            handleMapPinTap(placeId)
         }
         .onAppear {
             // Clear navigation path only on the first appearance (when the sheet opens).
             guard !hasInitiallyAppeared else { return }
             hasInitiallyAppeared = true
             navigationPath = NavigationPath()
+            sheetVM.beginSession(
+                listId: viewModel.currentList.list_id,
+                placeCount: viewModel.currentList.place_count,
+                isExternal: true,
+                source: "external_map_sheet"
+            )
+        }
+        .onDisappear {
+            sheetVM.endSession()
         }
         .task {
             await viewModel.loadPlacesIfNeeded()
+            sheetVM.fitToPlaces(viewModel.currentPlaces)
+            placeMeta.prefetchCities(for: viewModel.currentPlaces)
         }
+    }
+
+    // MARK: - Map-First Actions
+
+    /// Row tap: highlight and center its pin. Tapping the already-selected row opens its details.
+    private func handleRowTap(_ place: LightweightPlace) {
+        if sheetVM.isFocused(place.place_id) {
+            openPlaceDetail(place)
+        } else {
+            sheetVM.focus(place: place, source: .row)
+        }
+    }
+
+    /// Opens the place page inside the sheet and selects the place on the map.
+    private func openPlaceDetail(_ place: LightweightPlace) {
+        sheetVM.ensureAtLeastHalf()
+        navigationPath.append(place.place_id)
+        Task {
+            guard let fetched = try? await PlaceService.shared.fetchPlace(withId: place.place_id) else { return }
+            selectedPlaceVM.selectPlaceAndFetchDetails(fetched, shouldAnimateMap: true)
+        }
+    }
+
+    /// Pin tap: scroll to and highlight the row; a second tap on the same pin opens its details.
+    /// While a place page is open, a pin tap swaps to that place (previous behavior).
+    private func handleMapPinTap(_ placeId: String) {
+        let tapped = viewModel.currentPlaces.first {
+            $0.place_id.caseInsensitiveCompare(placeId) == .orderedSame
+        }
+        let isShowingDetail = !navigationPath.isEmpty
+        guard let tapped else {
+            replaceDetail(with: placeId)
+            return
+        }
+        if isShowingDetail {
+            sheetVM.focus(place: tapped, source: .pin)
+            replaceDetail(with: tapped.place_id)
+        } else if sheetVM.isFocused(tapped.place_id) {
+            replaceDetail(with: tapped.place_id)
+        } else {
+            sheetVM.focus(place: tapped, source: .pin)
+        }
+    }
+
+    /// Replaces the navigation stack with a single place page.
+    private func replaceDetail(with placeId: String) {
+        sheetVM.ensureAtLeastHalf()
+        var newPath = NavigationPath()
+        newPath.append(placeId)
+        navigationPath = newPath
     }
 
     // MARK: - Popup Header
@@ -78,7 +142,7 @@ struct ExternalUserLightweightListPopupView: View {
                 Text(viewModel.currentList.name)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.black)
+                    .foregroundColor(.primary)
 
                 Text("\(viewModel.currentList.place_count) place\(viewModel.currentList.place_count == 1 ? "" : "s")")
                     .font(.caption)
@@ -116,17 +180,10 @@ struct ExternalUserLightweightListPopupView: View {
             set: { viewModel.onListIndexChanged($0) }
         )) {
             ForEach(viewModel.lists.indices, id: \.self) { index in
-                ExternalUserLightweightListContentScrollView(
-                    list: viewModel.lists[index],
+                placesList(
                     places: viewModel.places(forListAt: index),
                     isLoading: viewModel.isLoading(forListAt: index),
-                    onNavigateToPlace: { placeId in
-                        navigationPath.append(placeId)
-                        Task {
-                            guard let place = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
-                            selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-                        }
-                    }
+                    showAddedBy: viewModel.lists[index].isCollaborative
                 )
                 .tag(index)
             }
@@ -135,81 +192,28 @@ struct ExternalUserLightweightListPopupView: View {
     }
 
     private var singleListScrollView: some View {
-        ExternalUserLightweightListContentScrollView(
-            list: viewModel.currentList,
+        placesList(
             places: viewModel.currentPlaces,
             isLoading: viewModel.isLoadingPlaces,
-            onNavigateToPlace: { placeId in
-                navigationPath.append(placeId)
-                Task {
-                    guard let place = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
-                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-                }
-            }
+            showAddedBy: viewModel.currentList.isCollaborative
         )
     }
-}
 
-// MARK: - External User Lightweight List Content Scroll View
-
-/// Displays the scrollable content for an external user's list.
-struct ExternalUserLightweightListContentScrollView: View {
-    let list: LightweightPlaceList
-    let places: [LightweightPlace]
-    let isLoading: Bool
-    let onNavigateToPlace: ((String) -> Void)?
-
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
-    var body: some View {
-        if isLoading && places.isEmpty {
-            loadingView
-        } else if !places.isEmpty {
-            placesGrid
-        } else {
-            emptyState
-        }
-    }
-
-    private var loadingView: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            ProgressView()
-                .scaleEffect(1.2)
-            Text("Loading places...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var placesGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(Array(places.enumerated()), id: \.element.id) { _, place in
-                    PopupPlaceCard(
-                        place: place,
-                        preferExternalThumbnail: true,
-                        onNavigate: onNavigateToPlace
-                    )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Spacer()
-            Text("No places in this list")
-                .foregroundColor(.gray)
-            Spacer()
-        }
-        .padding(.vertical, 30)
+    /// Place rows for one list, wired to the map-first view model.
+    private func placesList(places: [LightweightPlace], isLoading: Bool, showAddedBy: Bool) -> some View {
+        ListPlacesScrollView(
+            places: places,
+            isLoadingInitial: isLoading,
+            isLoadingMore: false,
+            showAddedBy: showAddedBy,
+            focusedPlaceId: sheetVM.focusedPlaceId,
+            scrollRequest: sheetVM.scrollRequest,
+            locationText: { placeMeta.location(for: $0) },
+            onRowAppear: { placeMeta.requestNeighborhood(for: $0) },
+            onLoadMore: {},
+            onSelect: { handleRowTap($0) },
+            onOpenDetail: { openPlaceDetail($0) },
+            onRemove: nil
+        )
     }
 }
