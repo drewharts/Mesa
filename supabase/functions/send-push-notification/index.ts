@@ -261,6 +261,7 @@ serve(async (req) => {
               : 'Tap for directions.'
         }
         notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
         notificationData.placeId = record.place_id
         break
       }
@@ -270,6 +271,7 @@ serve(async (req) => {
         title = `${groupPickLabel(record.pick_title)}: you're in`
         body = `${inviter} wants your vote on where to go. Tap to vote.`
         notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
         break
       }
 
@@ -277,6 +279,7 @@ serve(async (req) => {
         title = `${groupPickLabel(record.pick_title)}: waiting on you`
         body = 'Everyone else has voted. Tap to pick so we can decide.'
         notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
         break
       }
 
@@ -286,6 +289,7 @@ serve(async (req) => {
         title = `${groupPickLabel(record.pick_title)}: new option${added === 1 ? '' : 's'}`
         body = `${adder} added ${added === 1 ? 'a place' : `${added} places`} to the vote. Tap to vote.`
         notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
         break
       }
 

@@ -69,6 +69,9 @@ struct GroupPickSheet: View {
                 ForEach(0..<3, id: \.self) { _ in TonightPickCardSkeleton() }
             }
         } else if let pick = viewModel.pick {
+            if !pick.members.isEmpty {
+                GroupPickMembersStrip(pick: pick, currentUserId: viewModel.currentUserId)
+            }
             if pick.hasWinner {
                 GroupPickResultView(
                     pick: pick,

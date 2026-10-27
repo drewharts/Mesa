@@ -8,6 +8,8 @@ class NotificationManager: ObservableObject {
     @Published var pendingNavigation: PendingNavigation?
     @Published var highlightedReviewId: String?
     @Published var pendingTripId: String?
+    /// A sheet to open once the main screen is visible (push taps that arrive during cold start or login restore).
+    @Published var pendingSheet: AppSheetType?
     
     private init() {}
     
@@ -54,6 +56,25 @@ class NotificationManager: ObservableObject {
                 userInfo: ["listId": listId]
             )
         }
+    }
+
+    /// Handles a group pick push tap: opens the pick (its result screen once decided), or Tonight
+    /// if the payload has no pick id. Queued so a cold-start tap still lands after the app is ready.
+    func handleGroupPickNotificationTap(pickId: String?) {
+        DispatchQueue.main.async {
+            if let pickId, !pickId.isEmpty {
+                self.pendingSheet = .groupPick(pickId: pickId)
+            } else {
+                self.pendingSheet = .tonight
+            }
+        }
+    }
+
+    /// Takes the queued sheet, if any.
+    func takePendingSheet() -> AppSheetType? {
+        let sheet = pendingSheet
+        pendingSheet = nil
+        return sheet
     }
 
     /// Handles trip notification tap by storing pending trip and presenting trips sheet.
