@@ -67,36 +67,5 @@ enum TonightVibe: String, CaseIterable, Identifiable, Codable {
         inferred(forHour: calendar.component(.hour, from: now))
     }
 
-    /// Strong category keywords (lowercased substrings) for this vibe.
-    var strongKeywords: [String] {
-        switch self {
-        case .coffee: return ["coffee", "cafe", "café", "espresso", "tea house", "bakery"]
-        case .lunch: return ["sandwich", "deli", "lunch", "salad", "taco", "burrito", "noodle", "ramen", "pho", "pizza", "bagel", "fast casual"]
-        case .dinner: return ["restaurant", "steak", "sushi", "italian", "bistro", "trattoria", "omakase", "brasserie", "tasting"]
-        case .drinks: return ["bar", "cocktail", "wine", "pub", "brewery", "beer", "speakeasy", "lounge", "tavern"]
-        case .lateNight: return ["bar", "club", "pizza", "diner", "taco", "late", "karaoke", "lounge", "night"]
-        }
-    }
-
-    /// Weaker, adjacent keywords that still fit this vibe.
-    var weakKeywords: [String] {
-        switch self {
-        case .coffee: return ["brunch", "breakfast", "dessert", "patisserie", "juice"]
-        case .lunch: return ["restaurant", "cafe", "bakery", "brunch", "food"]
-        case .dinner: return ["bar", "wine", "pizza", "ramen", "taco", "food"]
-        case .drinks: return ["restaurant", "bistro", "club", "rooftop"]
-        case .lateNight: return ["restaurant", "burger", "ramen", "food"]
-        }
-    }
-
-    /// Keywords that make a place a poor fit for this vibe.
-    var mismatchKeywords: [String] {
-        switch self {
-        case .coffee: return ["bar", "pub", "club", "steak", "cocktail"]
-        case .lunch: return ["club", "cocktail", "speakeasy"]
-        case .dinner: return ["coffee shop", "espresso", "juice"]
-        case .drinks: return ["coffee", "cafe", "bakery", "juice", "breakfast"]
-        case .lateNight: return ["coffee", "cafe", "bakery", "breakfast", "brunch"]
-        }
-    }
+    // Eligibility and fit per vibe live in TonightCategoryClassifier.
 }

@@ -120,12 +120,6 @@ struct ProfileView: View {
     private var mainContent: some View {
         ZStack {
             // Main Content
-            VStack(spacing: 0) {
-            ProfileShortcutsRow { sheet, item in
-                Analytics.track(.navTapped, ["item": item, "from": "profile"])
-                profile.pendingSheet = sheet
-                presentationMode.wrappedValue.dismiss()
-            }
             ProfileContentView(
                 socialVM: profile.socialViewModel,
                 myPlacesVM: profile.myPlacesViewModel,
@@ -136,7 +130,6 @@ struct ProfileView: View {
                 photoImportVM: photoImportVM,
                 navigationPath: $navigationPath
             )
-            }
             
             // Content Processing Overlay
             if externalContentVM.isProcessingContent || externalContentVM.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
@@ -251,16 +244,7 @@ struct ToolbarModifier: ViewModifier {
 
     private var trailingToolbarItems: some View {
         HStack(spacing: 16) {
-            // Share own profile button
-            if let user = profile.user {
-                ProfileShareButton(
-                    userId: user.id,
-                    fullName: user.fullName,
-                    profilePhotoURL: user.profilePhotoURL?.absoluteString,
-                    style: .toolbar
-                )
-            }
-
+            // Share Profile lives in the account menu (4.93) to keep the header to two icons.
             Button {
                 photoImportVM.handleImportButtonTap()
             } label: {

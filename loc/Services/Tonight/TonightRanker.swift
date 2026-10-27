@@ -6,26 +6,33 @@
 //  passed in, so it is cheap to re-run when the user changes the vibe chip
 //  and easy to unit test.
 //
-//  score = 0.35 * vibe fit      (place categories vs. the vibe's keywords)
+//  score = 0.35 * vibe fit      (TonightCategoryClassifier.fit: 0.7...1.0)
 //        + 0.30 * proximity     (1 / (1 + meters / 1200))
 //        + 0.15 * open now      (open 1.0, unknown hours 0.6, closing soon 0.5)
 //        + 0.20 * social proof  (you saved it +0.4, each friend who saved it +0.35, capped at 1)
-//  Places known to be closed right now, more than 25 km away, or a clear
-//  mismatch for the vibe (e.g. a cocktail bar for coffee) are dropped, unless
-//  that would leave fewer than 3 picks.
+//  Eligibility (hard rules, never relaxed to fill slots):
+//    * Only food & drink places (by category; names only rescue places whose
+//      categories are missing or generic). Shops, parks, museums, services: out.
+//    * Must fit the vibe per TonightCategoryClassifier (Dinner = restaurants only,
+//      Coffee = cafes/coffee shops only, Drinks = bars, Lunch = no bars/nightlife...).
+//    * Closed right now, temporarily/permanently closed, or > 50 km: out.
+//  If fewer than 3 eligible places are nearby the radius widens
+//  (3 km -> 8 km -> 20 km -> 50 km); if still fewer, fewer picks are shown.
 //
 
 import Foundation
 import CoreLocation
 
 struct TonightRanker {
-    static let maxDistanceMeters: Double = 25_000
+    static let maxDistanceMeters: Double = 50_000
+    /// Search radii tried in order until `resultCount` eligible picks are found.
+    static let radiusSteps: [Double] = [3_000, 8_000, 20_000, 50_000]
     static let resultCount = 3
 
     /// Generic category labels that say nothing about a place's vibe.
     static let genericCategories: Set<String> = [
         "restaurant", "restaurants", "food", "point_of_interest", "point of interest",
-        "establishment", "store", "premise", "place", "meal_takeaway", "meal_delivery"
+        "establishment", "store", "premise", "place", "meal takeaway", "meal delivery"
     ]
 
     let vibe: TonightVibe
@@ -36,27 +43,24 @@ struct TonightRanker {
     var usesMetric: Bool = Locale.current.measurementSystem != .us
     var openStatus: (DetailPlace) -> OpenStatus = { OpenStatusService.getStatus(for: $0) }
 
-    /// Returns the top picks for the candidates whose place details are known.
+    /// Returns up to `limit` eligible picks, widening the radius until enough are found.
     func rank(candidates: [TonightCandidate], places: [String: DetailPlace], limit: Int = TonightRanker.resultCount) -> [TonightPick] {
-        var preferred: [TonightPick] = []
-        var fallback: [TonightPick] = []
+        var eligible: [TonightPick] = []
         for candidate in candidates {
             guard let place = places[candidate.placeId.lowercased()] else { continue }
             let evaluation = evaluate(candidate: candidate, place: place)
-            switch evaluation.tier {
-            case .preferred: preferred.append(evaluation.pick)
-            case .fallback: fallback.append(evaluation.pick)
-            case .excluded: continue
-            }
+            if evaluation.tier == .preferred { eligible.append(evaluation.pick) }
         }
-        let sortedPreferred = preferred.sorted(by: Self.ordering)
-        if sortedPreferred.count >= limit { return Array(sortedPreferred.prefix(limit)) }
-        let fill = fallback.sorted(by: Self.ordering).prefix(limit - sortedPreferred.count)
-        return sortedPreferred + fill
+        for radius in Self.radiusSteps {
+            let within = eligible.filter { ($0.distanceMeters ?? 0) <= radius }
+            if within.count >= limit { return Array(within.sorted(by: Self.ordering).prefix(limit)) }
+        }
+        return Array(eligible.sorted(by: Self.ordering).prefix(limit))
     }
 
     // MARK: - Scoring
 
+    /// `.fallback` is no longer produced: ineligible places are never used to fill slots.
     enum Tier { case preferred, fallback, excluded }
 
     /// Scores a single candidate and decides whether it is eligible.
@@ -92,32 +96,31 @@ struct TonightRanker {
         if case .permanentlyClosed = status { return (pick, .excluded) }
         if case .temporarilyClosed = status { return (pick, .excluded) }
         if let distance, distance > Self.maxDistanceMeters { return (pick, .excluded) }
-        if hardClosed || vibeFit <= 0 { return (pick, .fallback) }
+        if !Self.isFoodOrDrink(place) { return (pick, .excluded) }
+        if hardClosed || vibeFit <= 0 { return (pick, .excluded) }
         return (pick, .preferred)
     }
 
-    /// Returns 0...1 for how well the place's categories fit the vibe (0 = clear mismatch).
+    /// Returns 0...1 for how well the place fits the vibe (0 = not eligible). See TonightCategoryClassifier.
     func vibeScore(for place: DetailPlace) -> Double {
-        let text = Self.categoryText(for: place)
-        let hasStrong = vibe.strongKeywords.contains { text.contains($0) }
-        let hasMismatch = vibe.mismatchKeywords.contains { text.contains($0) }
-        var score: Double
-        if hasStrong {
-            score = 1.0
-        } else if hasMismatch {
-            score = 0
-        } else if vibe.weakKeywords.contains(where: { text.contains($0) }) {
-            score = 0.55
-        } else {
-            score = text.isEmpty ? 0.3 : 0.2
-        }
-        switch vibe {
-        case .dinner where place.serversDinner == true: score = max(score, 0.75)
-        case .lunch where place.serversLunch == true: score = max(score, 0.75)
-        case .coffee where place.servesBreakfast == true: score = max(score, 0.5)
-        default: break
-        }
-        return score
+        TonightCategoryClassifier.fit(place, vibe: vibe)
+    }
+
+    // MARK: - Food & drink eligibility
+
+    /// True when the place is a restaurant, cafe, bar, bakery, etc. Shops, services, parks and
+    /// museums are excluded. Places with only generic categories qualify by name only.
+    static func isFoodOrDrink(_ place: DetailPlace) -> Bool {
+        !TonightCategoryClassifier.kinds(for: place).isEmpty
+    }
+
+    /// Joins strings into whole-word form (" wine bar | barber shop ").
+    static func tokenText(_ pieces: [String]) -> String {
+        pieces.map { TonightCategoryClassifier.tokenText($0) }.joined(separator: "|")
+    }
+
+    static func matches(_ tokenText: String, _ keyword: String) -> Bool {
+        TonightCategoryClassifier.matches(tokenText, keyword)
     }
 
     /// Returns 0...1 social proof: the user's own save counts, each friend who saved it counts more.
@@ -169,11 +172,9 @@ struct TonightRanker {
 
     // MARK: - Helpers
 
-    /// Returns lowercased, joined category text used for keyword matching.
+    /// Returns lowercased, joined category text (kept for callers/debugging).
     static func categoryText(for place: DetailPlace) -> String {
-        var pieces = place.categories ?? []
-        if let corrected = place.userCorrectedCategory { pieces.append(corrected) }
-        return pieces.map { $0.lowercased().replacingOccurrences(of: "_", with: " ") }.joined(separator: " | ")
+        TonightCategoryClassifier.categoryPieces(for: place).joined(separator: " | ")
     }
 
     /// Returns the first non-generic category, human-cased ("wine_bar" -> "Wine bar").

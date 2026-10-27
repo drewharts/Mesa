@@ -41,13 +41,159 @@ final class TonightRankerTests: XCTestCase {
         XCTAssertEqual(picks.first?.place.name, "Bar")
     }
 
-    func testClosedPlacesOnlyFillWhenNeeded() {
+    private func rank(_ vibe: TonightVibe, _ places: [DetailPlace], status: OpenStatus = .unknown) -> [TonightPick] {
+        let map = Dictionary(uniqueKeysWithValues: places.map { ($0.id.uuidString.lowercased(), $0) })
+        let candidates = places.map { TonightCandidate(placeId: $0.id.uuidString.lowercased(), saverIds: ["me"]) }
+        return ranker(vibe, status: status).rank(candidates: candidates, places: map)
+    }
+
+    func testClosedPlacesNeverFill() {
         let a = place(name: "A", categories: ["Wine bar"])
-        let picks = ranker(.drinks, status: .closed).rank(
-            candidates: [TonightCandidate(placeId: a.id.uuidString.lowercased(), saverIds: ["me"])],
-            places: [a.id.uuidString.lowercased(): a]
-        )
-        XCTAssertEqual(picks.count, 1)
+        XCTAssertTrue(rank(.drinks, [a], status: .closed).isEmpty)
+    }
+
+    /// Regression: "Suede" (a clothing store) was recommended for Lunch.
+    func testClothingStoreNeverRecommended() {
+        let suede = place(name: "Suede", categories: ["clothing_store", "establishment", "point_of_interest", "store"], dLat: 0.0005)
+        for vibe in TonightVibe.allCases {
+            XCTAssertTrue(rank(vibe, [suede]).isEmpty, "clothing store picked for \(vibe)")
+        }
+        let deli = place(name: "Deli", categories: ["Deli"], dLat: 0.01)
+        XCTAssertEqual(rank(.lunch, [suede, deli]).map(\.place.name), ["Deli"])
+    }
+
+    func testNonFoodPlacesExcluded() {
+        let others = [
+            place(name: "Golden Gate Park", categories: ["Park", "tourist_attraction"]),
+            place(name: "MoMA", categories: ["Museum"]),
+            place(name: "Cuts", categories: ["hair_care", "beauty_salon"]),
+            place(name: "Barber", categories: ["barber_shop"]),
+            place(name: "Vino Shop", categories: ["Wine store"]),
+            place(name: "Safeway", categories: ["grocery_or_supermarket", "food", "store"])
+        ]
+        for vibe in TonightVibe.allCases {
+            XCTAssertTrue(rank(vibe, others).isEmpty, "non-food picked for \(vibe)")
+        }
+    }
+
+    func testGenericOnlyCategoriesNeedFoodName() {
+        let vague = place(name: "Suede", categories: ["point_of_interest", "establishment"])
+        let pizza = place(name: "Joe's Pizza", categories: ["point_of_interest", "establishment", "food"])
+        let none = place(name: "Blue Bottle Coffee", categories: [])
+        XCTAssertEqual(rank(.lunch, [vague, pizza]).map(\.place.name), ["Joe's Pizza"])
+        XCTAssertEqual(rank(.coffee, [vague, none]).map(\.place.name), ["Blue Bottle Coffee"])
+    }
+
+    func testLunchExcludesBarsAndNightlife() {
+        let cocktail = place(name: "Bar", categories: ["Cocktail bar", "bar"])
+        let club = place(name: "Club", categories: ["night_club"])
+        let pub = place(name: "Pub", categories: ["Pub"])
+        let barGrill = place(name: "Grill", categories: ["Bar & grill", "restaurant"])
+        XCTAssertEqual(rank(.lunch, [cocktail, club, pub, barGrill]).map(\.place.name), ["Grill"])
+    }
+
+    func testMismatchesNeverFillAndFewerThanThreeIsOK() {
+        let bar = place(name: "Bar", categories: ["Cocktail bar"])
+        let cafe = place(name: "Cafe", categories: ["Coffee shop"])
+        let picks = rank(.coffee, [bar, cafe])
+        XCTAssertEqual(picks.map(\.place.name), ["Cafe"])
+    }
+
+    func testRadiusWidensWhenNearbyIsThin() {
+        let near = place(name: "Near", categories: ["Sandwich shop"], dLat: 0.005)   // ~0.5 km
+        let mid = place(name: "Mid", categories: ["Taco restaurant"], dLat: 0.1)      // ~11 km
+        let far = place(name: "Far", categories: ["Ramen restaurant"], dLat: 0.3)     // ~33 km
+        let tooFar = place(name: "TooFar", categories: ["Deli"], dLat: 0.6)           // ~67 km
+        let names = rank(.lunch, [near, mid, far, tooFar]).map(\.place.name)
+        XCTAssertEqual(Set(names), ["Near", "Mid", "Far"])
+    }
+
+    // MARK: - Per-vibe rules (4.94)
+
+    private func fit(_ vibe: TonightVibe, _ categories: [String], name: String = "X",
+                     lunch: Bool? = nil, dinner: Bool? = nil) -> Double {
+        var p = place(name: name, categories: categories)
+        p.serversLunch = lunch
+        p.serversDinner = dinner
+        return TonightCategoryClassifier.fit(p, vibe: vibe)
+    }
+
+    /// Regression: a cafe was recommended for Dinner.
+    func testCafeNeverForDinner() {
+        XCTAssertEqual(fit(.dinner, ["cafe", "food", "point_of_interest", "establishment"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Coffee shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Bakery", "Cafe", "Pastry shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Ice cream shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Juice shop"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Tea house"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Dessert restaurant"]), 0)
+        // Cafe with only a plain "restaurant" tag is still a cafe...
+        XCTAssertEqual(fit(.dinner, ["cafe", "restaurant", "food"]), 0)
+        // ...unless it is known to serve dinner, or has a cuisine-type restaurant category.
+        XCTAssertGreaterThan(fit(.dinner, ["cafe", "restaurant"], dinner: true), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["Coffee shop", "Italian restaurant", "Restaurant"]), 0)
+        let cafe = place(name: "Corner Cafe", categories: ["Cafe"], dLat: 0.0005)
+        let bistro = place(name: "Bistro", categories: ["French restaurant"], dLat: 0.02)
+        XCTAssertEqual(rank(.dinner, [cafe, bistro]).map(\.place.name), ["Bistro"])
+    }
+
+    func testDinnerRules() {
+        XCTAssertGreaterThan(fit(.dinner, ["Japanese restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["Steak house", "Bar"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Breakfast restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.dinner, ["Breakfast restaurant"], dinner: true), 0)
+        XCTAssertEqual(fit(.dinner, ["Cocktail bar"]), 0)
+        XCTAssertEqual(fit(.dinner, ["Japanese restaurant"], dinner: false), 0)
+    }
+
+    func testCoffeeIsCafesOnly() {
+        XCTAssertGreaterThan(fit(.coffee, ["Coffee shop"]), 0)
+        XCTAssertGreaterThan(fit(.coffee, ["Espresso bar"]), 0)
+        XCTAssertGreaterThan(fit(.coffee, ["cafe"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Bakery"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Ice cream shop"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Italian restaurant"]), 0)
+        XCTAssertEqual(fit(.coffee, ["indian_restaurant", "cafe"]), 0)
+        XCTAssertEqual(fit(.coffee, ["Wine bar"]), 0)
+    }
+
+    func testLunchRules() {
+        XCTAssertGreaterThan(fit(.lunch, ["Sandwich shop"]), 0)
+        XCTAssertGreaterThan(fit(.lunch, ["Bakery"]), 0)
+        XCTAssertGreaterThan(fit(.lunch, ["Thai restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.lunch, ["cafe", "food"]), 0)          // cafe that serves food
+        XCTAssertEqual(fit(.lunch, ["Coffee shop"]), 0)                 // coffee only
+        XCTAssertEqual(fit(.lunch, ["Wine bar"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Pub"]), 0)
+        XCTAssertEqual(fit(.lunch, ["night_club"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Ice cream shop"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Dessert restaurant"]), 0)
+        XCTAssertEqual(fit(.lunch, ["Gourmet grocery store", "Deli", "Grocery store"]), 0)
+    }
+
+    func testDrinksAndLateNightRules() {
+        XCTAssertGreaterThan(fit(.drinks, ["Cocktail bar"]), fit(.drinks, ["Steak house", "Bar"]))
+        XCTAssertGreaterThan(fit(.drinks, ["Pub"]), 0)
+        XCTAssertGreaterThan(fit(.drinks, ["wine_bar"]), 0)
+        XCTAssertEqual(fit(.drinks, ["Italian restaurant"]), 0)
+        XCTAssertEqual(fit(.drinks, ["Espresso bar"]), 0)
+        XCTAssertEqual(fit(.drinks, ["Juice shop"]), 0)
+        XCTAssertGreaterThan(fit(.lateNight, ["Pizza restaurant"]), 0)
+        XCTAssertGreaterThan(fit(.lateNight, ["Diner"]), 0)
+        XCTAssertGreaterThan(fit(.lateNight, ["Night club"]), 0)
+        XCTAssertEqual(fit(.lateNight, ["Coffee shop"]), 0)
+        XCTAssertEqual(fit(.lateNight, ["French restaurant"]), 0)
+    }
+
+    func testLodgingAndWholesaleAreNotFood() {
+        XCTAssertFalse(TonightRanker.isFoodOrDrink(place(name: "Inn", categories: ["Bed & breakfast"])))
+        XCTAssertFalse(TonightRanker.isFoodOrDrink(place(name: "Fish Co", categories: ["Seafood wholesaler"])))
+    }
+
+    func testWholeWordMatching() {
+        XCTAssertTrue(TonightRanker.matches(TonightRanker.tokenText(["wine_bar"]), "bar"))
+        XCTAssertFalse(TonightRanker.matches(TonightRanker.tokenText(["barber_shop"]), "bar"))
     }
 
     func testReasonNamesFriend() {

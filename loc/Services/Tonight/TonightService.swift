@@ -18,7 +18,7 @@ final class TonightService {
     static let shared = TonightService()
 
     /// Max places whose full details are fetched per Tonight load.
-    static let detailFetchLimit = 60
+    static let detailFetchLimit = 150 // Supabase only (no Google); enough for Coffee to find 3
 
     private let supabase = SupabaseManager.shared
     private let placeService = SupabasePlaceService.shared
