@@ -212,7 +212,8 @@ class ExternalContentService: ObservableObject {
             status: ImportJobStatus(rawValue: json["status"] as? String ?? "") ?? .queued,
             totalFound: json["total_found"] as? Int ?? places.count,
             places: places,
-            error: json["error"] as? String
+            error: json["error"] as? String,
+            url: json["url"] as? String
         )
     }
 

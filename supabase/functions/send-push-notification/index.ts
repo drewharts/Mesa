@@ -210,6 +210,27 @@ serve(async (req) => {
         break
       }
 
+      case 'import_complete': {
+        // Sent by Mesa-backend when a video import job finishes (the user may have left the app).
+        const count = Number(record.place_count ?? 0)
+        const importedName = record.place_name
+        if (record.failed || count === 0) {
+          title = "Couldn't find a place"
+          body = 'We couldn\'t find a place in that video. Tap to add one yourself.'
+        } else if (count === 1) {
+          title = importedName ? `Found ${importedName}` : 'Found your place'
+          body = 'Saved from your video. Tap to add it to a list.'
+        } else {
+          title = `Found ${count} places`
+          body = importedName
+            ? `${importedName} and ${count - 1} more from your video. Tap to review.`
+            : 'Saved from your video. Tap to review.'
+        }
+        notificationData.jobId = record.job_id
+        notificationData.placeId = record.place_id
+        break
+      }
+
       default:
         console.log('⚠️ [Push] Unknown notification type:', record.type)
         return new Response(

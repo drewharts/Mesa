@@ -211,10 +211,13 @@ struct locApp: App {
                 .onAppear {
                     // Check for shared content URLs on app launch
                     checkForSharedContentURL()
+                    // Pick up imports that were still running when the app was closed
+                    ImportTracker.shared.resumePending()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
                     // Check for shared content URLs when app becomes active
                     checkForSharedContentURL()
+                    ImportTracker.shared.resumePending()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TripInvitationRedeemed"))) { notification in
                     let tripName = notification.userInfo?["tripName"] as? String ?? "a trip"
@@ -336,7 +339,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // Set UNUserNotificationCenter delegate
         UNUserNotificationCenter.current().delegate = self
         
-        // Request notification permissions and register for remote notifications
+        // Register for remote notifications if already allowed. The permission prompt itself is
+        // shown later, when it's useful (first video import), not cold at launch.
         requestNotificationPermissions(application: application)
         
         return true
@@ -353,21 +357,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     private func requestNotificationPermissions(application: UIApplication) {
-        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-        UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
-            if let error = error {
-                print("❌ Error requesting notification permissions: \(error)")
-                return
-            }
-            
-            if granted {
-                DispatchQueue.main.async {
-                    // Register for remote notifications on main thread
-                    application.registerForRemoteNotifications()
-                }
-            } else {
-                print("⚠️ User denied notification permissions")
-            }
+        Task { @MainActor in
+            await NotificationPermissionService.shared.handleLaunch()
         }
     }
     
@@ -415,7 +406,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 extension AppDelegate: UNUserNotificationCenterDelegate {
     // Handle notifications when app is in foreground
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound, .badge])
+        let userInfo = notification.request.content.userInfo
+        // Don't pop a banner for an import the user is already watching finish.
+        Task { @MainActor in
+            if ImportTracker.shared.shouldSuppressForegroundNotification(userInfo: userInfo) {
+                completionHandler([])
+            } else {
+                completionHandler([.banner, .sound, .badge])
+            }
+        }
     }
     
     // Handle notification tap
@@ -423,8 +422,15 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         let userInfo = response.notification.request.content.userInfo
         let type = userInfo["type"] as? String
         
+        // Import finished (push from the backend, or the local fallback): open the result
+        if type == "import_complete", let jobId = userInfo["jobId"] as? String {
+            Task { @MainActor in
+                Analytics.track(.importNotificationOpened)
+                ImportTracker.shared.openResult(jobId: jobId)
+            }
+        }
         // Handle follow notifications
-        if type == "follow", let userId = userInfo["userId"] as? String {
+        else if type == "follow", let userId = userInfo["userId"] as? String {
             NotificationManager.shared.handleFollowNotificationTap(userId: userId)
         }
         // Handle place added to list notifications
