@@ -85,6 +85,8 @@ class DeepLinkManager: ObservableObject {
             await handleContentFromExtension()
         case "invite":
             await handleInviteDeepLink(url)
+        case "pick":
+            handleGroupPickDeepLink(url)
         case "share":
             if url.path == "/content" || url.path == "/tiktok" {
                 await handleExternalContentDeepLink(url)
@@ -183,6 +185,13 @@ class DeepLinkManager: ObservableObject {
         }
     }
     
+    /// Opens the group pick vote sheet for loc://pick/{pickId}.
+    private func handleGroupPickDeepLink(_ url: URL) {
+        let pickId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !pickId.isEmpty else { return }
+        PresentationService.shared.present(.groupPick(pickId: pickId))
+    }
+
     /// Extracts the invite token from the URL and redeems it, or stashes it for post-login redemption.
     private func handleInviteDeepLink(_ url: URL) async {
         // Extract token from path: loc://invite/{token}

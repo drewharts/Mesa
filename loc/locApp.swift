@@ -282,6 +282,10 @@ struct locApp: App {
             
             return deepLinkComponents.url
             
+        } else if path.hasPrefix("/pick/") {
+            let pickId = String(path.dropFirst("/pick/".count))
+            return URL(string: "loc://pick/\(pickId)")
+
         } else if path.hasPrefix("/list/") {
             let listId = String(path.dropFirst("/list/".count))
 

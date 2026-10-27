@@ -294,6 +294,13 @@ struct MainView: View {
             case .tripsList:
                 tripsListSheet
 
+            // Tonight
+            case .tonight:
+                tonightSheet
+
+            case .groupPick(let pickId):
+                groupPickSheet(pickId: pickId)
+
             // Onboarding
             case .suggestedProfiles:
                 suggestedProfilesSheet
@@ -537,6 +544,27 @@ struct MainView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationBackgroundInteraction(.enabled(upThrough: .large))
+    }
+
+    /// Tonight sheet: 3 instant picks from the user's and friends' saves.
+    private var tonightSheet: some View {
+        TonightSheet(userSession: userSession, locationManager: locationManager, onOpenPlace: openPlaceFromSheet)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+    }
+
+    /// Group pick sheet: live one-tap voting with an automatic winner.
+    private func groupPickSheet(pickId: String) -> some View {
+        GroupPickSheet(pickId: pickId, onOpenPlace: openPlaceFromSheet)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+    }
+
+    /// Dismisses the current sheet and opens the place detail for the given place.
+    private func openPlaceFromSheet(_ place: DetailPlace) {
+        PresentationService.shared.dismiss()
+        selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+        selectedPlaceVM.isDetailSheetPresented = true
     }
 
     /// Loading view for lists.

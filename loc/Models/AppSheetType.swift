@@ -57,6 +57,11 @@ enum AppSheetType: Identifiable, Equatable {
 
     case tripsList
 
+    // MARK: - Tonight
+
+    case tonight
+    case groupPick(pickId: String)
+
     // MARK: - Onboarding
 
     case suggestedProfiles
@@ -101,6 +106,10 @@ enum AppSheetType: Identifiable, Equatable {
             return "feed"
         case .tripsList:
             return "tripsList"
+        case .tonight:
+            return "tonight"
+        case .groupPick(let pickId):
+            return "groupPick-\(pickId)"
         case .suggestedProfiles:
             return "suggestedProfiles"
         }
@@ -144,6 +153,10 @@ enum AppSheetType: Identifiable, Equatable {
             return true
         case (.tripsList, .tripsList):
             return true
+        case (.tonight, .tonight):
+            return true
+        case (.groupPick(let lhsId), .groupPick(let rhsId)):
+            return lhsId == rhsId
         case (.suggestedProfiles, .suggestedProfiles):
             return true
         case (.cityOverview(let lhsName, _, _), .cityOverview(let rhsName, _, _)):
