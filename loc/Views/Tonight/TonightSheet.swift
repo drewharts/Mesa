@@ -13,6 +13,7 @@ struct TonightSheet: View {
     @StateObject private var viewModel: TonightViewModel
     let onOpenPlace: (DetailPlace) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var showAllPicks = false
 
     init(userSession: UserSession, locationManager: LocationManager, onOpenPlace: @escaping (DetailPlace) -> Void) {
         _viewModel = StateObject(wrappedValue: TonightViewModel(userSession: userSession, locationManager: locationManager))
@@ -24,11 +25,12 @@ struct TonightSheet: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    // Vibe chips and results first; recent group picks collapsed below.
+                    TonightVibeChipRow(selected: viewModel.vibe) { viewModel.selectVibe($0) }
+                    content
                     if !viewModel.myPicks.isEmpty {
                         myPicksSection
                     }
-                    TonightVibeChipRow(selected: viewModel.vibe) { viewModel.selectVibe($0) }
-                    content
                 }
                 .padding(.bottom, 24)
             }
@@ -79,6 +81,12 @@ struct TonightSheet: View {
                 .padding(.top, 24)
         case .loaded(let picks):
             VStack(spacing: 10) {
+                if viewModel.openingLaterMode {
+                    Text("Nothing that fits is open right now. Opening soon:")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 ForEach(Array(picks.enumerated()), id: \.element.id) { index, pick in
                     TonightPickCard(pick: pick, rank: index + 1) { onOpenPlace(pick.place) }
                 }
@@ -97,9 +105,20 @@ struct TonightSheet: View {
     /// Active and decided group picks, so a result is never lost.
     private var myPicksSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Your group picks")
-                .font(.subheadline.weight(.semibold))
-            ForEach(viewModel.myPicks) { summary in
+            Button { withAnimation { showAllPicks.toggle() } } label: {
+                HStack {
+                    Text("Your group picks").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    if viewModel.myPicks.count > 1 {
+                        Text(showAllPicks ? "Less" : "\(viewModel.myPicks.count)")
+                            .font(.caption.weight(.semibold)).foregroundColor(.secondary)
+                        Image(systemName: showAllPicks ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold)).foregroundColor(.secondary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            ForEach(showAllPicks ? viewModel.myPicks : Array(viewModel.myPicks.prefix(1))) { summary in
                 Button { viewModel.openPick(summary) } label: {
                     HStack(spacing: 12) {
                         Image(systemName: summary.hasWinner ? "party.popper.fill" : (summary.needsMyVote ? "hand.thumbsup.fill" : "clock.fill"))

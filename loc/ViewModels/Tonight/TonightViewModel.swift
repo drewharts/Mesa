@@ -27,6 +27,8 @@ final class TonightViewModel: ObservableObject {
     @Published private(set) var myPicks: [GroupPickSummary] = []
     /// True when more than one page of picks is available ("More options").
     @Published private(set) var canShowMore = false
+    /// True when nothing fitting is open and the picks are the places opening soonest.
+    @Published private(set) var openingLaterMode = false
 
     private let userSession: UserSession
     private let locationManager: LocationManager
@@ -75,7 +77,14 @@ final class TonightViewModel: ObservableObject {
     /// Loads the user's active/decided group picks for the "Your picks" row. Failure just hides the row.
     func loadMyPicks() async {
         let picks = await groupPickService.fetchMyPicks()
-        myPicks = Array(picks.prefix(3))
+        // Hide finished picks older than ~12h and stuck ones whose deadline passed long ago.
+        let cutoff = Date().addingTimeInterval(-12 * 3600)
+        let fresh = picks.filter { p in
+            if p.isDecided { return (p.decidedAt ?? .distantPast) > cutoff }
+            if let decideAt = p.decideAt { return decideAt > cutoff }
+            return true
+        }
+        myPicks = Array(fresh.prefix(3))
         if !picks.isEmpty {
             Analytics.track(.tonightPicksRowShown, [
                 "count": picks.count,
@@ -108,6 +117,12 @@ final class TonightViewModel: ObservableObject {
         state = .loading
         origin = await currentLocation()
         hasLocation = origin != nil
+        // Learn the real time zone where the user is (the phone clock may be on home time while
+        // travelling), so nearby places are judged open/closed in their own local time.
+        if let origin, let tz = try? await CLGeocoder().reverseGeocodeLocation(origin).first?.timeZone {
+            PlaceTimeZoneCache.shared.addAnchor(latitude: origin.coordinate.latitude,
+                                                longitude: origin.coordinate.longitude, timeZone: tz)
+        }
 
         let friends = await tonightService.fetchFriends(userId: userId)
         friendNames = Dictionary(friends.map { ($0.id.lowercased(), $0.firstName) }, uniquingKeysWith: { a, _ in a })
@@ -135,11 +150,20 @@ final class TonightViewModel: ObservableObject {
         pages = picks.isEmpty ? [] : [picks] + extras.chunked(into: 3)
         pageIndex = 0
         canShowMore = pages.count > 1
-        if picks.isEmpty {
+        let later = picks.isEmpty ? ranker.openingLater(candidates: candidates, places: details) : []
+        if picks.isEmpty, !later.isEmpty {
+            // Everything that fits is closed now: show what opens next instead of a dead end.
+            openingLaterMode = true
+            pages = [later]
+            canShowMore = false
+            state = .loaded(later)
+        } else if picks.isEmpty {
+            openingLaterMode = false
             state = .empty(candidates.isEmpty
                 ? "Save a few places (or follow friends) and Mesa will pick for you."
                 : "Nothing from your saves fits right now. Try another vibe.")
         } else {
+            openingLaterMode = false
             state = .loaded(picks)
         }
         if reportAnalytics {

@@ -151,6 +151,7 @@ struct MapView: View {
         switch item.layer {
         case .network, .community:
             guard let base, let placeId = item.placeId else { return base }
+            PlaceTimeZoneCache.shared.registerCoordinate(placeId: placeId, latitude: item.coordinate.latitude, longitude: item.coordinate.longitude)
             hoursStore.prefetch([placeId])
             // Open = green dot, closed = gray dot, unknown hours = no dot.
             if let state = hoursStore.state(for: placeId) {

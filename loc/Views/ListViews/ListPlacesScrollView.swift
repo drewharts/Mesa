@@ -78,7 +78,12 @@ struct ListPlacesScrollView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
-            .onAppear { PlaceHoursStore.shared.prefetch(places.map(\.place_id)) }
+            .onAppear {
+                for p in places { if let la = p.latitude, let lo = p.longitude {
+                    PlaceTimeZoneCache.shared.registerCoordinate(placeId: p.place_id, latitude: la, longitude: lo)
+                } }
+                PlaceHoursStore.shared.prefetch(places.map(\.place_id))
+            }
             .onChange(of: places.count) { _, _ in PlaceHoursStore.shared.prefetch(places.map(\.place_id)) }
             .onChange(of: scrollRequest) { _, request in
                 guard let request else { return }

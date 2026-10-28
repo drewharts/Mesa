@@ -93,6 +93,9 @@ struct OpenStatusService {
         case "permanently_closed": return .permanentlyClosed
         default: break
         }
+        if let c = place.coordinate {
+            PlaceTimeZoneCache.shared.registerCoordinate(placeId: place.id.uuidString, latitude: c.latitude, longitude: c.longitude)
+        }
         if let hours = PlaceHours(weekdayText: openHours) {
             let tz = PlaceTimeZoneCache.shared.timeZone(for: place.id.uuidString)
             let state = hours.state(at: Date(), timeZone: tz)
