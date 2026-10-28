@@ -249,14 +249,13 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
         placeMeta.prefetchCities(for: places)
     }
 
-    /// Tile tap: select and center its pin; a second tap opens the place.
-    /// Places without coordinates (e.g. some videos) have no pin, so they open directly.
+    /// Tile tap: open the place immediately and focus/center its pin (when it has one),
+    /// so the map is on that place when details close.
     private func handleTileTap(_ place: LightweightPlace) {
-        if sheetVM.isFocused(place.place_id) || !hasCoordinate(place) {
-            openPlaceDetail(place)
-        } else {
+        if hasCoordinate(place) {
             sheetVM.focus(place: place, source: .row)
         }
+        openPlaceDetail(place)
     }
 
     private func openPlaceDetail(_ place: LightweightPlace) {
