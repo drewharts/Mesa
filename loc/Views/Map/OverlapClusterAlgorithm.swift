@@ -2,39 +2,128 @@
 //  OverlapClusterAlgorithm.swift
 //  loc
 //
-//  Screen-space, footprint-aware clustering for GMUClusterManager. Replaces
-//  GMUNonHierarchicalDistanceBasedAlgorithm, which (a) used a fixed 20pt radius, far smaller
-//  than our 44-60pt pins, and (b) clusters at the *rounded integer* zoom GMUClusterManager
-//  passes in, so between integer zoom levels pins could sit up to ~1.4x closer than it
-//  assumed. Here two markers merge whenever their on-screen rects (actual icon size, incl.
-//  bottom-anchored photo pins) would touch at the map's exact current zoom; clusters are
-//  then re-checked against each other until nothing overlaps.
+//  Screen-space, footprint-aware clustering. Two markers merge whenever their on-screen rects
+//  (real icon size, incl. bottom-anchored photo pins) would touch at the map's exact zoom.
+//
+//  Performance design:
+//  - The math is a pure function over value snapshots (`OverlapClusterer.compute`), run on a
+//    background queue by GoogleMapView.Coordinator; only marker updates touch the main thread.
+//  - Greedy assignment and every merge pass use a spatial hash grid: O(n) per pass, no O(n^2).
+//  - Only items inside the visible viewport (+50% margin) are clustered at all.
+//  - GMUClusterManager still owns the renderer + tap forwarding; this algorithm object just
+//    stores items and hands back the latest precomputed clusters instantly.
 //
 
 import Foundation
 import CoreLocation
 import GoogleMaps
 import GoogleMapsUtils
+import os
 
-final class OverlapClusterAlgorithm: NSObject, GMUClusterAlgorithm {
-    /// Visual footprint of an item's marker in points and where it sits relative to the coordinate.
-    struct Footprint {
-        var size: CGSize
-        /// true = marker hangs above the coordinate (bottom anchor), false = centered on it.
+enum MapPerf {
+    static let log = OSLog(subsystem: Bundle.main.bundleIdentifier ?? "mesa", category: "MapPins")
+    static let signposter = OSSignposter(logHandle: log)
+}
+
+/// Latest requested clustering generation, readable from the background clusterer to cancel stale runs.
+enum OverlapGenerationToken {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var value = 0
+    static var current: Int {
+        get { lock.lock(); defer { lock.unlock() }; return value }
+        set { lock.lock(); value = newValue; lock.unlock() }
+    }
+}
+
+/// Value-type clustering kernel. Safe to run off the main thread.
+enum OverlapClusterer {
+    struct Entry: Sendable {
+        var x: Double, y: Double          // world points at the current zoom
+        var w: Double, h: Double
         var bottomAnchored: Bool
     }
 
-    weak var mapView: GMSMapView?
-    /// Supplies the real rendered size (falls back to layer defaults).
-    var footprint: (MapAnnotationItem) -> Footprint = OverlapClusterAlgorithm.defaultFootprint
-    /// Extra breathing room so pins don't even kiss.
-    var gap: CGFloat = 4
-    /// Cluster badge diameter (ClusterBadgeView).
-    var badgeSize: CGFloat = 46
+    /// Returns groups of entry indices. Entries must be in a stable order.
+    static func compute(_ entries: [Entry], badge: Double, gap: Double, isCancelled: () -> Bool) -> [[Int]] {
+        struct Box { var members: [Int]; var sx: Double; var sy: Double; var rect: CGRect; var alive = true
+            var cx: Double { sx / Double(members.count) }; var cy: Double { sy / Double(members.count) } }
+        let cell = 140.0
+        @inline(__always) func k(_ x: Double, _ y: Double) -> SIMD2<Int64> {
+            SIMD2(Int64((x / cell).rounded(.down)), Int64((y / cell).rounded(.down)))
+        }
+        func itemRect(_ e: Entry) -> CGRect {
+            let oy = e.bottomAnchored ? e.y - e.h : e.y - e.h / 2
+            return CGRect(x: e.x - e.w / 2, y: oy, width: e.w, height: e.h).insetBy(dx: -gap / 2, dy: -gap / 2)
+        }
+        func badgeRect(_ b: Box) -> CGRect {
+            let s = badge + gap
+            return CGRect(x: b.cx - s / 2, y: b.cy - s / 2, width: s, height: s)
+        }
 
-    private var items: [String: MapAnnotationItem] = [:]
+        var boxes: [Box] = []
+        boxes.reserveCapacity(entries.count)
+        var grid: [SIMD2<Int64>: [Int]] = [:]
 
-    // MARK: GMUClusterAlgorithm
+        for (i, e) in entries.enumerated() {
+            if i & 255 == 0, isCancelled() { return [] }
+            let r = itemRect(e)
+            let key = k(e.x, e.y)
+            var target: Int?
+            outer: for dx in -1...1 { for dy in -1...1 {
+                for b in grid[key &+ SIMD2(Int64(dx), Int64(dy))] ?? [] where boxes[b].rect.intersects(r) {
+                    target = b; break outer
+                }
+            } }
+            if let t = target {
+                boxes[t].members.append(i); boxes[t].sx += e.x; boxes[t].sy += e.y
+                boxes[t].rect = badgeRect(boxes[t])
+            } else {
+                boxes.append(Box(members: [i], sx: e.x, sy: e.y, rect: r))
+                grid[key, default: []].append(boxes.count - 1)
+            }
+        }
+
+        // Merge passes (centroids drift as members join), each O(n) via a rebuilt grid.
+        for _ in 0..<6 {
+            if isCancelled() { return [] }
+            var g: [SIMD2<Int64>: [Int]] = [:]
+            for i in boxes.indices where boxes[i].alive { g[k(boxes[i].cx, boxes[i].cy), default: []].append(i) }
+            var merged = false
+            for i in boxes.indices where boxes[i].alive {
+                let key = k(boxes[i].cx, boxes[i].cy)
+                for dx in -1...1 { for dy in -1...1 {
+                    for j in g[key &+ SIMD2(Int64(dx), Int64(dy))] ?? [] where j > i && boxes[j].alive {
+                        guard boxes[i].rect.intersects(boxes[j].rect) else { continue }
+                        boxes[i].members += boxes[j].members
+                        boxes[i].sx += boxes[j].sx; boxes[i].sy += boxes[j].sy
+                        boxes[i].rect = badgeRect(boxes[i])
+                        boxes[j].alive = false
+                        merged = true
+                    }
+                } }
+            }
+            if !merged { break }
+        }
+        return boxes.filter(\.alive).map(\.members)
+    }
+
+    static func project(_ c: CLLocationCoordinate2D, worldSize: Double) -> (Double, Double) {
+        let x = (c.longitude + 180) / 360 * worldSize
+        let lat = max(min(c.latitude, 85.0511), -85.0511) * .pi / 180
+        let y = (1 - log(tan(lat) + 1 / cos(lat)) / .pi) / 2 * worldSize
+        return (x, y)
+    }
+}
+
+/// Item store handed to GMUClusterManager. Returns the latest clusters computed in the background.
+final class OverlapClusterAlgorithm: NSObject, GMUClusterAlgorithm {
+    struct Footprint {
+        var size: CGSize
+        var bottomAnchored: Bool
+    }
+
+    private(set) var items: [String: MapAnnotationItem] = [:]
+    var latestClusters: [GMUCluster] = []
 
     @objc(addItems:) func add(_ newItems: [GMUClusterItem]) {
         for case let item as MapAnnotationItem in newItems { items[item.stableId] = item }
@@ -44,105 +133,9 @@ final class OverlapClusterAlgorithm: NSObject, GMUClusterAlgorithm {
         if let item = item as? MapAnnotationItem { items.removeValue(forKey: item.stableId) }
     }
 
-    func clearItems() { items.removeAll() }
+    func clearItems() { items.removeAll(); latestClusters = [] }
 
-    @objc(clustersAtZoom:) func clusters(atZoom zoom: Float) -> [GMUCluster] {
-        // Use the exact zoom, not the rounded integer GMUClusterManager hands us.
-        let z = Double(mapView?.camera.zoom ?? zoom)
-        let worldSize = 256.0 * pow(2.0, z)
-
-        struct Box {
-            var members: [MapAnnotationItem]
-            var sumX: Double, sumY: Double
-            var rect: CGRect
-        }
-
-        func project(_ c: CLLocationCoordinate2D) -> CGPoint {
-            let x = (c.longitude + 180) / 360 * worldSize
-            let lat = max(min(c.latitude, 85.0511), -85.0511) * .pi / 180
-            let y = (1 - log(tan(lat) + 1 / cos(lat)) / .pi) / 2 * worldSize
-            return CGPoint(x: x, y: y)
-        }
-        func itemRect(_ item: MapAnnotationItem, at p: CGPoint) -> CGRect {
-            let f = footprint(item)
-            let originY = f.bottomAnchored ? p.y - f.size.height : p.y - f.size.height / 2
-            return CGRect(x: p.x - f.size.width / 2, y: originY, width: f.size.width, height: f.size.height)
-                .insetBy(dx: -gap / 2, dy: -gap / 2)
-        }
-        func badgeRect(_ b: Box) -> CGRect {
-            let n = Double(b.members.count)
-            let c = CGPoint(x: b.sumX / n, y: b.sumY / n)
-            let s = badgeSize + gap
-            return CGRect(x: c.x - s / 2, y: c.y - s / 2, width: s, height: s)
-        }
-
-        // Stable order so reclustering the same view never shuffles groupings (no jitter).
-        let ordered = items.values.sorted { $0.stableId < $1.stableId }
-        var boxes: [Box] = []
-        boxes.reserveCapacity(ordered.count)
-
-        // Spatial hash over box centers; cell >= largest footprint so a 3x3 lookup is enough.
-        let cell: Double = 140
-        var grid: [Int64: [Int]] = [:]
-        func key(_ p: CGPoint) -> (Int64, Int64) { (Int64((Double(p.x) / cell).rounded(.down)), Int64((Double(p.y) / cell).rounded(.down))) }
-        func hash(_ k: (Int64, Int64)) -> Int64 { k.0 &* 73_856_093 ^ k.1 &* 19_349_663 }
-
-        for item in ordered {
-            let p = project(item.position)
-            let r = itemRect(item, at: p)
-            let k = key(p)
-            var joined = false
-            search: for dx in -1...1 {
-                for dy in -1...1 {
-                    for idx in grid[hash((k.0 + Int64(dx), k.1 + Int64(dy)))] ?? [] where boxes[idx].rect.intersects(r) {
-                        boxes[idx].members.append(item)
-                        boxes[idx].sumX += Double(p.x); boxes[idx].sumY += Double(p.y)
-                        boxes[idx].rect = badgeRect(boxes[idx])
-                        joined = true
-                        break search
-                    }
-                }
-            }
-            if !joined {
-                boxes.append(Box(members: [item], sumX: Double(p.x), sumY: Double(p.y), rect: r))
-                grid[hash(k), default: []].append(boxes.count - 1)
-            }
-        }
-
-        // Merge passes: centroid shifts can make badges overlap neighbours; repeat until stable.
-        for _ in 0..<6 {
-            var merged = false
-            var i = 0
-            while i < boxes.count {
-                var j = i + 1
-                while j < boxes.count {
-                    if boxes[i].rect.intersects(boxes[j].rect) {
-                        boxes[i].members += boxes[j].members
-                        boxes[i].sumX += boxes[j].sumX; boxes[i].sumY += boxes[j].sumY
-                        boxes[i].rect = badgeRect(boxes[i])
-                        boxes.remove(at: j)
-                        merged = true
-                    } else {
-                        j += 1
-                    }
-                }
-                i += 1
-            }
-            if !merged { break }
-        }
-
-        return boxes.map { box in
-            let lat = box.members.map(\.position.latitude).reduce(0, +) / Double(box.members.count)
-            let lon = box.members.map(\.position.longitude).reduce(0, +) / Double(box.members.count)
-            let position = box.members.count == 1 ? box.members[0].position
-                : CLLocationCoordinate2D(latitude: lat, longitude: lon)
-            let cluster = GMUStaticCluster(position: position)
-            box.members.forEach { cluster.addItem($0) }
-            return cluster
-        }
-    }
-
-    // MARK: Defaults
+    @objc(clustersAtZoom:) func clusters(atZoom zoom: Float) -> [GMUCluster] { latestClusters }
 
     static func defaultFootprint(_ item: MapAnnotationItem) -> Footprint {
         switch item.layer {
