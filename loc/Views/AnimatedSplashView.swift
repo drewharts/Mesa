@@ -28,7 +28,9 @@ struct AnimatedSplashView: View {
         ("SplashLetterA", CGRect(x: 825, y: 1270, width: 162, height: 147)),
     ]
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Splash") }
+
+    @ViewBuilder private var analyticsBody: some View {
         GeometryReader { geo in
             // Same mapping as Image("SplashScreen").scaledToFill() centered in the screen.
             let scale = max(geo.size.width / Self.canvas.width, geo.size.height / Self.canvas.height)

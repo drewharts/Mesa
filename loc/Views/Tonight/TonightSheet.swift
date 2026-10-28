@@ -21,7 +21,9 @@ struct TonightSheet: View {
         self.onOpenPlace = onOpenPlace
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Tonight") }
+
+    @ViewBuilder private var analyticsBody: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
             ScrollView {

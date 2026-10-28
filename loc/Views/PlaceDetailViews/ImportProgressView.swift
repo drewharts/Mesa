@@ -37,7 +37,9 @@ struct ImportProgressView: View {
         self._viewModel = StateObject(wrappedValue: ImportProgressViewModel(jobId: jobId))
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Import Sheet") }
+
+    @ViewBuilder private var analyticsBody: some View {
         // One continuous sheet: a single scroll on the sheet's material (no opaque panel, no divider),
         // with the primary button pinned at the bottom on the same material behind a soft fade.
         ScrollView {

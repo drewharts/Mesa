@@ -254,7 +254,9 @@ struct MapView: View {
         }
     }
     
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Map") }
+
+    @ViewBuilder private var analyticsBody: some View {
         ZStack {
             GoogleMapView(
                 mapPosition: $mapPosition,

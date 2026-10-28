@@ -19,7 +19,9 @@ struct LoginView: View {
     private let cardBackground = Color(red: 248/255, green: 248/255, blue: 250/255)
     private let subtleGray = Color(red: 200/255, green: 200/255, blue: 205/255)
     
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Login") }
+
+    @ViewBuilder private var analyticsBody: some View {
         ZStack {
             // Splash screen background
             mesaCharcoal

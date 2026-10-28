@@ -27,7 +27,9 @@ struct GroupPickSheet: View {
         self.onOpenPlace = onOpenPlace
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Group Pick") }
+
+    @ViewBuilder private var analyticsBody: some View {
         Group {
             switch viewModel.mode {
             case .vote:

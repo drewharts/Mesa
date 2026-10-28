@@ -44,7 +44,9 @@ struct VisiblePlacesPopupView: View {
 
     // MARK: - Body
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Places In View") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 headerSection
@@ -59,7 +61,7 @@ struct VisiblePlacesPopupView: View {
         }
         .onAppear {
             configureViewModel()
-            sheetVM.beginSession(listId: "places_in_view", placeCount: 0, isExternal: false, source: "places_in_view")
+            sheetVM.beginSession(listId: "places_in_view", placeCount: viewModel.visiblePlaces.count, isExternal: false, source: "places_in_view")
         }
         .onDisappear { sheetVM.endSession() }
     }
@@ -116,6 +118,12 @@ struct VisiblePlacesPopupView: View {
     private var contentSection: some View {
         if viewModel.visiblePlaces.isEmpty && !viewModel.showsLoadingIndicator {
             emptyStateView
+                .onAppear {
+                    Analytics.track(.placesInViewEmpty, [
+                        "reason": viewModel.emptyReason,
+                        "filter": viewModel.selectedFilter.rawValue
+                    ])
+                }
         } else {
             ListPlacesScrollView(
                 places: viewModel.tilePlaces,
