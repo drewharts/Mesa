@@ -221,6 +221,7 @@ final class TonightViewModel: ObservableObject {
             shareService.presentShareSheet(with: [text])
         }
     }
+}
 
 // MARK: - Planned group pick (future date, ranked top 3)
 
@@ -283,5 +284,3 @@ extension TonightViewModel {
             return false
         }
     }
-}
-
