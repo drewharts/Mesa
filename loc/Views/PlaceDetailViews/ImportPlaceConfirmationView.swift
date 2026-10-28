@@ -18,7 +18,9 @@ struct ImportPlaceConfirmationView: View {
         self._viewModel = StateObject(wrappedValue: ImportPlaceConfirmationViewModel(place: place, contentUrl: contentUrl))
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Import Confirm") }
+
+    @ViewBuilder private var analyticsBody: some View {
         VStack(spacing: 0) {
             dragIndicator
             Spacer().frame(height: 24)

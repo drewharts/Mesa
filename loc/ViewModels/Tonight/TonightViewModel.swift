@@ -164,6 +164,19 @@ final class TonightViewModel: ObservableObject {
             state = .loaded(later)
         } else if picks.isEmpty {
             openingLaterMode = false
+            if reportAnalytics {
+                var props: [String: Any] = [
+                    "vibe": vibe.rawValue,
+                    "candidates": candidates.count,
+                    "details_loaded": details.count,
+                    "has_location": origin != nil
+                ]
+                // How many loaded places fit each vibe at all (ignoring open hours).
+                for v in TonightVibe.allCases {
+                    props["saved_\(v.rawValue)"] = details.values.filter { TonightCategoryClassifier.fit($0, vibe: v) > 0 }.count
+                }
+                Analytics.track(.tonightEmpty, props)
+            }
             state = .empty(candidates.isEmpty
                 ? "Save a few places (or follow friends) and Mesa will pick for you."
                 : "Nothing from your saves fits right now. Try another vibe.")

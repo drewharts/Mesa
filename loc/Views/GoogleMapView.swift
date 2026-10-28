@@ -437,6 +437,10 @@ struct GoogleMapView: UIViewRepresentable {
         /// no mapView(_:idleAt:)-style delegate method and needed a manual debounce timer here).
         func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
             isCameraMoving = false
+            Analytics.trackThrottled(.mapCameraIdle, every: 10, [
+                "zoom": (Double(position.zoom) * 10).rounded() / 10,
+                "markers": clusterRenderer?.markers.count ?? 0
+            ])
             if let pending = pendingIconRevision {
                 // Flush after the settle work below has run.
                 DispatchQueue.main.async { [weak self] in self?.syncIconRevision(pending) }
@@ -484,6 +488,7 @@ struct GoogleMapView: UIViewRepresentable {
             clusterGeneration &+= 1
             let generation = clusterGeneration
             let snapshotState = MapPerf.signposter.beginInterval("ClusterSnapshot")
+            let startedAt = CFAbsoluteTimeGetCurrent()
 
             let zoom = Double(mapView.camera.zoom)
             let worldSize = 256.0 * pow(2.0, zoom)
@@ -506,6 +511,7 @@ struct GoogleMapView: UIViewRepresentable {
                 items.append(item)
                 entries.append(.init(x: x, y: y, w: Double(f.size.width), h: Double(f.size.height), bottomAnchored: f.bottomAnchored))
             }
+            let totalCount = sorted.count
             MapPerf.signposter.endInterval("ClusterSnapshot", snapshotState, "\(entries.count) of \(sorted.count) items")
 
             OverlapGenerationToken.current = generation
@@ -519,6 +525,13 @@ struct GoogleMapView: UIViewRepresentable {
                 Task { @MainActor [weak self] in
                     guard let self, generation == self.clusterGeneration, !groups.isEmpty || entries.isEmpty else { return }
                     self.applyClusters(groups, items: items)
+                    // Recluster request -> markers on screen. Throttled: at most one per 15 s.
+                    Analytics.trackThrottled(.mapPinsRendered, every: 15, [
+                        "ms": Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1000),
+                        "pin_count": items.count,
+                        "total_items": totalCount,
+                        "cluster_count": groups.count
+                    ])
                 }
             }
         }

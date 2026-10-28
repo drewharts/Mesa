@@ -22,7 +22,9 @@ struct ProfilePhotoOnboardingView: View {
         self._viewModel = StateObject(wrappedValue: ProfilePhotoOnboardingViewModel(userId: userId))
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Onboarding Photo") }
+
+    @ViewBuilder private var analyticsBody: some View {
         ZStack {
             mesaCharcoal.ignoresSafeArea()
 

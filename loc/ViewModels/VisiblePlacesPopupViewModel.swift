@@ -110,6 +110,7 @@ class VisiblePlacesPopupViewModel: ObservableObject {
         communityMarkers = seedCommunityMarkers
 
         guard let bounds = viewportBounds, let userId else {
+            missingInput = mapRegion == nil ? "no_region" : "no_user"
             print("⚠️ [VisiblePlacesPopupVM] Cannot fetch places: missing region or userId")
             return
         }
@@ -118,6 +119,17 @@ class VisiblePlacesPopupViewModel: ObservableObject {
     }
 
     // MARK: - Computed Properties
+
+    /// Set when configure() could not start a fetch.
+    private var missingInput: String?
+
+    /// Why the grid is empty, for analytics.
+    var emptyReason: String {
+        if let missingInput { return missingInput }
+        if !hasConfigured { return "not_configured" }
+        let seeded = friendsAnnotations.count + communityMarkers.count
+        return seeded == 0 ? "no_places_in_viewport" : "filter_has_no_places"
+    }
 
     /// Returns true when places are still loading and there is nothing to show yet.
     var showsLoadingIndicator: Bool {

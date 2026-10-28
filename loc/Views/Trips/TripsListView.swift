@@ -19,7 +19,9 @@ struct TripsListView: View {
 
     @State private var navigationPath = NavigationPath()
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Trips") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationStack(path: $navigationPath) {
             Group {
                 if viewModel.isLoading && viewModel.trips.isEmpty {

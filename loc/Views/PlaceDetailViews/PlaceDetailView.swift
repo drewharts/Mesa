@@ -35,7 +35,9 @@ struct PlaceDetailView: View {
         self.minSheetHeight = minSheetHeight
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Place") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationView {
             ZStack {
                 mainContent

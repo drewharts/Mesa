@@ -40,7 +40,9 @@ struct ProfileView: View {
         appearance.configureWithOpaqueBackground() // Use opaque background
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Profile") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationStack(path: $navigationPath) {
             mainContent
                 .navigationBarBackButtonHidden(true)

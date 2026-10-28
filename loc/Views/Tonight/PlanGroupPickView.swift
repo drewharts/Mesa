@@ -53,7 +53,9 @@ struct PlanGroupPickView: View {
 
     private var effectiveDeadline: Date { customDeadline ? decideAt : autoDeadline }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Plan Group Pick") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationStack {
             Form {
                 Section {
