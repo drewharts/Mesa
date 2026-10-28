@@ -160,6 +160,7 @@ class TripService {
         dayIndex: Int,
         addedBy: String
     ) async throws {
+        try PlaceIdGuard.requireReal(placeId)
         // Get current max sort_order for this day
         let existing: [SortOrderResult] = try await supabase.client
             .from("trip_day_places")

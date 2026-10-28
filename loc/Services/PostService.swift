@@ -43,7 +43,7 @@ class PostService: ObservableObject {
                 // shares it, so posts would later collapse onto whatever place it ends up as.
                 guard !place.hasPlaceholderID,
                       post.placeId != DetailPlace.placeholderUUID.uuidString else {
-                    throw NSError(domain: "PostService", code: 1, userInfo: [NSLocalizedDescriptionKey: "This place is still loading. Try again in a moment."])
+                    throw PlaceIdError.stillLoading
                 }
                 // Ensure place exists before saving post (satisfies FK constraint)
                 try await placeService.ensurePlaceExists(place: place)

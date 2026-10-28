@@ -165,6 +165,17 @@ class ListsPlaceMutationsViewModel: ObservableObject {
 
     /// Add a place to a list (old UUID-based format) - delegates to addPlaceToLightweightList.
     func addPlaceToList(listId: UUID, place: DetailPlace) {
+        if place.hasPlaceholderID {
+            // Resolve the real id first; never save the shared placeholder id.
+            Task { @MainActor [weak self] in
+                guard let resolved = try? await PlaceRepository.shared.ensureResolved(place) else {
+                    print("❌ [ListsPlaceMutationsViewModel] Place still loading; not added to list")
+                    return
+                }
+                self?.addPlaceToList(listId: listId, place: resolved)
+            }
+            return
+        }
         guard let dataVM = dataViewModel else { return }
 
         let listIdString = listId.uuidString

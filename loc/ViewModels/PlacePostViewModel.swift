@@ -127,17 +127,19 @@ class PlacePostViewModel: ObservableObject {
     /// Refuses to submit while `place` still has its placeholder ID, since that would
     /// permanently orphan the post on a sentinel UUID no place actually queries against.
     func submitPost(completion: @escaping (Result<PlacePost, Error>) -> Void) {
-        guard !place.hasPlaceholderID else {
-            completion(.failure(PostSubmissionError.placeStillResolving))
-            return
-        }
-
         isLoading = true
         errorMessage = nil
         uploadProgress = 0.0
 
         Task {
             do {
+                if place.hasPlaceholderID {
+                    do {
+                        place = try await PlaceRepository.shared.ensureResolved(place)
+                    } catch {
+                        throw PostSubmissionError.placeStillResolving
+                    }
+                }
                 var post = createPost()
                 try await uploadMedia(for: &post)
                 try await savePostAsync(post)

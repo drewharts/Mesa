@@ -20,6 +20,7 @@ class SupabasePlaceService: ObservableObject {
 
     /// Updates the user-corrected category for a place.
     func updatePlaceCorrectedCategory(placeId: String, category: String?) async throws {
+        try PlaceIdGuard.requireReal(placeId)
         struct UpdateData: Encodable {
             let user_corrected_category: String?
         }
@@ -647,6 +648,7 @@ class SupabasePlaceService: ObservableObject {
     }
     
     func addToAllPlaces(place: DetailPlace, completion: @escaping (Error?) -> Void) {
+        guard !place.hasPlaceholderID else { completion(PlaceIdError.stillLoading); return }
         Task {
             do {
                 // Convert DetailPlace to dictionary for Supabase insertion
@@ -671,7 +673,7 @@ class SupabasePlaceService: ObservableObject {
     /// Uses upsert to insert if not exists, or do nothing if already present
     func ensurePlaceExists(place: DetailPlace) async throws {
         guard !place.hasPlaceholderID else {
-            throw NSError(domain: "SupabasePlaceService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing to upsert placeholder place id"])
+            throw PlaceIdError.stillLoading
         }
         let placeData = convertToPlaceData(place)
         
@@ -684,6 +686,7 @@ class SupabasePlaceService: ObservableObject {
     }
     
     func addToMyPlaces(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
+        guard !place.hasPlaceholderID else { completion(PlaceIdError.stillLoading); return }
         Task {
             do {
                 // Convert coordinate to LocationData struct (same format as PlaceRecord)
@@ -1466,6 +1469,7 @@ class SupabasePlaceService: ObservableObject {
     // MARK: - Add/Remove Favorites
     
     func addFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
+        guard !PlaceIdGuard.isPlaceholder(placeId) else { completion(PlaceIdError.stillLoading); return }
         Task {
             do {
                 // Only store the minimal required data - IDs and timestamp
