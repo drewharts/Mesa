@@ -31,6 +31,7 @@ final class GroupPickService {
 
     /// Creates a group pick pre-filled with the given places and returns its id.
     func createPick(placeIds: [String], title: String, decideInMinutes: Int = 90) async throws -> String {
+        let placeIds = placeIds.filter { !PlaceIdGuard.isPlaceholder($0) }
         struct Params: Encodable { let p_place_ids: [String]; let p_title: String; let p_minutes: Int }
         let id: String = try await supabase.client
             .rpc("create_group_pick", params: Params(p_place_ids: placeIds, p_title: title, p_minutes: decideInMinutes))
@@ -52,6 +53,7 @@ final class GroupPickService {
 
     /// Records the caller's yes/no on one place and returns the updated pick (which may now be decided).
     func vote(pickId: String, placeId: String, yes: Bool) async throws -> GroupPick {
+        try PlaceIdGuard.requireReal(placeId)
         struct Params: Encodable { let p_pick_id: String; let p_place_id: String; let p_vote: Bool }
         let pick: GroupPick = try await supabase.client
             .rpc("vote_group_pick", params: Params(p_pick_id: pickId, p_place_id: placeId, p_vote: yes))
