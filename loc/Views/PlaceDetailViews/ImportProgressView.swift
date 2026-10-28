@@ -389,6 +389,7 @@ struct ImportProgressView: View {
 }
 
 /// Resolves the selected list from the selection view model.
+@MainActor
 private func importSelectedList(_ vm: PlaceListSelectionViewModel, _ id: String?) -> LightweightPlaceList? {
     guard let id else { return nil }
     return vm.allLists.first { $0.list_id == id }
