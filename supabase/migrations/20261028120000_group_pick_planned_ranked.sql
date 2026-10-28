@@ -47,21 +47,20 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     ORDER BY 3 DESC, 4 DESC, 5 DESC, 2 ASC;
 $$;
 
+-- Base pick JSON (members, waiting_on, added_by...) plus the ranked fields.
 CREATE OR REPLACE FUNCTION public._planned_group_pick_json(p_pick_id UUID)
 RETURNS JSON LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-    SELECT json_build_object(
-        'id', g.id, 'creator_id', g.creator_id, 'title', g.title, 'place_ids', g.place_ids,
-        'mode', g.mode, 'event_at', g.event_at, 'decide_at', g.decide_at,
-        'decided_place_id', g.decided_place_id, 'decided_at', g.decided_at, 'outcome', g.outcome,
-        'member_count', (SELECT COUNT(*) FROM group_pick_members m WHERE m.pick_id = g.id),
+    SELECT (_group_pick_json(g.id)::jsonb || jsonb_build_object(
+        'mode', g.mode, 'event_at', g.event_at,
         'ranked_count', (SELECT COUNT(DISTINCT lower(r.user_id)) FROM group_pick_rankings r WHERE r.pick_id = g.id),
-        'standings', COALESCE((SELECT json_agg(json_build_object(
+        'ranked_by', COALESCE((SELECT jsonb_agg(DISTINCT lower(r.user_id)) FROM group_pick_rankings r WHERE r.pick_id = g.id), '[]'::jsonb),
+        'standings', COALESCE((SELECT jsonb_agg(jsonb_build_object(
                 'place_id', b.pid, 'points', b.points, 'first', b.first_n,
                 'second', b.second_n, 'third', b.third_n, 'voters', b.voters))
-            FROM _group_pick_borda(g.id) b), '[]'::json),
-        'my_ranking', COALESCE((SELECT json_agg(r.place_id ORDER BY r.rank) FROM group_pick_rankings r
-            WHERE r.pick_id = g.id AND lower(r.user_id) = lower(app_uid())), '[]'::json)
-    )
+            FROM _group_pick_borda(g.id) b), '[]'::jsonb),
+        'my_ranking', COALESCE((SELECT jsonb_agg(r.place_id ORDER BY r.rank) FROM group_pick_rankings r
+            WHERE r.pick_id = g.id AND lower(r.user_id) = lower(app_uid())), '[]'::jsonb)
+    ))::json
     FROM group_picks g WHERE g.id = p_pick_id;
 $$;
 
