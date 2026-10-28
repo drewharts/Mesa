@@ -15,6 +15,14 @@ struct OpenStatusBadgeView: View {
     
     let status: OpenStatus
     var onTap: (() -> Void)? = nil
+    /// Optional secondary text shown inside the pill, e.g. "Closes 11 PM".
+    var detailText: String? = nil
+
+    private var label: String {
+        if case .alwaysOpen = status { return status.displayText }
+        guard let detailText, !detailText.isEmpty else { return status.displayText }
+        return "\(status.displayText) · \(detailText)"
+    }
     
     // MARK: - Body
     
@@ -22,10 +30,12 @@ struct OpenStatusBadgeView: View {
         if status.shouldDisplay {
             Button(action: { onTap?() }) {
                 HStack(spacing: 4) {
-                    Text(status.displayText)
+                    Text(label)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(textColor)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     
                     // Show chevron if tappable
                     if onTap != nil {
@@ -38,6 +48,7 @@ struct OpenStatusBadgeView: View {
                 .padding(.vertical, 4)
                 .background(backgroundColor)
                 .cornerRadius(6)
+                .fixedSize()
             }
             .buttonStyle(.plain)
         }

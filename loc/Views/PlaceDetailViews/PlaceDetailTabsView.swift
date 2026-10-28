@@ -233,44 +233,48 @@ struct PlaceDetailTabsView: View {
     
     @ViewBuilder
     private var infoRow: some View {
-        HStack(spacing: 10) {
-            if viewModel.isCustomPlace {
-                CustomPlaceCreatorView(
-                    viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
-                    onCreatorTapped: { userId in
-                        guard let currentUserId = userSession.currentUserId else { return }
-                        userProfileNavigationVM.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if viewModel.isCustomPlace {
+                    CustomPlaceCreatorView(
+                        viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
+                        onCreatorTapped: { userId in
+                            guard let currentUserId = userSession.currentUserId else { return }
+                            userProfileNavigationVM.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+                        }
+                    )
+                    .layoutPriority(-1)
+                } else if let restaurantType = viewModel.restaurantType {
+                    Button {
+                        showingCategoryCorrectionSheet = true
+                    } label: {
+                        Text(restaurantType)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                )
-            } else if let restaurantType = viewModel.restaurantType {
-                Button {
-                    showingCategoryCorrectionSheet = true
-                } label: {
-                    Text(restaurantType)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                    .layoutPriority(-1)
+                }
+
+                TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
+                    .fixedSize()
+
+                if viewModel.showSaversIndicator {
+                    SavedByIndicator(
+                        savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
+                        additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
+                        onTap: { showingSaversSheet = true }
+                    )
+                    .fixedSize()
                 }
             }
-            
-            HStack(spacing: 6) {
-                OpenStatusBadgeView(status: viewModel.openStatus) {
-                    showingHoursSheet = true
-                }
-                if viewModel.openStatus.shouldDisplay, let changeText = viewModel.openStatusChangeText {
-                    Text(changeText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .onTapGesture { showingHoursSheet = true }
-                }
-            }
-            
-            TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
-            
-            if viewModel.showSaversIndicator {
-                SavedByIndicator(
-                    savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
-                    additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
-                    onTap: { showingSaversSheet = true }
+
+            if viewModel.openStatus.shouldDisplay {
+                OpenStatusBadgeView(
+                    status: viewModel.openStatus,
+                    onTap: { showingHoursSheet = true },
+                    detailText: viewModel.openStatusChangeText
                 )
             }
         }
