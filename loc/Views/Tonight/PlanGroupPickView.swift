@@ -53,6 +53,8 @@ struct PlanGroupPickView: View {
 
     private var effectiveDeadline: Date { customDeadline ? decideAt : autoDeadline }
 
+    @State private var peekPlace: DetailPlace?
+
     var body: some View { analyticsBody.analyticsScreen("Plan Group Pick") }
 
     @ViewBuilder private var analyticsBody: some View {
@@ -92,8 +94,20 @@ struct PlanGroupPickView: View {
                             .textInputAutocapitalization(.never)
                     }
                     ForEach(rows) { row in
-                        Button { toggle(row.placeId) } label: { rowLabel(row) }
-                            .buttonStyle(.plain)
+                        HStack(spacing: 8) {
+                            Button { toggle(row.placeId) } label: { rowLabel(row) }
+                                .buttonStyle(.plain)
+                            // Separate target so viewing details never toggles the selection.
+                            Button { peekPlace = row.place } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 36, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Details for \(row.place.name)")
+                        }
                     }
                     if rows.isEmpty {
                         Text(query.isEmpty ? "Save a few places and they'll show up here." : "No saved place matches that.")
@@ -108,6 +122,7 @@ struct PlanGroupPickView: View {
             }
             .navigationTitle("Plan for later")
             .navigationBarTitleDisplayMode(.inline)
+            .placePeek($peekPlace, source: "plan_group_pick")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -159,7 +174,9 @@ struct PlanGroupPickView: View {
             TonightPlaceThumbnail(place: row.place, size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.place.name).font(.subheadline.weight(.semibold)).lineLimit(1)
-                if let address = row.place.address {
+                if let category = TonightRanker.displayCategory(for: row.place) {
+                    Text(category).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                } else if let address = row.place.address {
                     Text(address).font(.caption).foregroundColor(.secondary).lineLimit(1)
                 }
             }

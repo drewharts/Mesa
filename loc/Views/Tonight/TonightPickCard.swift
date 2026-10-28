@@ -15,7 +15,7 @@ struct TonightPickCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 14) {
-                TonightPlaceThumbnail(place: pick.place, size: 64)
+                TonightPlaceThumbnail(place: pick.place, size: 72)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text("\(rank)")
@@ -26,6 +26,12 @@ struct TonightPickCard: View {
                         Text(pick.place.name)
                             .font(.headline)
                             .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                    if let category = TonightRanker.displayCategory(for: pick.place) {
+                        Text(category)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                     Text(pick.reason)

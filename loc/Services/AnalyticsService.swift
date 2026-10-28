@@ -120,6 +120,7 @@ enum Analytics {
         case onboardingStep = "onboarding_step"
         case signInFailed = "sign_in_failed"
         case placesInViewEmpty = "places_in_view_empty"
+        case placePeekOpened = "place_peek_opened"
     }
 }
 

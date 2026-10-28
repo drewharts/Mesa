@@ -32,6 +32,12 @@ struct GroupPickRankRow: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                             .lineLimit(1)
+                        if let place, let category = TonightRanker.displayCategory(for: place) {
+                            Text(category)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
                         Text(pointsText)
                             .font(.caption)
                             .foregroundColor(.secondary)
