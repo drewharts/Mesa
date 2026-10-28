@@ -252,8 +252,16 @@ struct PlaceDetailTabsView: View {
                 }
             }
             
-            OpenStatusBadgeView(status: viewModel.openStatus) {
-                showingHoursSheet = true
+            HStack(spacing: 6) {
+                OpenStatusBadgeView(status: viewModel.openStatus) {
+                    showingHoursSheet = true
+                }
+                if viewModel.openStatus.shouldDisplay, let changeText = viewModel.openStatusChangeText {
+                    Text(changeText)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .onTapGesture { showingHoursSheet = true }
+                }
             }
             
             TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)

@@ -21,6 +21,8 @@ struct MapView: View {
 
     /// Map-first list sheet: which list row/pin is focused and where the camera should go.
     @ObservedObject private var listSheetVM = ListMapSheetViewModel.shared
+    /// Stored opening hours, for the small "open now" dot on place pins.
+    @ObservedObject private var hoursStore = PlaceHoursStore.shared
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
@@ -145,6 +147,21 @@ struct MapView: View {
     /// precomputed profile-photo composite cache where available and MapMarkerImageFactory
     /// for everything else.
     private func annotationImage(for item: MapAnnotationItem, isSelected: Bool) -> UIImage? {
+        let base = baseAnnotationImage(for: item, isSelected: isSelected)
+        switch item.layer {
+        case .network, .community:
+            guard let base, let placeId = item.placeId else { return base }
+            hoursStore.prefetch([placeId])
+            if hoursStore.state(for: placeId)?.isOpen == true {
+                return MapMarkerImageFactory.shared.withOpenDot(base)
+            }
+            return base
+        default:
+            return base
+        }
+    }
+
+    private func baseAnnotationImage(for item: MapAnnotationItem, isSelected: Bool) -> UIImage? {
         switch item.layer {
         case .network(let annotation):
             if mapViewModel.showEmojiAnnotations {
@@ -424,7 +441,7 @@ struct MapView: View {
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userProfileNavigationVM)
                 .environmentObject(userSession)
-                .presentationDragIndicator(.visible)
+                .applyListMapSheetPresentation()
         }
         .onChange(of: selectedPlaceVM.selectedPlace?.id) { oldValue, newValue in
             if newValue == nil {

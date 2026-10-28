@@ -94,6 +94,9 @@ final class ListPlaceMetaStore: ObservableObject {
                     longitude: next.longitude
                 )
                 self.record(outcome, for: next.key)
+                if let tz = NeighborhoodGeocodingService.shared.lastTimeZone {
+                    PlaceHoursStore.shared.setTimeZone(tz, for: next.key)
+                }
                 // Stay under the geocoder's rate limit.
                 try? await Task.sleep(nanoseconds: 1_300_000_000)
             }

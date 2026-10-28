@@ -71,6 +71,8 @@ struct ListPlacesScrollView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
+            .onAppear { PlaceHoursStore.shared.prefetch(places.map(\.place_id)) }
+            .onChange(of: places.count) { _, _ in PlaceHoursStore.shared.prefetch(places.map(\.place_id)) }
             .onChange(of: scrollRequest) { _, request in
                 guard let request else { return }
                 scroll(proxy, to: request.placeId, delay: 250_000_000)
@@ -154,6 +156,7 @@ struct ListPlaceTileView: View {
     let onTap: () -> Void
 
     private let radius: CGFloat = 12
+    @ObservedObject private var hoursStore = PlaceHoursStore.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -165,6 +168,12 @@ struct ListPlaceTileView: View {
                     }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay(alignment: .bottomLeading) {
+                    if let state = hoursStore.state(for: place.place_id) {
+                        OpenNowPill(isOpen: state.isOpen)
+                            .padding(7)
+                    }
+                }
                 .overlay(
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .stroke(isSelected ? Color.mesaAccent : Color.gray.opacity(0.15),
@@ -201,6 +210,27 @@ struct ListPlaceTileView: View {
             return "Added by \(addedBy)"
         }
         return ListPlaceRowView.subtitle(for: place, locationText: locationText)
+    }
+}
+
+/// Small "Open" (green dot) / "Closed" pill drawn over a tile photo.
+struct OpenNowPill: View {
+    let isOpen: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(isOpen ? Color.green : Color.white.opacity(0.7))
+                .frame(width: 6, height: 6)
+            Text(isOpen ? "Open" : "Closed")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Color.black.opacity(isOpen ? 0.55 : 0.4)))
+        .accessibilityLabel(isOpen ? "Open now" : "Closed")
     }
 }
 

@@ -25,16 +25,20 @@ final class NeighborhoodGeocodingService {
 
     private let geocoder = CLGeocoder()
     private var backoffUntil = Date.distantPast
+    /// Time zone of the most recent successful lookup (used for open/closed evaluation).
+    private(set) var lastTimeZone: TimeZone?
 
     private init() {}
 
     /// Reverse-geocodes the coordinate and returns its neighborhood, if any.
     func neighborhood(latitude: Double, longitude: Double) async -> Outcome {
         guard Date() >= backoffUntil else { return .unavailable }
+        lastTimeZone = nil
         do {
             let placemarks = try await geocoder.reverseGeocodeLocation(
                 CLLocation(latitude: latitude, longitude: longitude)
             )
+            lastTimeZone = placemarks.first?.timeZone
             if let name = placemarks.first?.subLocality?.trimmingCharacters(in: .whitespacesAndNewlines),
                !name.isEmpty {
                 return .found(name)
