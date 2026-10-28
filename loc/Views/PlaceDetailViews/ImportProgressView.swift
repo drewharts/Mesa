@@ -256,9 +256,8 @@ struct ImportProgressView: View {
                 listViewModel: listViewModel,
                 selectedListId: $selectedListId,
                 isSaving: isSaving,
-                canSave: canSave,
-                buttonTitle: saveButtonTitle,
-                onSave: saveToSelectedList,
+                placeCount: placesToSave.count,
+                onSave: { list in saveToList(list) },
                 onChooseElsewhere: { viewModel.reviewAllPlaces(detailPlaceVM: detailPlaceViewModel) }
             )
         }
@@ -291,7 +290,13 @@ struct ImportProgressView: View {
 
     /// The one tap: saves all (checked) places to the selected list, then closes the sheet.
     private func saveToSelectedList() {
-        guard let listViewModel, let list = selectedList, canSave else { return }
+        guard let list = selectedList else { return }
+        saveToList(list)
+    }
+
+    /// Saves all (checked) places to the given list (resolved by the picker, which observes the VM).
+    private func saveToList(_ list: LightweightPlaceList) {
+        guard let listViewModel, !isSaving, !placesToSave.isEmpty else { return }
         let places = placesToSave
         isSaving = true
         Task { @MainActor in
@@ -359,9 +364,8 @@ private struct ImportSaveSection: View {
     @ObservedObject var listViewModel: PlaceListSelectionViewModel
     @Binding var selectedListId: String?
     let isSaving: Bool
-    let canSave: Bool
-    let buttonTitle: String
-    let onSave: () -> Void
+    let placeCount: Int
+    let onSave: (LightweightPlaceList) -> Void
     let onChooseElsewhere: () -> Void
 
     @State private var query = ""
@@ -369,6 +373,21 @@ private struct ImportSaveSection: View {
 
     private var sourceLists: [LightweightPlaceList] {
         listViewModel.allLists.isEmpty ? listViewModel.lists : listViewModel.allLists
+    }
+
+    /// Resolved here (this view observes the VM) so the checkmark and the button always agree.
+    private var selectedList: LightweightPlaceList? {
+        guard let id = selectedListId else { return nil }
+        return listViewModel.allLists.first { $0.list_id == id }
+            ?? listViewModel.lists.first { $0.list_id == id }
+            ?? listViewModel.filteredLists.first { $0.list_id == id }
+    }
+
+    private var canSave: Bool { !isSaving && selectedList != nil && placeCount > 0 }
+
+    private var buttonTitle: String {
+        guard let name = selectedList?.name else { return "Save" }
+        return placeCount <= 1 ? "Save to \(name)" : "Save \(placeCount) places to \(name)"
     }
 
     private var visibleLists: [LightweightPlaceList] {
@@ -409,7 +428,7 @@ private struct ImportSaveSection: View {
                 .frame(maxHeight: 260)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                Button(action: onSave) {
+                Button { if let list = selectedList { onSave(list) } } label: {
                     HStack(spacing: 8) {
                         if isSaving { ProgressView().tint(.white) }
                         Text(buttonTitle)
