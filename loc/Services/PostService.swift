@@ -39,6 +39,12 @@ class PostService: ObservableObject {
     func savePost(_ post: PlacePost, forPlace place: DetailPlace, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
             do {
+                // Never save against the shared placeholder UUID: every unresolved place
+                // shares it, so posts would later collapse onto whatever place it ends up as.
+                guard !place.hasPlaceholderID,
+                      post.placeId != DetailPlace.placeholderUUID.uuidString else {
+                    throw NSError(domain: "PostService", code: 1, userInfo: [NSLocalizedDescriptionKey: "This place is still loading. Try again in a moment."])
+                }
                 // Ensure place exists before saving post (satisfies FK constraint)
                 try await placeService.ensurePlaceExists(place: place)
                 

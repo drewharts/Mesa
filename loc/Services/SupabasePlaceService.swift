@@ -670,6 +670,9 @@ class SupabasePlaceService: ObservableObject {
     /// Ensures a place exists in the database before creating posts/reviews
     /// Uses upsert to insert if not exists, or do nothing if already present
     func ensurePlaceExists(place: DetailPlace) async throws {
+        guard !place.hasPlaceholderID else {
+            throw NSError(domain: "SupabasePlaceService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing to upsert placeholder place id"])
+        }
         let placeData = convertToPlaceData(place)
         
         try await supabase.client
