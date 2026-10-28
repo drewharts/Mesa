@@ -418,6 +418,7 @@ struct GoogleMapView: UIViewRepresentable {
         // MARK: GMSMapViewDelegate — camera
 
         func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
+            isCameraMoving = true
             if gesture {
                 isApplyingProgrammaticCameraChange = false
             }
@@ -426,6 +427,11 @@ struct GoogleMapView: UIViewRepresentable {
         /// GMSMapView has a native "camera came to rest" callback, unlike MKMapView (which has
         /// no mapView(_:idleAt:)-style delegate method and needed a manual debounce timer here).
         func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
+            isCameraMoving = false
+            if let pending = pendingIconRevision {
+                // Flush after the settle work below has run.
+                DispatchQueue.main.async { [weak self] in self?.syncIconRevision(pending) }
+            }
             let region = currentRegion(on: mapView)
             #if DEBUG
             print("[MapCenter] idleAt: target=\(position.target) hasAppliedInitialCamera=\(hasAppliedInitialCamera) isApplyingProgrammaticCameraChange=\(isApplyingProgrammaticCameraChange)")
@@ -450,10 +456,19 @@ struct GoogleMapView: UIViewRepresentable {
         // MARK: Icon refresh
 
         private var lastIconRevision = 0
+        /// True between willMove and idleAt. Re-clustering / re-rendering markers mid-flight
+        /// makes pins pop and the camera stutter, so icon refreshes wait for the camera to settle.
+        private var isCameraMoving = false
+        private var pendingIconRevision: Int?
 
         /// Redraws every marker when icon inputs (open/closed status) changed.
         func syncIconRevision(_ revision: Int) {
             guard revision != lastIconRevision else { return }
+            if isCameraMoving {
+                pendingIconRevision = revision
+                return
+            }
+            pendingIconRevision = nil
             lastIconRevision = revision
             clusterManager.cluster()
             for (_, marker) in directMarkersById {
