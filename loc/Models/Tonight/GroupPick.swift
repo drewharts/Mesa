@@ -65,6 +65,21 @@ struct GroupPickMember: Codable, Equatable, Identifiable {
     }
 }
 
+/// Borda standing for one place in a planned (ranked) pick: 1st = 3 pts, 2nd = 2, 3rd = 1.
+struct GroupPickStanding: Codable, Equatable {
+    let placeId: String
+    let points: Int
+    let first: Int
+    let second: Int
+    let third: Int
+    let voters: Int
+
+    enum CodingKeys: String, CodingKey {
+        case placeId = "place_id"
+        case points, first, second, third, voters
+    }
+}
+
 struct GroupPick: Codable, Equatable, Identifiable {
     let id: String
     let creatorId: String
@@ -82,6 +97,16 @@ struct GroupPick: Codable, Equatable, Identifiable {
     let members: [GroupPickMember]
     let waitingOn: [String]
     let addedBy: [String: String]
+    /// Planned (ranked) pick fields from the 20261028120000 migration; defaults for "tonight" picks.
+    var modeRaw: String?
+    var eventAt: Date?
+    var rankedCount: Int = 0
+    var rankedBy: [String] = []
+    var standings: [GroupPickStanding] = []
+    var myRanking: [String] = []
+
+    /// A future plan where everyone ranks their top 3 (vs. tonight's yes/no vote).
+    var isPlanned: Bool { modeRaw == "planned" }
 
     /// Decided with a winner, a tie-break winner, or closed with no match.
     var isDecided: Bool { decidedAt != nil || decidedPlaceId != nil }
@@ -111,6 +136,12 @@ struct GroupPick: Codable, Equatable, Identifiable {
         case members
         case waitingOn = "waiting_on"
         case addedBy = "added_by"
+        case modeRaw = "mode"
+        case eventAt = "event_at"
+        case rankedCount = "ranked_count"
+        case rankedBy = "ranked_by"
+        case standings
+        case myRanking = "my_ranking"
     }
 
     /// Decodes the RPC JSON, tolerating missing optional collections and Postgres timestamp formats.
@@ -131,6 +162,12 @@ struct GroupPick: Codable, Equatable, Identifiable {
         members = (try? c.decodeIfPresent([GroupPickMember].self, forKey: .members)) ?? []
         waitingOn = (try? c.decodeIfPresent([String].self, forKey: .waitingOn)) ?? []
         addedBy = (try? c.decodeIfPresent([String: String].self, forKey: .addedBy)) ?? [:]
+        modeRaw = try? c.decodeIfPresent(String.self, forKey: .modeRaw)
+        eventAt = GroupPick.parseDate(try? c.decodeIfPresent(String.self, forKey: .eventAt))
+        rankedCount = (try? c.decodeIfPresent(Int.self, forKey: .rankedCount)) ?? 0
+        rankedBy = (try? c.decodeIfPresent([String].self, forKey: .rankedBy)) ?? []
+        standings = (try? c.decodeIfPresent([GroupPickStanding].self, forKey: .standings)) ?? []
+        myRanking = (try? c.decodeIfPresent([String].self, forKey: .myRanking)) ?? []
     }
 
     /// Encodes dates back as ISO-8601 strings.
@@ -151,6 +188,12 @@ struct GroupPick: Codable, Equatable, Identifiable {
         try c.encode(members, forKey: .members)
         try c.encode(waitingOn, forKey: .waitingOn)
         try c.encode(addedBy, forKey: .addedBy)
+        try c.encodeIfPresent(modeRaw, forKey: .modeRaw)
+        try c.encodeIfPresent(eventAt.map { ISO8601DateFormatter().string(from: $0) }, forKey: .eventAt)
+        try c.encode(rankedCount, forKey: .rankedCount)
+        try c.encode(rankedBy, forKey: .rankedBy)
+        try c.encode(standings, forKey: .standings)
+        try c.encode(myRanking, forKey: .myRanking)
     }
 
     /// Parses Postgres timestamptz JSON strings (with or without fractional seconds).
@@ -272,5 +315,35 @@ struct GroupPickSummary: Codable, Equatable, Identifiable {
         if needsMyVote { return "Your vote is needed · \(memberCount) \(memberCount == 1 ? "person" : "people")" }
         if let decideAt { return "Waiting for the others · decides by \(decideAt.formatted(date: .omitted, time: .shortened))" }
         return "Waiting for the others"
+    }
+}
+
+extension GroupPick {
+    /// Places with at least one point, best first (server order: points, 1sts, 2nds, list order).
+    var podium: [GroupPickStanding] { Array(standings.filter { $0.points > 0 }.prefix(3)) }
+
+    /// The caller's rank (1...3) for a place, if ranked.
+    func myRank(for placeId: String) -> Int? {
+        myRanking.firstIndex { $0.lowercased() == placeId.lowercased() }.map { $0 + 1 }
+    }
+
+    /// Members who haven't ranked yet, excluding the caller.
+    func unrankedMembers(excluding userId: String?) -> [GroupPickMember] {
+        let ranked = Set(rankedBy.map { $0.lowercased() })
+        let me = userId?.lowercased()
+        return members.filter { !ranked.contains($0.userId.lowercased()) && $0.userId.lowercased() != me }
+    }
+
+    /// Keeps the planned fields from an earlier state when a base-JSON RPC (invite / add places) replies.
+    func keepingPlannedFields(from old: GroupPick) -> GroupPick {
+        guard modeRaw == nil, old.isPlanned else { return self }
+        var copy = self
+        copy.modeRaw = old.modeRaw
+        copy.eventAt = old.eventAt
+        copy.rankedCount = old.rankedCount
+        copy.rankedBy = old.rankedBy
+        copy.standings = old.standings
+        copy.myRanking = old.myRanking
+        return copy
     }
 }

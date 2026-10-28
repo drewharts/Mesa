@@ -72,7 +72,9 @@ struct GroupPickSheet: View {
             if !pick.members.isEmpty {
                 GroupPickMembersStrip(pick: pick, currentUserId: viewModel.currentUserId)
             }
-            if pick.hasWinner {
+            if pick.isPlanned {
+                plannedContent(pick)
+            } else if pick.hasWinner {
                 GroupPickResultView(
                     pick: pick,
                     winner: viewModel.winner,
@@ -94,14 +96,53 @@ struct GroupPickSheet: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
-            if pick.hasWinner {
+            if !pick.isPlanned && pick.hasWinner {
                 Text("All options")
                     .font(.subheadline.weight(.semibold))
                     .padding(.top, 4)
             }
-            voteRows(pick)
+            if !pick.isPlanned { voteRows(pick) }
             if !pick.isDecided {
                 actionRow
+            }
+        }
+    }
+
+    /// Planned pick: live/final podium, then every option with one-tap 1st/2nd/3rd badges.
+    @ViewBuilder
+    private func plannedContent(_ pick: GroupPick) -> some View {
+        GroupPickPodiumView(
+            pick: pick,
+            note: pick.isDecided ? viewModel.decisionNote : nil,
+            placeName: { viewModel.place(for: $0)?.name ?? "Loading…" },
+            winner: viewModel.winner,
+            onOpenWinner: {
+                guard let place = viewModel.winner else { return }
+                Analytics.track(.groupPickPlaceOpened, ["source": "planned_result"])
+                onOpenPlace(place)
+            },
+            onDirections: {
+                guard let place = viewModel.winner else { return }
+                Analytics.track(.groupPickDirectionsTapped)
+                PlaceDirections.open(place)
+            }
+        )
+        if let waiting = viewModel.waitingText {
+            Text(waiting).font(.subheadline).foregroundColor(.secondary)
+        }
+        VStack(spacing: 10) {
+            ForEach(pick.placeIds, id: \.self) { placeId in
+                let place = viewModel.place(for: placeId)
+                GroupPickRankRow(
+                    name: place?.name ?? "Loading…",
+                    place: place,
+                    standing: pick.standings.first { $0.placeId.lowercased() == placeId.lowercased() },
+                    myRank: pick.myRank(for: placeId),
+                    isWinner: pick.decidedPlaceId?.lowercased() == placeId.lowercased(),
+                    isDecided: pick.isDecided,
+                    onToggle: { Task { await viewModel.toggleRank(placeId: placeId) } },
+                    onOpen: { if let place { onOpenPlace(place) } }
+                )
             }
         }
     }
@@ -220,7 +261,7 @@ struct GroupPickSheet: View {
             }
             Spacer()
             if let url = GroupPickService.shared.shareURL(pickId: viewModel.pickId), viewModel.pick?.isDecided == false {
-                ShareLink(item: url, message: Text("Tap to vote on where we go")) {
+                ShareLink(item: url, message: Text(viewModel.pick?.isPlanned == true ? "Rank your top 3 for \(viewModel.pick?.title ?? "our plan")" : "Tap to vote on where we go")) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 18))
                         .foregroundColor(.primary)

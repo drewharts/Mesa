@@ -12,12 +12,20 @@ struct GroupPickMembersStrip: View {
     let pick: GroupPick
     let currentUserId: String?
 
-    private var waiting: Set<String> { Set(pick.waitingOn.map { $0.lowercased() }) }
+    /// Planned picks: waiting on whoever hasn't ranked; tonight picks: the server's waiting_on.
+    private var waiting: Set<String> {
+        if pick.isPlanned {
+            let ranked = Set(pick.rankedBy.map { $0.lowercased() })
+            return Set(pick.members.map { $0.userId.lowercased() }.filter { !ranked.contains($0) })
+        }
+        return Set(pick.waitingOn.map { $0.lowercased() })
+    }
 
     /// Once a pick is decided, anyone who voted counts as done: an early decision
     /// (e.g. unanimous yes) can leave places nobody needed to vote on, and the server's
     /// waiting_on still lists those members.
     private func isDone(_ member: GroupPickMember) -> Bool {
+        if pick.isPlanned { return !waiting.contains(member.userId.lowercased()) }
         if pick.isDecided { return member.votedCount > 0 || !waiting.contains(member.userId.lowercased()) }
         return !waiting.contains(member.userId.lowercased())
     }
@@ -47,7 +55,7 @@ struct GroupPickMembersStrip: View {
                 }
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text("\(doneCount) of \(pick.members.count) voted")
+                Text("\(doneCount) of \(pick.members.count) \(pick.isPlanned ? "ranked" : "voted")")
                     .font(.subheadline.weight(.semibold))
                 if let waitingLine {
                     Text(waitingLine)

@@ -90,6 +90,7 @@ final class GroupPickViewModel: ObservableObject {
     var statusText: String {
         guard let pick else { return "" }
         let people = "\(pick.memberCount) \(pick.memberCount == 1 ? "person" : "people") in"
+        if pick.isPlanned { return plannedStatusText(pick, people: people) }
         if pick.isDecided { return "Decided · \(people)" }
         guard let decideAt = pick.decideAt else { return people }
         return "\(people) · decides by \(decideAt.formatted(date: .omitted, time: .shortened))"
@@ -98,6 +99,14 @@ final class GroupPickViewModel: ObservableObject {
     /// Who the vote is waiting on, e.g. "Waiting on Grace" or "Your vote is needed".
     var waitingText: String? {
         guard let pick, !pick.isDecided else { return nil }
+        if pick.isPlanned {
+            if pick.myRanking.isEmpty { return "Tap your favorites in order: 1st, 2nd, 3rd" }
+            let left = pick.unrankedMembers(excluding: userId).map(\.displayName)
+            if left.isEmpty { return "You've ranked. Waiting for the others." }
+            return left.count <= 2
+                ? "You've ranked. Waiting on \(left.joined(separator: " and "))."
+                : "You've ranked. Waiting on \(left[0]) and \(left.count - 1) others."
+        }
         if !pick.hasVotedOnAll(userId: userId) { return "Tap 👍 or 👎 on each place" }
         // The members strip already says who it's waiting on.
         if !pick.members.isEmpty { return nil }
@@ -114,6 +123,14 @@ final class GroupPickViewModel: ObservableObject {
     /// One line explaining how the result was reached.
     var decisionNote: String? {
         guard let pick, pick.isDecided else { return nil }
+        if pick.isPlanned {
+            let ranked = "\(pick.rankedCount) of \(max(pick.memberCount, 1)) ranked"
+            switch pick.outcome {
+            case .noMatch: return "Voting closed and nobody ranked a place."
+            case .tieBreak: return "Final · tied on points, more 1st-place votes won · \(ranked)."
+            default: return pick.decidedReason == "everyone_voted" ? "Final · everyone ranked." : "Final · voting closed · \(ranked)."
+            }
+        }
         let yes = pick.decidedPlaceId.map { pick.tally(for: $0).yes } ?? 0
         let total = max(pick.memberCount, 1)
         switch pick.outcome {
@@ -205,9 +222,60 @@ final class GroupPickViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Ranking (planned picks)
+
+    /// One tap per place: unranked -> next free rank (up to 3); ranked -> removed (later ranks move up).
+    /// Saved right away so standings update live for everyone.
+    func toggleRank(placeId: String) async {
+        guard let pick, pick.isPlanned, !pick.isDecided else { return }
+        var ranking = pick.myRanking
+        if let i = ranking.firstIndex(where: { $0.lowercased() == placeId.lowercased() }) {
+            ranking.remove(at: i)
+        } else {
+            guard ranking.count < 3 else {
+                notice = "You've picked your top 3. Tap one to swap it out."
+                return
+            }
+            ranking.append(placeId)
+        }
+        notice = nil
+        // Optimistic update so the 1/2/3 badges move instantly.
+        var optimistic = pick
+        optimistic.myRanking = ranking
+        self.pick = optimistic
+        do {
+            apply(try await groupPickService.rank(pickId: pickId, placeIds: ranking))
+            Analytics.track(.groupPickVoted, ["vote": "rank", "ranked": ranking.count])
+            if self.pick?.isDecided == true { stop() }
+        } catch {
+            self.pick = pick
+            errorMessage = "Your ranking didn't save. Try again."
+        }
+    }
+
+    private func plannedStatusText(_ pick: GroupPick, people: String) -> String {
+        var parts: [String] = []
+        if let eventAt = pick.eventAt {
+            parts.append(eventAt.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))
+        }
+        if pick.isDecided {
+            parts.append("Final")
+        } else if let decideAt = pick.decideAt {
+            parts.append("voting closes \(decideAt.formatted(.dateTime.weekday(.abbreviated).hour().minute()))")
+        }
+        parts.append("\(pick.rankedCount)/\(max(pick.memberCount, 1)) ranked")
+        return parts.joined(separator: " · ")
+    }
+
     /// Stores new state and reports the decision once. A reopened pick (more options after no match) re-arms it.
     private func apply(_ newPick: GroupPick) {
         let wasDecided = pick?.isDecided == true
+        var newPick = newPick
+        if let old = pick, old.isPlanned, newPick.modeRaw == nil {
+            // invite / add places reply with the base JSON: keep ranked fields, then reload them.
+            newPick = newPick.keepingPlannedFields(from: old)
+            Task { [weak self] in await self?.refresh() }
+        }
         pick = newPick
         if wasDecided && !newPick.isDecided {
             reportedDecision = false

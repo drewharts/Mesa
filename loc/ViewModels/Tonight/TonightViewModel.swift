@@ -57,6 +57,11 @@ final class TonightViewModel: ObservableObject {
         self.groupPickService = groupPickService
     }
 
+    var pagesFlattened: [TonightPick] { pages.flatMap { $0 } }
+    var candidatesBySaves: [TonightCandidate] { candidates.sorted { $0.saverIds.count > $1.saverIds.count } }
+    var groupPickServiceForPlan: GroupPickService { groupPickService }
+    func detailsFor(_ placeId: String) -> DetailPlace? { details[placeId.lowercased()] ?? details[placeId] }
+
     var picks: [TonightPick] {
         if case .loaded(let picks) = state { return picks }
         return []
@@ -216,4 +221,67 @@ final class TonightViewModel: ObservableObject {
             shareService.presentShareSheet(with: [text])
         }
     }
+
+// MARK: - Planned group pick (future date, ranked top 3)
+
+/// A place offered in the "Plan for later" screen.
+struct PlanCandidate: Identifiable, Equatable {
+    let placeId: String
+    let place: DetailPlace
+    var id: String { placeId.lowercased() }
 }
+
+extension TonightViewModel {
+    /// Smart suggestions for a plan: Tonight's ranked picks first (any open state), then the most-saved
+    /// places in the circle. The first 3 are preselected by the planner.
+    var planSuggestions: [PlanCandidate] {
+        var seen = Set<String>()
+        var out: [PlanCandidate] = []
+        for pick in pagesFlattened where seen.insert(pick.placeId.lowercased()).inserted {
+            out.append(PlanCandidate(placeId: pick.placeId, place: pick.place))
+        }
+        for c in candidatesBySaves where seen.insert(c.placeId.lowercased()).inserted {
+            if let place = detailsFor(c.placeId) { out.append(PlanCandidate(placeId: c.placeId, place: place)) }
+            if out.count >= 8 { break }
+        }
+        return Array(out.prefix(8))
+    }
+
+    /// Searches every loaded save (yours and friends') by name or address.
+    func searchSaved(_ query: String) -> [PlanCandidate] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return [] }
+        return candidatesBySaves.compactMap { c -> PlanCandidate? in
+            guard let place = detailsFor(c.placeId) else { return nil }
+            let hay = (place.name + " " + (place.address ?? "")).lowercased()
+            return hay.contains(q) ? PlanCandidate(placeId: c.placeId, place: place) : nil
+        }
+        .prefix(20).map { $0 }
+    }
+
+    /// Creates the planned pick, swaps to the live ranking sheet, then opens the share sheet with the link.
+    func createPlannedPick(title: String, placeIds: [String], eventAt: Date?, decideAt: Date?) async -> Bool {
+        guard placeIds.count >= 2, !isSharing else { return false }
+        isSharing = true
+        defer { isSharing = false }
+        do {
+            let pickId = try await groupPickServiceForPlan.createPlannedPick(
+                placeIds: placeIds, title: title, eventAt: eventAt, decideAt: decideAt)
+            Analytics.track(.groupPickCreated, ["mode": "planned", "count": placeIds.count, "has_date": eventAt != nil])
+            guard let url = groupPickServiceForPlan.shareURL(pickId: pickId) else { return true }
+            var text = "Help pick where we go"
+            if let eventAt {
+                text += " \(eventAt.formatted(.dateTime.weekday(.wide).hour().minute()))"
+            }
+            text += ". Rank your top 3:"
+            PresentationService.shared.present(.groupPick(pickId: pickId))
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            PlaceShareService().presentShareSheet(with: [text, url])
+            return true
+        } catch {
+            print("⚠️ [Tonight] Planned group pick unavailable: \(error)")
+            return false
+        }
+    }
+}
+
