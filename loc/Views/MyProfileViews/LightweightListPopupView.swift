@@ -395,13 +395,10 @@ struct LightweightListPopupView: View {
         placeMeta.prefetchCities(for: allPlaces)
     }
 
-    /// Row tap: highlight and center its pin. Tapping the already-selected row opens its details.
+    /// Tile tap: open the place immediately and focus/center its pin, so the map is on it when details close.
     private func handleRowTap(_ place: LightweightPlace) {
-        if sheetVM.isFocused(place.place_id) {
-            openPlaceDetail(place)
-        } else {
-            sheetVM.focus(place: place, source: .row)
-        }
+        sheetVM.focus(place: place, source: .row)
+        openPlaceDetail(place)
     }
 
     /// Opens the place page inside the sheet.
