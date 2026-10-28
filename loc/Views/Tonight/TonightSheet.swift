@@ -21,6 +21,8 @@ struct TonightSheet: View {
         self.onOpenPlace = onOpenPlace
     }
 
+    @State private var peekPlace: DetailPlace?
+
     var body: some View { analyticsBody.analyticsScreen("Tonight") }
 
     @ViewBuilder private var analyticsBody: some View {
@@ -41,6 +43,7 @@ struct TonightSheet: View {
         .padding(.top, 16)
         .task { await viewModel.loadIfNeeded() }
         .sheet(isPresented: $showPlanner) { PlanGroupPickView(viewModel: viewModel) }
+        .placePeek($peekPlace, source: "tonight", onShowOnMap: onOpenPlace)
     }
 
     // MARK: - Header
@@ -92,7 +95,7 @@ struct TonightSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ForEach(Array(picks.enumerated()), id: \.element.id) { index, pick in
-                    TonightPickCard(pick: pick, rank: index + 1) { onOpenPlace(pick.place) }
+                    TonightPickCard(pick: pick, rank: index + 1) { peekPlace = pick.place }
                 }
                 if viewModel.canShowMore {
                     moreOptionsButton

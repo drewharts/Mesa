@@ -27,6 +27,8 @@ struct GroupPickSheet: View {
         self.onOpenPlace = onOpenPlace
     }
 
+    @State private var peekPlace: DetailPlace?
+
     var body: some View { analyticsBody.analyticsScreen("Group Pick") }
 
     @ViewBuilder private var analyticsBody: some View {
@@ -40,6 +42,7 @@ struct GroupPickSheet: View {
                 GroupPickInviteView(viewModel: viewModel)
             }
         }
+        .placePeek($peekPlace, source: "group_pick", onShowOnMap: onOpenPlace)
         .task { await viewModel.start() }
         .onDisappear { viewModel.stop() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
@@ -143,7 +146,7 @@ struct GroupPickSheet: View {
                     isWinner: pick.decidedPlaceId?.lowercased() == placeId.lowercased(),
                     isDecided: pick.isDecided,
                     onToggle: { Task { await viewModel.toggleRank(placeId: placeId) } },
-                    onOpen: { if let place { onOpenPlace(place) } }
+                    onOpen: { if let place { peekPlace = place } }
                 )
             }
         }
@@ -161,7 +164,7 @@ struct GroupPickSheet: View {
                     isWinner: pick.decidedPlaceId?.lowercased() == placeId.lowercased(),
                     isDecided: pick.isDecided,
                     onVote: { yes in Task { await viewModel.vote(placeId: placeId, yes: yes) } },
-                    onOpen: { if let place { onOpenPlace(place) } }
+                    onOpen: { if let place { peekPlace = place } }
                 )
             }
         }
