@@ -65,6 +65,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
     // Forwarded from OpenStatusViewModel (enables view re-render when status changes)
     @Published var openStatus: OpenStatus = .unknown
+    @Published var openStatusChangeText: String?
 
     // MARK: - Place Actions State
     /// Whether the current place is saved in any of the user's lists or favorites
@@ -193,6 +194,11 @@ class PlaceDetailTabsViewModel: ObservableObject {
         openStatusViewModel.$status
             .sink { [weak self] status in
                 self?.openStatus = status
+            }
+            .store(in: &cancellables)
+        openStatusViewModel.$changeText
+            .sink { [weak self] text in
+                self?.openStatusChangeText = text
             }
             .store(in: &cancellables)
     }

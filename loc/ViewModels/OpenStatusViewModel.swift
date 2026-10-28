@@ -19,6 +19,8 @@ class OpenStatusViewModel: ObservableObject {
     @Published private(set) var displayText: String = ""
     @Published private(set) var isOpen: Bool = false
     @Published private(set) var shouldDisplay: Bool = false
+    /// "Closes 10 PM" / "Opens 9 AM", nil when unknown.
+    @Published private(set) var changeText: String?
 
     // MARK: - Private Properties
 
@@ -54,6 +56,8 @@ class OpenStatusViewModel: ObservableObject {
         
         let newStatus = OpenStatusService.getStatus(for: place)
         applyStatus(newStatus)
+        changeText = newStatus.shouldDisplay ? OpenStatusService.changeText(for: place) : nil
+        PlaceHoursStore.shared.seed(placeId: place.id.uuidString, weekdayText: place.openHours)
         
         // Schedule refresh for time-sensitive statuses
         scheduleRefreshIfNeeded(for: newStatus)
@@ -71,12 +75,13 @@ class OpenStatusViewModel: ObservableObject {
         displayText = ""
         isOpen = false
         shouldDisplay = false
+        changeText = nil
     }
     
     /// Schedules automatic refresh for time-sensitive statuses (closing/opening soon)
     private func scheduleRefreshIfNeeded(for status: OpenStatus) {
         switch status {
-        case .closingSoon, .openingSoon:
+        case .closingSoon, .openingSoon, .open, .closed:
             // Refresh every minute for time-sensitive statuses
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
