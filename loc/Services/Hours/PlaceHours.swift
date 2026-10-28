@@ -89,7 +89,7 @@ struct PlaceHours: Equatable {
         let closeMeridiem = meridiem(of: sides[1])
         var open = parseTime(sides[0], fallbackMeridiem: closeMeridiem)
         // "11-2 PM": if sharing the meridiem would put open after close, the open is AM.
-        if meridiem(of: sides[0]) == nil, closeMeridiem == "pm", let o = open, o > close.minutes {
+        if meridiem(of: sides[0]) == nil, closeMeridiem == "pm", let o = open, o.minutes > close.minutes {
             open = (o.minutes - 720, o.hasMeridiem)
         }
         guard let open else { return nil }

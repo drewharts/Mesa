@@ -33,7 +33,7 @@ final class PlaceHoursStore: ObservableObject {
     // MARK: - Reading
 
     func timeZone(for placeId: String) -> TimeZone {
-        timeZones[placeId.lowercased()] ?? .current
+        PlaceTimeZoneCache.shared.timeZone(for: placeId)
     }
 
     /// Current state, or nil when hours are unknown.
