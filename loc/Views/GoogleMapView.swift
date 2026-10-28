@@ -46,15 +46,7 @@ struct GoogleMapView: UIViewRepresentable {
     /// arriving or the minute ticking over), so already-rendered markers get redrawn.
     var iconRevision: Int = 0
 
-    /// On-screen point distance below which GMUClusterManager merges pins into a cluster
-    /// badge. Deliberately smaller than the markers' own visual footprint (community/emoji
-    /// circles up to ~70pt, profile-photo composites up to 60pt wide) — pins are allowed to
-    /// overlap somewhat before clustering kicks in, so merging only happens once you're
-    /// zoomed out noticeably farther, rather than as soon as two pins first touch. Raise this
-    /// to cluster sooner (at less zoom-out); lower it to require even more zoom-out first.
-    /// MapKit's built-in clustering had no equivalent tunable — this is the parameter that
-    /// was missing there.
-    static let clusterDistancePoints: UInt = 20
+    // Clustering radius is now footprint-based; see OverlapClusterAlgorithm.
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -118,6 +110,9 @@ struct GoogleMapView: UIViewRepresentable {
         private var hasSelection = false
         /// Opacity of every other pin while one place is selected.
         private static let dimmedOpacity: Float = 0.5
+        private var overlapAlgorithm: OverlapClusterAlgorithm?
+        /// Real on-screen size of each rendered pin (minus shadow padding), fed back into clustering.
+        private var renderedFootprints: [String: OverlapClusterAlgorithm.Footprint] = [:]
 
         init(_ parent: GoogleMapView) {
             self.parent = parent
@@ -128,13 +123,23 @@ struct GoogleMapView: UIViewRepresentable {
             let iconGenerator = GMUDefaultClusterIconGenerator()
             // Swift imports this initializer as failable even though it can't actually fail for
             // any UInt input — force-unwrap is safe here.
-            let algorithm = GMUNonHierarchicalDistanceBasedAlgorithm(
-                clusterDistancePoints: GoogleMapView.clusterDistancePoints
-            )!
+            // One footprint-aware clusterer for every clusterable layer (friends' photo pins,
+            // community emoji, cities): markers merge as soon as their on-screen rects touch.
+            let algorithm = OverlapClusterAlgorithm()
+            algorithm.mapView = mapView
+            algorithm.badgeSize = 40
+            algorithm.footprint = { [weak self] item in
+                self?.renderedFootprints[item.stableId] ?? OverlapClusterAlgorithm.defaultFootprint(item)
+            }
+            overlapAlgorithm = algorithm
             let renderer = GMUDefaultClusterRenderer(mapView: mapView, clusterIconGenerator: iconGenerator)
             // Clusters of 2+ overlapping pins should show a badge — the library's own default
             // (4) would leave 2-3 visually-overlapping pins rendered individually.
             renderer.minimumClusterSize = 2
+            // Library default stops clustering above zoom 20, letting same-building pins overlap.
+            renderer.maximumClusterZoom = 23
+            renderer.animatesClusters = true
+            renderer.animationDuration = 0.3
             renderer.delegate = self
             clusterRenderer = renderer
             clusterManager = GMUClusterManager(map: mapView, algorithm: algorithm, renderer: renderer)
@@ -245,16 +250,22 @@ struct GoogleMapView: UIViewRepresentable {
 
         private func syncClusterableItems(_ newItems: [MapAnnotationItem]) {
             let newById = Dictionary(uniqueKeysWithValues: newItems.map { ($0.stableId, $0) })
-            guard Set(newById.keys) != Set(clusterableItemsById.keys) else {
+            let oldIds = Set(clusterableItemsById.keys)
+            let newIds = Set(newById.keys)
+            guard oldIds != newIds else {
                 clusterableItemsById = newById
                 return
             }
-            clusterManager.clearItems()
-            for item in newItems {
-                clusterManager.add(item)
+            // Incremental diff (no clear + re-add): the renderer keeps markers for unchanged items.
+            for id in oldIds.subtracting(newIds) {
+                if let old = clusterableItemsById[id] { clusterManager.remove(old) }
+                renderedFootprints.removeValue(forKey: id)
             }
+            let added = newIds.subtracting(oldIds).compactMap { newById[$0] }
+            if !added.isEmpty { clusterManager.add(added as [GMUClusterItem]) }
             clusterableItemsById = newById
-            clusterManager.cluster()
+            // Mid-flight reclusters make pins pop; idleAt reclusters once the camera settles.
+            if !isCameraMoving { clusterManager.cluster() }
         }
 
         private func syncDirectMarkers(_ newItems: [MapAnnotationItem], on mapView: GMSMapView) {
@@ -518,6 +529,14 @@ struct GoogleMapView: UIViewRepresentable {
             let isSelected = highlightedStableIds.contains(item.stableId)
             let image = parent.annotationImageProvider(item, isSelected)
             marker.icon = image
+            if let image {
+                let pad = MapMarkerImageFactory.renderPadding
+                let bottom: Bool = { if case .network = item.layer { return true } else { return false } }()
+                renderedFootprints[item.stableId] = .init(
+                    size: CGSize(width: max(image.size.width - pad * 2, 1), height: max(image.size.height - pad * 2, 1)),
+                    bottomAnchored: bottom
+                )
+            }
 
             if case .network = item.layer {
                 // Emulates the old MapKit centerOffset trick — anchor the marker at the bottom-
@@ -574,8 +593,13 @@ struct GoogleMapView: UIViewRepresentable {
             for item in cluster.items {
                 bounds = bounds.includingCoordinate(item.position)
             }
-            let update = GMSCameraUpdate.fit(bounds, withPadding: 60)
-            mapView.animate(with: update)
+            // Zoom to fit the members; if they share (almost) one spot, step in 2 levels instead.
+            let ne = bounds.northEast, sw = bounds.southWest
+            if abs(ne.latitude - sw.latitude) < 0.00005, abs(ne.longitude - sw.longitude) < 0.00005 {
+                mapView.animate(with: GMSCameraUpdate.setTarget(cluster.position, zoom: min(mapView.camera.zoom + 2, mapView.maxZoom)))
+            } else {
+                mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 80))
+            }
         }
 
         // MARK: Gestures — long-press-to-create-place and tap-to-discover
