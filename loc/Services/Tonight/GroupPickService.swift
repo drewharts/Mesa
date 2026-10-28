@@ -40,13 +40,50 @@ final class GroupPickService {
         return id
     }
 
-    /// Loads a pick, joining the caller as a member and auto-deciding it if voting is done or time is up.
-    func fetchPick(id: String) async throws -> GroupPick {
-        struct Params: Encodable { let p_pick_id: String }
-        let pick: GroupPick? = try await supabase.client
-            .rpc("get_group_pick", params: Params(p_pick_id: id))
+    /// Creates a planned pick for a future date where everyone ranks their top 3
+    /// (create_planned_group_pick, 20261028120000). `decideAt` nil = server default (day before the event).
+    func createPlannedPick(placeIds: [String], title: String, eventAt: Date?, decideAt: Date?) async throws -> String {
+        let placeIds = placeIds.filter { !PlaceIdGuard.isPlaceholder($0) }
+        struct Params: Encodable {
+            let p_place_ids: [String]; let p_title: String; let p_event_at: String?; let p_decide_at: String?
+        }
+        let iso = ISO8601DateFormatter()
+        let id: String = try await supabase.client
+            .rpc("create_planned_group_pick", params: Params(
+                p_place_ids: placeIds, p_title: title,
+                p_event_at: eventAt.map { iso.string(from: $0) },
+                p_decide_at: decideAt.map { iso.string(from: $0) }))
             .execute()
             .value
+        return id
+    }
+
+    /// Replaces the caller's ranking (ordered, up to 3) on a planned pick and returns the updated pick.
+    func rank(pickId: String, placeIds: [String]) async throws -> GroupPick {
+        struct Params: Encodable { let p_pick_id: String; let p_place_ids: [String] }
+        let pick: GroupPick = try await supabase.client
+            .rpc("rank_group_pick", params: Params(p_pick_id: pickId, p_place_ids: Array(placeIds.prefix(3))))
+            .execute()
+            .value
+        return pick
+    }
+
+    /// Loads a pick, joining the caller as a member and auto-deciding it if voting is done or time is up.
+    /// Uses get_planned_group_pick (adds ranked fields) and falls back to get_group_pick on older servers.
+    func fetchPick(id: String) async throws -> GroupPick {
+        struct Params: Encodable { let p_pick_id: String }
+        let pick: GroupPick?
+        do {
+            pick = try await supabase.client
+                .rpc("get_planned_group_pick", params: Params(p_pick_id: id))
+                .execute()
+                .value
+        } catch {
+            pick = try await supabase.client
+                .rpc("get_group_pick", params: Params(p_pick_id: id))
+                .execute()
+                .value
+        }
         guard let pick else { throw GroupPickError.notFound }
         return pick
     }

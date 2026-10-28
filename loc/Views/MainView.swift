@@ -209,7 +209,7 @@ struct MainView: View {
                     latitude: coordinate.latitude - span.latitudeDelta * 0.25,
                     longitude: coordinate.longitude
                 )
-                withAnimation(.easeOut(duration: 0.25)) {
+                withAnimation(.placeOpen) {
                     mapPosition = .region(MKCoordinateRegion(center: offsetCenter, span: span))
                 }
                 selectedPlaceVM.shouldAnimateMapToPlace = false
@@ -339,7 +339,7 @@ struct MainView: View {
             .presentationBackground(Color.clear)
             .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
             .interactiveDismissDisabled(false)
-            .transaction { $0.animation = .spring(response: 0.25, dampingFraction: 0.9) }
+            .transaction { $0.animation = .placeOpen }
     }
 
     /// External place selection sheet content.
@@ -574,9 +574,10 @@ struct MainView: View {
 
     /// Dismisses the current sheet and opens the place detail for the given place.
     private func openPlaceFromSheet(_ place: DetailPlace) {
-        PresentationService.shared.dismiss()
+        // Camera flight starts now; the sheet swap is sequenced (dismiss, then present) on the
+        // same spring so the two sheets never animate on top of each other.
         selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-        selectedPlaceVM.isDetailSheetPresented = true
+        PresentationService.shared.transition(to: .placeDetail)
     }
 
     /// Loading view for lists.

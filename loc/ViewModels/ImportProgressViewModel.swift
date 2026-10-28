@@ -137,7 +137,8 @@ class ImportProgressViewModel: ObservableObject {
             if job.places.isEmpty {
                 finish(error: "We couldn't find any places in this video.")
             } else {
-                statusText = "Added \(savedCount) of \(job.totalFound) places"
+                // Detection status only: nothing is in a list until the user saves.
+                statusText = "Found \(savedCount) place\(savedCount == 1 ? "" : "s")"
                 isFinished = true
                 Analytics.track(.importFinished, ["success": true, "places_found": job.totalFound, "places_saved": savedCount])
             }

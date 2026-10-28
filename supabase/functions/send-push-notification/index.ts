@@ -247,7 +247,20 @@ serve(async (req) => {
       case 'group_pick_decided': {
         const label = groupPickLabel(record.pick_title)
         const winner = record.place_name
-        if (record.outcome === 'no_match' || !winner) {
+        if (record.mode === 'planned') {
+          // Ranked (Borda) pick closed at its deadline or when everyone ranked.
+          const top3 = Array.isArray(record.top3) ? record.top3 : []
+          if (record.outcome === 'no_match' || !winner) {
+            title = `${label}: voting closed`
+            body = 'Nobody ranked a place. Tap to see the options.'
+          } else {
+            title = `${label}: ${winner} won`
+            const medals = ['1st', '2nd', '3rd']
+            body = top3.length > 1
+              ? top3.map((t: any, i: number) => `${medals[i]} ${t.name ?? 'Unnamed place'} (${t.points})`).join(' · ')
+              : `${Number(record.yes_count ?? 0)} of ${Number(record.member_count ?? 0)} voted. Tap for details.`
+          }
+        } else if (record.outcome === 'no_match' || !winner) {
           title = `${label}: no match`
           body = 'Nobody liked the picks. Tap to add more options.'
         } else {

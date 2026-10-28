@@ -25,8 +25,11 @@ struct SplashScreenView: View {
     let searchViewModel: SearchViewModel
     let searchCoordinator: SearchCoordinatorViewModel
 
+    @State private var introFinished = false
+
     var body: some View {
-        Group {
+        ZStack {
+            // The app mounts underneath as soon as the session is ready; the intro never gates it.
             if viewModel.isActive {
                 ContentView(
                     selectedPlaceViewModel: selectedPlaceViewModel,
@@ -42,24 +45,18 @@ struct SplashScreenView: View {
                     searchViewModel: searchViewModel,
                     searchCoordinator: searchCoordinator
                 )
-                .transition(.opacity)
-            } else {
-                splashImage
+            }
+            // Stays up until BOTH the intro finished and the app is ready, then fades/zooms away.
+            if !(viewModel.isActive && introFinished) {
+                AnimatedSplashView { introFinished = true }
+                    .transition(.asymmetric(insertion: .identity,
+                                            removal: .opacity.combined(with: .scale(scale: 1.06))))
+                    .zIndex(1)
             }
         }
+        .animation(.easeInOut(duration: 0.35), value: viewModel.isActive && introFinished)
         .task {
             await viewModel.checkSessionAndTransition()
         }
-    }
-
-    private var splashImage: some View {
-        GeometryReader { geometry in
-            Image("SplashScreen")
-                .resizable()
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped()
-        }
-        .edgesIgnoringSafeArea(.all)
     }
 }

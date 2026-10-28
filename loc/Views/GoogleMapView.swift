@@ -45,16 +45,10 @@ struct GoogleMapView: UIViewRepresentable {
     /// Bumped when pin icons change without the annotations changing (e.g. open/closed hours
     /// arriving or the minute ticking over), so already-rendered markers get redrawn.
     var iconRevision: Int = 0
+    /// Bumped when new avatar composites are baked; visible markers update their icon in place.
+    var photoRevision: Int = 0
 
-    /// On-screen point distance below which GMUClusterManager merges pins into a cluster
-    /// badge. Deliberately smaller than the markers' own visual footprint (community/emoji
-    /// circles up to ~70pt, profile-photo composites up to 60pt wide) — pins are allowed to
-    /// overlap somewhat before clustering kicks in, so merging only happens once you're
-    /// zoomed out noticeably farther, rather than as soon as two pins first touch. Raise this
-    /// to cluster sooner (at less zoom-out); lower it to require even more zoom-out first.
-    /// MapKit's built-in clustering had no equivalent tunable — this is the parameter that
-    /// was missing there.
-    static let clusterDistancePoints: UInt = 20
+    // Clustering radius is now footprint-based; see OverlapClusterAlgorithm.
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -78,6 +72,7 @@ struct GoogleMapView: UIViewRepresentable {
         context.coordinator.syncCameraIfNeeded(mapPosition, on: mapView)
         context.coordinator.syncSelection()
         context.coordinator.syncIconRevision(iconRevision)
+        context.coordinator.syncPhotoRevision(photoRevision)
     }
 
     // MARK: - Coordinator
@@ -118,6 +113,9 @@ struct GoogleMapView: UIViewRepresentable {
         private var hasSelection = false
         /// Opacity of every other pin while one place is selected.
         private static let dimmedOpacity: Float = 0.5
+        private var overlapAlgorithm: OverlapClusterAlgorithm?
+        /// Real on-screen size of each rendered pin (minus shadow padding), fed back into clustering.
+        private var renderedFootprints: [String: OverlapClusterAlgorithm.Footprint] = [:]
 
         init(_ parent: GoogleMapView) {
             self.parent = parent
@@ -128,13 +126,18 @@ struct GoogleMapView: UIViewRepresentable {
             let iconGenerator = GMUDefaultClusterIconGenerator()
             // Swift imports this initializer as failable even though it can't actually fail for
             // any UInt input — force-unwrap is safe here.
-            let algorithm = GMUNonHierarchicalDistanceBasedAlgorithm(
-                clusterDistancePoints: GoogleMapView.clusterDistancePoints
-            )!
+            // One footprint-aware clusterer for every clusterable layer (friends' photo pins,
+            // community emoji, cities): markers merge as soon as their on-screen rects touch.
+            let algorithm = OverlapClusterAlgorithm()
+            overlapAlgorithm = algorithm
             let renderer = GMUDefaultClusterRenderer(mapView: mapView, clusterIconGenerator: iconGenerator)
             // Clusters of 2+ overlapping pins should show a badge — the library's own default
             // (4) would leave 2-3 visually-overlapping pins rendered individually.
             renderer.minimumClusterSize = 2
+            // Library default stops clustering above zoom 20, letting same-building pins overlap.
+            renderer.maximumClusterZoom = 23
+            renderer.animatesClusters = true
+            renderer.animationDuration = 0.3
             renderer.delegate = self
             clusterRenderer = renderer
             clusterManager = GMUClusterManager(map: mapView, algorithm: algorithm, renderer: renderer)
@@ -245,16 +248,22 @@ struct GoogleMapView: UIViewRepresentable {
 
         private func syncClusterableItems(_ newItems: [MapAnnotationItem]) {
             let newById = Dictionary(uniqueKeysWithValues: newItems.map { ($0.stableId, $0) })
-            guard Set(newById.keys) != Set(clusterableItemsById.keys) else {
+            let oldIds = Set(clusterableItemsById.keys)
+            let newIds = Set(newById.keys)
+            guard oldIds != newIds else {
                 clusterableItemsById = newById
                 return
             }
-            clusterManager.clearItems()
-            for item in newItems {
-                clusterManager.add(item)
+            // Incremental diff (no clear + re-add): the renderer keeps markers for unchanged items.
+            for id in oldIds.subtracting(newIds) {
+                if let old = clusterableItemsById[id] { clusterManager.remove(old) }
+                renderedFootprints.removeValue(forKey: id)
             }
+            let added = newIds.subtracting(oldIds).compactMap { newById[$0] }
+            if !added.isEmpty { clusterManager.add(added as [GMUClusterItem]) }
             clusterableItemsById = newById
-            clusterManager.cluster()
+            // Mid-flight reclusters make pins pop; idleAt reclusters once the camera settles.
+            if !isCameraMoving { requestRecluster() }
         }
 
         private func syncDirectMarkers(_ newItems: [MapAnnotationItem], on mapView: GMSMapView) {
@@ -418,6 +427,7 @@ struct GoogleMapView: UIViewRepresentable {
         // MARK: GMSMapViewDelegate — camera
 
         func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
+            isCameraMoving = true
             if gesture {
                 isApplyingProgrammaticCameraChange = false
             }
@@ -426,6 +436,11 @@ struct GoogleMapView: UIViewRepresentable {
         /// GMSMapView has a native "camera came to rest" callback, unlike MKMapView (which has
         /// no mapView(_:idleAt:)-style delegate method and needed a manual debounce timer here).
         func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
+            isCameraMoving = false
+            if let pending = pendingIconRevision {
+                // Flush after the settle work below has run.
+                DispatchQueue.main.async { [weak self] in self?.syncIconRevision(pending) }
+            }
             let region = currentRegion(on: mapView)
             #if DEBUG
             print("[MapCenter] idleAt: target=\(position.target) hasAppliedInitialCamera=\(hasAppliedInitialCamera) isApplyingProgrammaticCameraChange=\(isApplyingProgrammaticCameraChange)")
@@ -441,21 +456,135 @@ struct GoogleMapView: UIViewRepresentable {
             // this only ever cleared on a real pan/pinch, leaving it stuck true after the very
             // first programmatic move for the rest of the map's lifetime.
             isApplyingProgrammaticCameraChange = false
-            clusterManager.cluster()
+            requestRecluster()
             if hasAppliedInitialCamera {
                 parent.onCameraSettled?(region)
             }
         }
 
+        // MARK: Background clustering
+
+        private let clusterQueue = DispatchQueue(label: "mesa.map.cluster", qos: .userInitiated)
+        private var clusterGeneration = 0
+        private var reclusterScheduled = false
+
+        /// Coalesces recluster requests to one per runloop, snapshots the visible items on main,
+        /// computes groups on a background queue, then renders on main (stale runs are dropped).
+        func requestRecluster() {
+            guard !reclusterScheduled else { return }
+            reclusterScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                self?.reclusterScheduled = false
+                self?.startRecluster()
+            }
+        }
+
+        private func startRecluster() {
+            guard let mapView, let algorithm = overlapAlgorithm else { return }
+            clusterGeneration &+= 1
+            let generation = clusterGeneration
+            let snapshotState = MapPerf.signposter.beginInterval("ClusterSnapshot")
+
+            let zoom = Double(mapView.camera.zoom)
+            let worldSize = 256.0 * pow(2.0, zoom)
+            // Viewport + 50% margin on every side, in world points at this zoom.
+            let visible = GMSCoordinateBounds(region: mapView.projection.visibleRegion())
+            let (x0, y0) = OverlapClusterer.project(CLLocationCoordinate2D(latitude: visible.northEast.latitude, longitude: visible.southWest.longitude), worldSize: worldSize)
+            let (x1, y1) = OverlapClusterer.project(CLLocationCoordinate2D(latitude: visible.southWest.latitude, longitude: visible.northEast.longitude), worldSize: worldSize)
+            let mx = abs(x1 - x0) * 0.5, my = abs(y1 - y0) * 0.5
+            let window = CGRect(x: min(x0, x1) - mx, y: min(y0, y1) - my, width: abs(x1 - x0) + 2 * mx, height: abs(y1 - y0) + 2 * my)
+            let wraps = x1 < x0 // antimeridian: skip culling
+
+            var items: [MapAnnotationItem] = []
+            var entries: [OverlapClusterer.Entry] = []
+            let sorted = algorithm.items.values.sorted { $0.stableId < $1.stableId }
+            items.reserveCapacity(sorted.count); entries.reserveCapacity(sorted.count)
+            for item in sorted {
+                let (x, y) = OverlapClusterer.project(item.position, worldSize: worldSize)
+                guard wraps || window.contains(CGPoint(x: x, y: y)) else { continue }
+                let f = renderedFootprints[item.stableId] ?? OverlapClusterAlgorithm.defaultFootprint(item)
+                items.append(item)
+                entries.append(.init(x: x, y: y, w: Double(f.size.width), h: Double(f.size.height), bottomAnchored: f.bottomAnchored))
+            }
+            MapPerf.signposter.endInterval("ClusterSnapshot", snapshotState, "\(entries.count) of \(sorted.count) items")
+
+            OverlapGenerationToken.current = generation
+            clusterQueue.async { [weak self] in
+                let state = MapPerf.signposter.beginInterval("ClusterCompute")
+                let groups = OverlapClusterer.compute(entries, badge: 40, gap: 4) {
+                    // Cheap staleness check without touching main-actor state.
+                    OverlapGenerationToken.current != generation
+                }
+                MapPerf.signposter.endInterval("ClusterCompute", state, "\(entries.count) items -> \(groups.count) clusters")
+                Task { @MainActor [weak self] in
+                    guard let self, generation == self.clusterGeneration, !groups.isEmpty || entries.isEmpty else { return }
+                    self.applyClusters(groups, items: items)
+                }
+            }
+        }
+
+        private func applyClusters(_ groups: [[Int]], items: [MapAnnotationItem]) {
+            guard let algorithm = overlapAlgorithm, let renderer = clusterRenderer else { return }
+            let state = MapPerf.signposter.beginInterval("MarkerRender")
+            let clusters: [GMUCluster] = groups.map { members in
+                let n = Double(members.count)
+                let position = members.count == 1 ? items[members[0]].position : CLLocationCoordinate2D(
+                    latitude: members.reduce(0) { $0 + items[$1].position.latitude } / n,
+                    longitude: members.reduce(0) { $0 + items[$1].position.longitude } / n
+                )
+                let cluster = GMUStaticCluster(position: position)
+                members.forEach { cluster.addItem(items[$0]) }
+                return cluster
+            }
+            algorithm.latestClusters = clusters
+            renderer.renderClusters(clusters)
+            applyDimming()
+            refreshRenderedIcons()   // reused markers pick up avatars/status that changed meanwhile
+            MapPerf.signposter.endInterval("MarkerRender", state, "\(clusters.count) clusters")
+        }
+
+        /// Updates icons of already-rendered markers in place (avatar arrived, open status changed,
+        /// selection highlight) without reclustering or recreating markers.
+        func refreshRenderedIcons() {
+            guard let renderer = clusterRenderer else { return }
+            let state = MapPerf.signposter.beginInterval("IconRefresh")
+            var changed = 0
+            for marker in renderer.markers {
+                guard let item = marker.userData as? MapAnnotationItem else { continue }
+                let image = parent.annotationImageProvider(item, highlightedStableIds.contains(item.stableId))
+                if marker.icon !== image { marker.icon = image; changed += 1 }
+            }
+            MapPerf.signposter.endInterval("IconRefresh", state, "\(changed) changed")
+        }
+
+        private var lastPhotoRevision = 0
+        /// Called when new avatar composites are available; refresh visible markers in place.
+        func syncPhotoRevision(_ revision: Int) {
+            guard revision != lastPhotoRevision else { return }
+            lastPhotoRevision = revision
+            if isCameraMoving { return }   // applyClusters refreshes icons after the camera settles
+            refreshRenderedIcons()
+        }
+
         // MARK: Icon refresh
 
         private var lastIconRevision = 0
+        /// True between willMove and idleAt. Re-clustering / re-rendering markers mid-flight
+        /// makes pins pop and the camera stutter, so icon refreshes wait for the camera to settle.
+        private var isCameraMoving = false
+        private var pendingIconRevision: Int?
 
         /// Redraws every marker when icon inputs (open/closed status) changed.
         func syncIconRevision(_ revision: Int) {
             guard revision != lastIconRevision else { return }
+            if isCameraMoving {
+                pendingIconRevision = revision
+                return
+            }
+            pendingIconRevision = nil
             lastIconRevision = revision
-            clusterManager.cluster()
+            if reclusterScheduled { return }   // the pending recluster refreshes icons anyway
+            refreshRenderedIcons()
             for (_, marker) in directMarkersById {
                 guard let item = marker.userData as? MapAnnotationItem else { continue }
                 configureDirectMarker(marker, for: item)
@@ -479,7 +608,7 @@ struct GoogleMapView: UIViewRepresentable {
             highlightedStableIds = newHighlighted
             applyDimming()
 
-            clusterManager.cluster()
+            refreshRenderedIcons()
             for (_, marker) in directMarkersById {
                 guard let item = marker.userData as? MapAnnotationItem else { continue }
                 configureDirectMarker(marker, for: item)
@@ -493,7 +622,8 @@ struct GoogleMapView: UIViewRepresentable {
         /// an individual pin. This is the one hook where .icon/.groundAnchor/.zIndex are honored.
         func renderer(_ renderer: GMUClusterRenderer, willRenderMarker marker: GMSMarker) {
             if let cluster = marker.userData as? GMUCluster {
-                marker.icon = MapMarkerImageFactory.shared.clusterImage(count: Int(cluster.count))
+                let badge = MapMarkerImageFactory.shared.clusterImage(count: Int(cluster.count))
+                if marker.icon !== badge { marker.icon = badge }
                 marker.groundAnchor = CGPoint(x: 0.5, y: 0.5)
                 marker.opacity = hasSelection ? Self.dimmedOpacity : 1
                 marker.zIndex = 1
@@ -502,7 +632,20 @@ struct GoogleMapView: UIViewRepresentable {
             guard let item = marker.userData as? MapAnnotationItem else { return }
             let isSelected = highlightedStableIds.contains(item.stableId)
             let image = parent.annotationImageProvider(item, isSelected)
-            marker.icon = image
+            // Re-assigning the same UIImage still makes GMSMapView re-upload the texture.
+            if marker.icon !== image { marker.icon = image }
+            if let image {
+                let pad = MapMarkerImageFactory.renderPadding
+                let bottom: Bool = { if case .network = item.layer { return true } else { return false } }()
+                // Not every icon carries the factory's shadow padding (baked avatar composites
+                // don't), so never let the measured size drop below the layer's known footprint.
+                let fallback = OverlapClusterAlgorithm.defaultFootprint(item).size
+                renderedFootprints[item.stableId] = .init(
+                    size: CGSize(width: max(image.size.width - pad * 2, fallback.width),
+                                 height: max(image.size.height - pad * 2, fallback.height)),
+                    bottomAnchored: bottom
+                )
+            }
 
             if case .network = item.layer {
                 // Emulates the old MapKit centerOffset trick — anchor the marker at the bottom-
@@ -559,8 +702,13 @@ struct GoogleMapView: UIViewRepresentable {
             for item in cluster.items {
                 bounds = bounds.includingCoordinate(item.position)
             }
-            let update = GMSCameraUpdate.fit(bounds, withPadding: 60)
-            mapView.animate(with: update)
+            // Zoom to fit the members; if they share (almost) one spot, step in 2 levels instead.
+            let ne = bounds.northEast, sw = bounds.southWest
+            if abs(ne.latitude - sw.latitude) < 0.00005, abs(ne.longitude - sw.longitude) < 0.00005 {
+                mapView.animate(with: GMSCameraUpdate.setTarget(cluster.position, zoom: min(mapView.camera.zoom + 2, mapView.maxZoom)))
+            } else {
+                mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 80))
+            }
         }
 
         // MARK: Gestures — long-press-to-create-place and tap-to-discover

@@ -6,6 +6,7 @@
 
 import SwiftUI
 import MapKit
+import Combine
 
 struct MapView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -23,6 +24,9 @@ struct MapView: View {
     @ObservedObject private var listSheetVM = ListMapSheetViewModel.shared
     /// Stored opening hours, for the small "open now" dot on place pins.
     @ObservedObject private var hoursStore = PlaceHoursStore.shared
+    /// Mirrors MapPhotoViewModel.imagesRevision (not forwarded through MapViewModel) so baked
+    /// avatar pins reach the map as soon as they exist.
+    @State private var photoRevision = 0
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
@@ -290,9 +294,11 @@ struct MapView: View {
                 annotationImageProvider: { item, isSelected in
                     annotationImage(for: item, isSelected: isSelected)
                 },
-                iconRevision: hoursStore.revision
+                iconRevision: hoursStore.revision,
+                photoRevision: photoRevision
             )
             .ignoresSafeArea()
+            .onReceive(mapViewModel.photoViewModel.$imagesRevision.removeDuplicates()) { photoRevision = $0 }
             .onChange(of: recenterMap) { oldValue, newValue in
                 if newValue {
                     let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
@@ -413,17 +419,7 @@ struct MapView: View {
                 )
             }
         }
-        .task {
-            // Load profile photos for annotation rendering
-            // Viewport annotations load via onMapCameraChange(.onEnd) — no need to duplicate here
-            guard let userId = profile.user?.id else { return }
-            if !mapViewModel.hasLoadedPhotos {
-                await mapViewModel.loadFollowedUsersPhotos(
-                    userId: userId,
-                    currentUserPhotoUrl: profile.user?.profilePhotoURL
-                )
-            }
-        }
+        // (Initial photo load is handled by .task(id: scenePhase) above, which also runs on appear.)
         .onChange(of: profile.user?.id) { oldValue, newValue in
             // When user profile becomes available (nil → value), load annotation photos
             // Viewport annotations load via onMapCameraChange(.onEnd)

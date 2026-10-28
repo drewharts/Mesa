@@ -29,8 +29,7 @@ class SplashScreenViewModel: ObservableObject {
             Task.detached(priority: .userInitiated) {
                 await self.dataManager.initializeProfileData(userId: profileId)
             }
-
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            // No artificial delay: AnimatedSplashView covers the handoff.
         } catch {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
         }

@@ -32,8 +32,33 @@ final class PlaceHoursStore: ObservableObject {
         timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
             .sink { [weak self] date in
                 self?.tick = date
-                self?.revision &+= 1
+                self?.bumpRevision()
             }
+    }
+
+    private var lastRevisionBump = Date.distantPast
+    private var revisionBumpTask: Task<Void, Never>?
+
+    /// Coalesces revision bumps to at most one per 0.5s. Every bump re-renders all map pins and
+    /// re-evaluates MapView's body; a burst of them (batched hours fetches + time-zone geocodes)
+    /// during a camera flight or sheet transition was a major source of stutter.
+    private func bumpRevision() {
+        let interval: TimeInterval = 0.5
+        let elapsed = Date().timeIntervalSince(lastRevisionBump)
+        if elapsed >= interval, revisionBumpTask == nil {
+            lastRevisionBump = Date()
+            revision &+= 1
+            return
+        }
+        guard revisionBumpTask == nil else { return }
+        let delay = max(interval - elapsed, 0.05)
+        revisionBumpTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard let self else { return }
+            self.revisionBumpTask = nil
+            self.lastRevisionBump = Date()
+            self.revision &+= 1
+        }
     }
 
     // MARK: - Reading
@@ -59,7 +84,7 @@ final class PlaceHoursStore: ObservableObject {
 
     func setTimeZone(_ tz: TimeZone, for placeId: String) {
         let key = placeId.lowercased()
-        if PlaceTimeZoneCache.shared.set(tz, for: key), hours[key] != nil { tick = Date(); revision &+= 1 }
+        if PlaceTimeZoneCache.shared.set(tz, for: key), hours[key] != nil { tick = Date(); bumpRevision() }
     }
 
     /// Seeds hours already loaded elsewhere (e.g. the detail view's DetailPlace).
@@ -67,7 +92,7 @@ final class PlaceHoursStore: ObservableObject {
         guard let weekdayText, let parsed = PlaceHours(weekdayText: weekdayText) else { return }
         let key = placeId.lowercased()
         requested.insert(key)
-        if hours[key] != parsed { hours[key] = parsed; revision &+= 1 }
+        if hours[key] != parsed { hours[key] = parsed; bumpRevision() }
     }
 
     /// Queues ids for a batched fetch. Safe to call from view bodies (work is deferred).
@@ -99,7 +124,7 @@ final class PlaceHoursStore: ObservableObject {
                 if let parsed = PlaceHours(weekdayText: lines) { merged[key] = parsed }
             }
             hours = merged
-            revision &+= 1
+            bumpRevision()
         } catch {
             requested.subtract(ids) // retry next time
         }

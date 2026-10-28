@@ -11,6 +11,7 @@ import SwiftUI
 
 struct TonightSheet: View {
     @StateObject private var viewModel: TonightViewModel
+    @State private var showPlanner = false
     let onOpenPlace: (DetailPlace) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var showAllPicks = false
@@ -37,6 +38,7 @@ struct TonightSheet: View {
         }
         .padding(.top, 16)
         .task { await viewModel.loadIfNeeded() }
+        .sheet(isPresented: $showPlanner) { PlanGroupPickView(viewModel: viewModel) }
     }
 
     // MARK: - Header
@@ -95,6 +97,7 @@ struct TonightSheet: View {
                 }
                 groupButton
                     .padding(.top, 2)
+                planButton
             }
             .padding(.horizontal, 20)
         }
@@ -151,6 +154,19 @@ struct TonightSheet: View {
     private var moreOptionsButton: some View {
         Button { viewModel.showMoreOptions() } label: {
             Label("More options", systemImage: "arrow.triangle.2.circlepath")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .foregroundColor(.primary)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.systemGray5)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Start a ranked group pick for a future date (defaults: next Friday, top 3 preselected).
+    private var planButton: some View {
+        Button { showPlanner = true } label: {
+            Label("Plan for later", systemImage: "calendar.badge.plus")
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)

@@ -157,6 +157,10 @@ class MapViewModel: ObservableObject {
         viewportViewModel.onAnnotationsLoaded = { [weak self] annotations in
             self?.photoViewModel.generateAnnotationImages(for: annotations)
         }
+        photoViewModel.onPicturesBatch = { [weak self] in
+            guard let self else { return }
+            self.photoViewModel.generateAnnotationImages(for: self.viewportViewModel.viewportAnnotations)
+        }
     }
 
     /// Forwards city annotation state changes so MapView re-renders.

@@ -120,7 +120,8 @@ class SelectedPlaceViewModel: ObservableObject {
         get { PresentationService.shared.activeSheet == .placeDetail }
         set {
             if newValue {
-                PresentationService.shared.present(.placeDetail)
+                // Sequenced swap (dismiss other sheet → present detail) on the shared spring.
+                PresentationService.shared.transition(to: .placeDetail)
             } else if PresentationService.shared.activeSheet == .placeDetail {
                 PresentationService.shared.dismiss()
             }
