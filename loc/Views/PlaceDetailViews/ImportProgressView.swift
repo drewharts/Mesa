@@ -4,7 +4,7 @@
 //
 //  Live progress sheet for importing places from a shared video.
 //  When the import finishes, the found places and the user's lists are shown on this same screen:
-//  a smart default list is preselected and a single tap saves everything (no second screen).
+//  search or create a list, pick it, one tap saves everything. Each place has a "Wrong?" fix.
 //
 
 import SwiftUI
@@ -24,6 +24,8 @@ struct ImportProgressView: View {
     /// Places the user unchecked (only relevant when several places were found).
     @State private var excludedPlaceIds: Set<String> = []
     @State private var isSaving = false
+    /// Detected place the user flagged as wrong (opens the place search to replace it).
+    @State private var correctingPlace: DetailPlace?
 
     /// Creates the progress sheet for a shared content URL.
     init(contentUrl: String) {
@@ -142,6 +144,16 @@ struct ImportProgressView: View {
                     placeRow(item)
                     Divider().padding(.leading, 52)
                 }
+                if viewModel.isFinished && !viewModel.savedPlaces.isEmpty {
+                    Button { showingManualAdd = true } label: {
+                        Label("Add a place the video missed", systemImage: "plus")
+                            .font(.subheadline.weight(.medium))
+                            .padding(.horizontal)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
+                }
             }
             .animation(.easeInOut, value: viewModel.places.map { "\($0.index)\($0.status.rawValue)" })
         }
@@ -163,6 +175,7 @@ struct ImportProgressView: View {
                         Text(item.place?.name ?? item.name)
                             .font(.body)
                             .foregroundColor(.primary)
+                            .lineLimit(1)
                         if let address = item.place?.address, !address.isEmpty {
                             Text(address)
                                 .font(.caption)
@@ -170,13 +183,37 @@ struct ImportProgressView: View {
                                 .lineLimit(1)
                         }
                     }
-                    Spacer()
+                    Spacer(minLength: 4)
                 }
                 .padding(.leading)
                 .padding(.vertical, 10)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            if let place = item.place, viewModel.isFinished, item.status == .saved || item.status == .duplicate {
+                // "Wrong place?": pick the right one (search) or drop it from this import.
+                Menu {
+                    Button {
+                        correctingPlace = place
+                    } label: {
+                        Label("Pick the right place", systemImage: "magnifyingglass")
+                    }
+                    Button(role: .destructive) {
+                        Task { await viewModel.removePlace(place) }
+                    } label: {
+                        Label("Remove from this video", systemImage: "trash")
+                    }
+                } label: {
+                    Text("Wrong?")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Color(.secondarySystemBackground)))
+                }
+                .accessibilityLabel("Wrong place? Fix \(place.name)")
+            }
 
             if let place = item.place, showsSelectionToggles, item.status == .saved {
                 let included = !excludedPlaceIds.contains(place.id.uuidString)
@@ -196,7 +233,6 @@ struct ImportProgressView: View {
         }
         .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
-
     /// Per-place checkmarks only make sense once the import is done and there is a choice to make.
     private var showsSelectionToggles: Bool {
         viewModel.isFinished && viewModel.savedPlaces.count > 1
@@ -236,65 +272,25 @@ struct ImportProgressView: View {
         }
     }
 
-    // MARK: - One-tap save to a list
+    // MARK: - Save to a list
 
-    /// Places that will be saved: everything found, minus anything the user unchecked.
+    /// Places that will be saved: everything found, minus anything unchecked, never a placeholder id.
     private var placesToSave: [DetailPlace] {
-        viewModel.savedPlaces.filter { !excludedPlaceIds.contains($0.id.uuidString) }
-    }
-
-    private var selectedList: LightweightPlaceList? {
-        listViewModel?.allLists.first { $0.list_id == selectedListId }
-            ?? listViewModel?.lists.first { $0.list_id == selectedListId }
-    }
-
-    /// Inline list choices (smart default preselected) and the single save button.
-    @ViewBuilder
-    private var saveSection: some View {
-        if let listViewModel {
-            ImportSaveSection(
-                listViewModel: listViewModel,
-                selectedListId: $selectedListId,
-                isSaving: isSaving,
-                placeCount: placesToSave.count,
-                onSave: { list in saveToList(list) },
-                onChooseElsewhere: { viewModel.reviewAllPlaces(detailPlaceVM: detailPlaceViewModel) }
-            )
+        viewModel.savedPlaces.filter {
+            !excludedPlaceIds.contains($0.id.uuidString) && !PlaceIdGuard.isPlaceholder($0.id.uuidString)
         }
     }
 
-    private var canSave: Bool {
-        !isSaving && selectedList != nil && !placesToSave.isEmpty
-    }
-
-    private var saveButtonTitle: String {
-        guard let name = selectedList?.name else { return "Save" }
-        let count = placesToSave.count
-        return count <= 1 ? "Save to \(name)" : "Save \(count) places to \(name)"
-    }
-
-    /// Loads the user's lists (last-used first, then nearest) and preselects the first one.
+    /// Loads every list (owned + shared, last-used first). Nothing is preselected: the user picks.
     private func prepareListChoices() {
         guard listViewModel == nil, let first = viewModel.savedPlaces.first else { return }
         let vm = PlaceListSelectionViewModel(profile: profile, userSession: userSession)
         vm.bulkPlaces = viewModel.savedPlaces
         listViewModel = vm
-        Task { @MainActor in
-            await vm.loadInitialLists(for: first)
-            // Smart default: `lists` is sorted last-used list first, then by proximity to the places.
-            let lastUsed = PlaceListSelectionViewModel.lastUsedListId
-            let all = vm.allLists.isEmpty ? vm.lists : vm.allLists
-            selectedListId = all.first(where: { $0.list_id == lastUsed })?.list_id ?? all.first?.list_id
-        }
+        Task { @MainActor in await vm.loadInitialLists(for: first) }
     }
 
-    /// The one tap: saves all (checked) places to the selected list, then closes the sheet.
-    private func saveToSelectedList() {
-        guard let list = selectedList else { return }
-        saveToList(list)
-    }
-
-    /// Saves all (checked) places to the given list (resolved by the picker, which observes the VM).
+    /// Saves all (checked) places to the given list, then closes the sheet.
     private func saveToList(_ list: LightweightPlaceList) {
         guard let listViewModel, !isSaving, !placesToSave.isEmpty else { return }
         let places = placesToSave
@@ -312,143 +308,22 @@ struct ImportProgressView: View {
         }
     }
 
-    /// Summary actions shown when the import finishes.
+    /// Bottom panel: list search + choices + one primary button once finished; otherwise one small action.
     private var footer: some View {
         VStack(spacing: 10) {
-            if viewModel.isFinished && !viewModel.savedPlaces.isEmpty {
-                saveSection
-            }
-            if viewModel.isFinished {
-                if viewModel.savedPlaces.isEmpty {
-                    Button {
-                        showingManualAdd = true
-                    } label: {
-                        Label("Add a place manually", systemImage: "magnifyingglass")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.accentColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                    }
-                } else {
-                    Button {
-                        showingManualAdd = true
-                    } label: {
-                        Label("Add another place", systemImage: "plus")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                }
-            }
-            Button(viewModel.isFinished ? (viewModel.savedPlaces.isEmpty ? "Done" : "Skip") : "Hide") {
-                viewModel.dismiss()
-            }
-            .font(.subheadline)
-        }
-        .padding()
-        .sheet(isPresented: $showingManualAdd) {
-            // Reuses the existing search + assign flow; links the place to this video (external_places).
-            PlaceCorrectionSheet(mode: .newAssignment(contentUrl: viewModel.contentUrl)) { place in
-                detailPlaceViewModel.places[place.id.uuidString] = place
-                viewModel.appendManualPlace(place)
-                showAddAllConfirmation("Added \(place.name)")
-            }
-            .environmentObject(profile)
-        }
-    }
-}
-
-/// One-screen list picker: search at top, then a compact scrollable list of EVERY list
-/// (owned + shared), last-used first then most recently updated, plus "New list".
-private struct ImportSaveSection: View {
-    @ObservedObject var listViewModel: PlaceListSelectionViewModel
-    @Binding var selectedListId: String?
-    let isSaving: Bool
-    let placeCount: Int
-    let onSave: (LightweightPlaceList) -> Void
-    let onChooseElsewhere: () -> Void
-
-    @State private var query = ""
-    @State private var showNewListSheet = false
-
-    private var sourceLists: [LightweightPlaceList] {
-        listViewModel.allLists.isEmpty ? listViewModel.lists : listViewModel.allLists
-    }
-
-    /// Resolved here (this view observes the VM) so the checkmark and the button always agree.
-    private var selectedList: LightweightPlaceList? {
-        guard let id = selectedListId else { return nil }
-        return listViewModel.allLists.first { $0.list_id == id }
-            ?? listViewModel.lists.first { $0.list_id == id }
-            ?? listViewModel.filteredLists.first { $0.list_id == id }
-    }
-
-    private var canSave: Bool { !isSaving && selectedList != nil && placeCount > 0 }
-
-    private var buttonTitle: String {
-        guard let name = selectedList?.name else { return "Save" }
-        return placeCount <= 1 ? "Save to \(name)" : "Save \(placeCount) places to \(name)"
-    }
-
-    private var visibleLists: [LightweightPlaceList] {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return sourceLists }
-        return sourceLists.filter { $0.name.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if !sourceLists.isEmpty {
-                HStack {
-                    Text("Save to")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(sourceLists.count) lists")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                searchField
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        newListRow
-                        ForEach(visibleLists, id: \.list_id) { list in
-                            Divider().padding(.leading, 12)
-                            row(list)
-                        }
-                        if visibleLists.isEmpty {
-                            Text("No lists match \u{201C}\(query)\u{201D}")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                        }
-                    }
-                }
-                .frame(maxHeight: 260)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                Button { if let list = selectedList { onSave(list) } } label: {
-                    HStack(spacing: 8) {
-                        if isSaving { ProgressView().tint(.white) }
-                        Text(buttonTitle)
-                            .font(.headline)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor.opacity(canSave ? 1 : 0.4))
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .disabled(!canSave)
-            } else if listViewModel.isLoadingInitial {
-                HStack { Spacer(); ProgressView(); Spacer() }
-                    .padding(.vertical, 8)
-            } else {
-                // No lists yet (or they failed to load): fall back to the full list picker.
-                Button(action: onChooseElsewhere) {
-                    Text("Choose a list")
+            if viewModel.isFinished && !viewModel.savedPlaces.isEmpty, let listViewModel {
+                ImportSaveSection(
+                    listViewModel: listViewModel,
+                    selectedListId: $selectedListId,
+                    isSaving: isSaving,
+                    placeCount: placesToSave.count,
+                    onSave: { list in saveToList(list) }
+                )
+            } else if viewModel.isFinished {
+                Button {
+                    showingManualAdd = true
+                } label: {
+                    Label("Search for the place", systemImage: "magnifyingglass")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -456,27 +331,135 @@ private struct ImportSaveSection: View {
                         .foregroundColor(.white)
                         .cornerRadius(12)
                 }
+            } else {
+                Button("Hide") { viewModel.dismiss() }
+                    .font(.subheadline)
             }
         }
-        .sheet(isPresented: $showNewListSheet) {
-            NewListSheetView(onSave: { listName in
-                let result = await listViewModel.addNewListToSelection(named: listName, city: "", emoji: "", image: "")
-                if case .success = result {
-                    query = ""
-                    selectedListId = listViewModel.allLists.first?.list_id ?? listViewModel.lists.first?.list_id
+        .padding(.horizontal)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .background(Color(.systemBackground).shadow(color: .black.opacity(0.06), radius: 6, y: -3))
+        .sheet(isPresented: $showingManualAdd) {
+            // Search + assign flow; links the place to this video (external_places) with a resolved id.
+            PlaceCorrectionSheet(mode: .newAssignment(contentUrl: viewModel.contentUrl)) { place in
+                guard !PlaceIdGuard.isPlaceholder(place.id.uuidString) else { return }
+                detailPlaceViewModel.places[place.id.uuidString] = place
+                viewModel.appendManualPlace(place)
+                showAddAllConfirmation("Added \(place.name)")
+            }
+            .environmentObject(profile)
+        }
+        .sheet(item: $correctingPlace) { wrong in
+            // Wrong place: search the right one; it is linked to the video, then the wrong link is removed.
+            PlaceCorrectionSheet(mode: .newAssignment(contentUrl: viewModel.contentUrl)) { place in
+                guard !PlaceIdGuard.isPlaceholder(place.id.uuidString) else { return }
+                detailPlaceViewModel.places[place.id.uuidString] = place
+                excludedPlaceIds.remove(wrong.id.uuidString)
+                Task { await viewModel.replacePlace(wrong, with: place) }
+                showAddAllConfirmation("Changed to \(place.name)")
+            }
+            .environmentObject(profile)
+        }
+    }
+}
+
+/// Save panel: a large list search, a short list of matching lists (owned + shared, last-used first),
+/// "New list" (or "Create “query”" when nothing matches), and one primary button. Nothing preselected.
+private struct ImportSaveSection: View {
+    @ObservedObject var listViewModel: PlaceListSelectionViewModel
+    @Binding var selectedListId: String?
+    let isSaving: Bool
+    let placeCount: Int
+    let onSave: (LightweightPlaceList) -> Void
+
+    @State private var query = ""
+    @State private var isCreating = false
+    @FocusState private var searchFocused: Bool
+
+    private var sourceLists: [LightweightPlaceList] {
+        listViewModel.allLists.isEmpty ? listViewModel.lists : listViewModel.allLists
+    }
+
+    private var selectedList: LightweightPlaceList? {
+        guard let id = selectedListId else { return nil }
+        return listViewModel.allLists.first { $0.list_id == id }
+            ?? listViewModel.lists.first { $0.list_id == id }
+            ?? listViewModel.filteredLists.first { $0.list_id == id }
+    }
+
+    private var trimmedQuery: String { query.trimmingCharacters(in: .whitespaces) }
+
+    private var canSave: Bool { !isSaving && selectedList != nil && placeCount > 0 }
+
+    private var buttonTitle: String {
+        guard let name = selectedList?.name else {
+            return placeCount <= 1 ? "Pick a list to save to" : "Pick a list for \(placeCount) places"
+        }
+        return placeCount <= 1 ? "Add to \(name)" : "Add \(placeCount) places to \(name)"
+    }
+
+    private var visibleLists: [LightweightPlaceList] {
+        guard !trimmedQuery.isEmpty else { return sourceLists }
+        return sourceLists.filter { $0.name.range(of: trimmedQuery, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+    }
+
+    private var hasExactMatch: Bool {
+        sourceLists.contains { $0.name.compare(trimmedQuery, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            searchField
+            if listViewModel.isLoadingInitial && sourceLists.isEmpty {
+                HStack { Spacer(); ProgressView(); Spacer() }.padding(.vertical, 10)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        if !trimmedQuery.isEmpty && !hasExactMatch {
+                            createRow(named: trimmedQuery)
+                        } else if trimmedQuery.isEmpty {
+                            createRow(named: nil)
+                        }
+                        ForEach(visibleLists, id: \.list_id) { list in
+                            Divider().padding(.leading, 40)
+                            row(list)
+                        }
+                    }
                 }
-            })
-            .presentationDetents([.height(200)])
-            .presentationDragIndicator(.visible)
+                .frame(maxHeight: 176)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            Button { if let list = selectedList { onSave(list) } } label: {
+                HStack(spacing: 8) {
+                    if isSaving { ProgressView().tint(.white) }
+                    Text(buttonTitle).font(.headline).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.accentColor.opacity(canSave ? 1 : 0.35))
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            .disabled(!canSave)
         }
     }
 
     private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-            TextField("Search your lists", text: $query)
-                .textInputAutocapitalization(.never)
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").font(.body.weight(.semibold)).foregroundColor(.secondary)
+            TextField("Search or create a list", text: $query)
+                .font(.body)
+                .focused($searchFocused)
+                .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
+                .submitLabel(.done)
+                .onSubmit {
+                    // Return picks the only match, or creates the list when none match.
+                    if visibleLists.count == 1 { selectedListId = visibleLists[0].list_id }
+                    else if visibleLists.isEmpty, !trimmedQuery.isEmpty { create(named: trimmedQuery) }
+                }
             if !query.isEmpty {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
@@ -484,33 +467,58 @@ private struct ImportSaveSection: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.secondarySystemBackground)))
+        .padding(.horizontal, 14)
+        .frame(height: 48)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(searchFocused ? Color.accentColor : Color.clear, lineWidth: 1.5))
     }
 
-    private var newListRow: some View {
-        Button { showNewListSheet = true } label: {
+    /// "New list" (focuses the search so the typed name becomes the list) or "Create “name”".
+    private func createRow(named name: String?) -> some View {
+        Button {
+            if let name { create(named: name) } else { searchFocused = true }
+        } label: {
             HStack(spacing: 10) {
-                Image(systemName: "plus.circle.fill").foregroundColor(.accentColor)
-                Text("New list").font(.subheadline.weight(.medium))
+                if isCreating { ProgressView().frame(width: 20) }
+                else { Image(systemName: "plus.circle.fill").foregroundColor(.accentColor).frame(width: 20) }
+                Text(name.map { "Create \u{201C}\($0)\u{201D}" } ?? "New list — type a name above")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(name == nil ? .secondary : .accentColor)
+                    .lineLimit(1)
                 Spacer()
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 11)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(isCreating)
+    }
+
+    private func create(named name: String) {
+        guard !isCreating else { return }
+        isCreating = true
+        Task { @MainActor in
+            let result = await listViewModel.addNewListToSelection(named: name, city: "", emoji: "", image: "")
+            isCreating = false
+            if case .success = result {
+                query = ""
+                searchFocused = false
+                selectedListId = listViewModel.allLists.first?.list_id ?? listViewModel.lists.first?.list_id
+            }
+        }
     }
 
     private func row(_ list: LightweightPlaceList) -> some View {
         let isSelected = list.list_id == selectedListId
         return Button {
-            selectedListId = list.list_id
+            selectedListId = isSelected ? nil : list.list_id
+            searchFocused = false
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .frame(width: 20)
                 Text(list.name)
                     .font(.subheadline.weight(isSelected ? .semibold : .regular))
                     .lineLimit(1)
@@ -523,7 +531,7 @@ private struct ImportSaveSection: View {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 11)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

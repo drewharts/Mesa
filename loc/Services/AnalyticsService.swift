@@ -55,6 +55,7 @@ enum Analytics {
         case importNotificationShown = "import_notification_shown"
         case importNotificationOpened = "import_notification_opened"
         case importSavedToList = "import_saved_to_list"
+        case importPlaceCorrected = "import_place_corrected"
         case notificationPermissionPrompted = "notification_permission_prompted"
         case placeSaved = "place_saved"
         case listCreated = "list_created"

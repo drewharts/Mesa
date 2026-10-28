@@ -27,11 +27,15 @@ final class MapMarkerImageFactory {
 
     private init() {}
 
-    private var openDotCache: [ObjectIdentifier: UIImage] = [:]
+    private struct StatusDotKey: Hashable { let base: ObjectIdentifier; let isOpen: Bool }
+    private var openDotCache: [StatusDotKey: UIImage] = [:]
 
     /// Adds a small green "open now" dot at the top-right edge of a round marker image.
-    func withOpenDot(_ base: UIImage) -> UIImage {
-        let key = ObjectIdentifier(base)
+    func withOpenDot(_ base: UIImage) -> UIImage { withStatusDot(base, isOpen: true) }
+
+    /// Badge in the pin's top-right: green when open now, gray when closed.
+    func withStatusDot(_ base: UIImage, isOpen: Bool) -> UIImage {
+        let key = StatusDotKey(base: ObjectIdentifier(base), isOpen: isOpen)
         if let cached = openDotCache[key] { return cached }
         let pad = Self.renderPadding
         let size = base.size
@@ -46,7 +50,7 @@ final class MapMarkerImageFactory {
             let rect = CGRect(x: center.x - dot / 2, y: center.y - dot / 2, width: dot, height: dot)
             UIColor.white.setFill()
             ctx.cgContext.fillEllipse(in: rect)
-            UIColor.systemGreen.setFill()
+            (isOpen ? UIColor.systemGreen : UIColor.systemGray).setFill()
             ctx.cgContext.fillEllipse(in: rect.insetBy(dx: 2, dy: 2))
         }
         if openDotCache.count > 500 { openDotCache.removeAll() }

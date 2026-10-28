@@ -125,8 +125,8 @@ class ImportProgressViewModel: ObservableObject {
     private func apply(_ job: ImportJob) {
         if contentUrl.isEmpty, let url = job.url { contentUrl = url }
         if job.status.isTerminal { ImportTracker.shared.finished(jobId: job.id) }
-        places = job.places
-        savedPlaces = job.savedPlaces
+        places = applyCorrections(to: job.places)
+        savedPlaces = places.filter { $0.status == .saved }.compactMap { $0.place }
         statusText = job.status.displayText
         if job.status == .saving, job.totalFound > 0 {
             statusText = "Adding places… \(savedCount)/\(job.totalFound)"
@@ -180,6 +180,70 @@ class ImportProgressViewModel: ObservableObject {
         errorMessage = nil
         statusText = "Added \(savedPlaces.count) place\(savedPlaces.count == 1 ? "" : "s")"
         isFinished = true
+    }
+
+    // MARK: - Wrong-place corrections
+
+    /// Place ids the user removed as wrong, and wrong id -> corrected place. Re-applied on every poll.
+    private var removedPlaceIds = Set<String>()
+    private var replacements: [String: DetailPlace] = [:]
+
+    private func applyCorrections(to jobPlaces: [ImportJobPlace]) -> [ImportJobPlace] {
+        jobPlaces.compactMap { item in
+            guard let id = item.place?.id.uuidString.lowercased() else { return item }
+            if removedPlaceIds.contains(id) { return nil }
+            if let fixed = replacements[id] {
+                return ImportJobPlace(index: item.index, name: fixed.name, status: .saved,
+                                      placeId: fixed.id.uuidString, place: fixed)
+            }
+            return item
+        }
+    }
+
+    /// Replaces a wrongly detected place with the one the user picked. The new place is already
+    /// linked to this video (PlaceCorrectionSheet, resolved id); this drops the wrong link.
+    func replacePlace(_ wrong: DetailPlace, with correct: DetailPlace) async {
+        guard !PlaceIdGuard.isPlaceholder(correct.id.uuidString) else { return }
+        let wrongKey = wrong.id.uuidString.lowercased()
+        replacements[wrongKey] = correct
+        if savedPlaces.contains(where: { $0.id == correct.id }) {
+            // Already in the import: just drop the wrong one.
+            removedPlaceIds.insert(wrongKey)
+        }
+        places = applyCorrections(to: places)
+        savedPlaces = dedup(places.filter { $0.status == .saved }.compactMap { $0.place })
+        await unlinkFromVideo(wrong)
+        Analytics.track(.importPlaceCorrected, ["action": "replace"])
+    }
+
+    /// Removes a wrongly detected place from this import and unlinks it from the video.
+    func removePlace(_ wrong: DetailPlace) async {
+        removedPlaceIds.insert(wrong.id.uuidString.lowercased())
+        places = applyCorrections(to: places)
+        savedPlaces = places.filter { $0.status == .saved }.compactMap { $0.place }
+        if places.isEmpty {
+            errorMessage = "No places left. Search for the right one below."
+        }
+        statusText = "\(savedPlaces.count) place\(savedPlaces.count == 1 ? "" : "s") found"
+        await unlinkFromVideo(wrong)
+        Analytics.track(.importPlaceCorrected, ["action": "remove"])
+    }
+
+    private func dedup(_ list: [DetailPlace]) -> [DetailPlace] {
+        var seen = Set<UUID>()
+        return list.filter { seen.insert($0.id).inserted }
+    }
+
+    /// Deletes the external_places row linking the wrong place to this video (best effort).
+    private func unlinkFromVideo(_ place: DetailPlace) async {
+        guard !contentUrl.isEmpty, !PlaceIdGuard.isPlaceholder(place.id.uuidString),
+              let userId = SupabaseAuthService.shared.currentUserId else { return }
+        do {
+            try await ExternalPlaceService.shared.deleteVideoFromPlace(
+                placeId: place.id.uuidString, videoUrl: contentUrl, userId: userId)
+        } catch {
+            print("ImportProgress: couldn't unlink wrong place: \(error.localizedDescription)")
+        }
     }
 
     /// Opens the existing confirmation prompt for a single saved place.

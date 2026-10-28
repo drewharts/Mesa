@@ -249,7 +249,7 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.fraction(0.75), .large])
                     .presentationDragIndicator(.visible)
 
             case .importJob(let jobId):
@@ -257,7 +257,7 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.fraction(0.75), .large])
                     .presentationDragIndicator(.visible)
 
             // Map Popups (User's Own Data)

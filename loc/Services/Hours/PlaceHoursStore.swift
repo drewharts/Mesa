@@ -19,6 +19,9 @@ final class PlaceHoursStore: ObservableObject {
     @Published private(set) var hours: [String: PlaceHours] = [:]
     /// Bumped every minute so observers re-evaluate.
     @Published private(set) var tick = Date()
+    /// Changes whenever any status may have changed (hours loaded, time zone learned, minute tick).
+    /// Map pins use it to redraw already-rendered markers.
+    @Published private(set) var revision = 0
 
     private var requested = Set<String>()
     private var pending = Set<String>()
@@ -27,7 +30,10 @@ final class PlaceHoursStore: ObservableObject {
 
     private init() {
         timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
-            .sink { [weak self] date in self?.tick = date }
+            .sink { [weak self] date in
+                self?.tick = date
+                self?.revision &+= 1
+            }
     }
 
     // MARK: - Reading
@@ -53,7 +59,7 @@ final class PlaceHoursStore: ObservableObject {
 
     func setTimeZone(_ tz: TimeZone, for placeId: String) {
         let key = placeId.lowercased()
-        if PlaceTimeZoneCache.shared.set(tz, for: key), hours[key] != nil { tick = Date() }
+        if PlaceTimeZoneCache.shared.set(tz, for: key), hours[key] != nil { tick = Date(); revision &+= 1 }
     }
 
     /// Seeds hours already loaded elsewhere (e.g. the detail view's DetailPlace).
@@ -61,12 +67,16 @@ final class PlaceHoursStore: ObservableObject {
         guard let weekdayText, let parsed = PlaceHours(weekdayText: weekdayText) else { return }
         let key = placeId.lowercased()
         requested.insert(key)
-        if hours[key] != parsed { hours[key] = parsed }
+        if hours[key] != parsed { hours[key] = parsed; revision &+= 1 }
     }
 
     /// Queues ids for a batched fetch. Safe to call from view bodies (work is deferred).
     func prefetch(_ placeIds: [String]) {
-        let missing = placeIds.map { $0.lowercased() }.filter { !requested.contains($0) }
+        // Only real place UUIDs: one non-UUID id (e.g. a Google place id on a community pin) or the
+        // shared placeholder makes Postgres reject the whole batch, so nothing would ever show.
+        let missing = placeIds
+            .map { $0.lowercased() }
+            .filter { UUID(uuidString: $0) != nil && !PlaceIdGuard.isPlaceholder($0) && !requested.contains($0) }
         guard !missing.isEmpty else { return }
         requested.formUnion(missing)
         pending.formUnion(missing)
@@ -89,6 +99,7 @@ final class PlaceHoursStore: ObservableObject {
                 if let parsed = PlaceHours(weekdayText: lines) { merged[key] = parsed }
             }
             hours = merged
+            revision &+= 1
         } catch {
             requested.subtract(ids) // retry next time
         }

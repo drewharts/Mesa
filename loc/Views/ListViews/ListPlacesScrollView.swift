@@ -188,6 +188,19 @@ struct ListPlaceTileView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                     .lineLimit(1)
+                if let state = hoursStore.state(for: place.place_id) {
+                    // Glanceable status line: "Open · Closes 10 PM" / "Closed · Opens 9 AM".
+                    HStack(spacing: 4) {
+                        Text(state.isOpen ? "Open" : "Closed")
+                            .fontWeight(.semibold)
+                            .foregroundColor(state.isOpen ? .green : .secondary)
+                        if let change = hoursStore.changeText(for: place.place_id) {
+                            Text("· \(change)").foregroundColor(.secondary)
+                        }
+                    }
+                    .font(.caption)
+                    .lineLimit(1)
+                }
                 if let meta = meta {
                     Text(meta)
                         .font(.caption)

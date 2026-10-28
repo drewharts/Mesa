@@ -42,6 +42,9 @@ struct GoogleMapView: UIViewRepresentable {
     var onLongPressCreatePlace: ((CLLocationCoordinate2D) -> Void)?
     var onDiscoveryTap: ((CLLocationCoordinate2D) -> Void)?
     var annotationImageProvider: (MapAnnotationItem, Bool) -> UIImage?
+    /// Bumped when pin icons change without the annotations changing (e.g. open/closed hours
+    /// arriving or the minute ticking over), so already-rendered markers get redrawn.
+    var iconRevision: Int = 0
 
     /// On-screen point distance below which GMUClusterManager merges pins into a cluster
     /// badge. Deliberately smaller than the markers' own visual footprint (community/emoji
@@ -74,6 +77,7 @@ struct GoogleMapView: UIViewRepresentable {
         context.coordinator.syncTripRoutes(tripRoutes, on: mapView)
         context.coordinator.syncCameraIfNeeded(mapPosition, on: mapView)
         context.coordinator.syncSelection()
+        context.coordinator.syncIconRevision(iconRevision)
     }
 
     // MARK: - Coordinator
@@ -440,6 +444,21 @@ struct GoogleMapView: UIViewRepresentable {
             clusterManager.cluster()
             if hasAppliedInitialCamera {
                 parent.onCameraSettled?(region)
+            }
+        }
+
+        // MARK: Icon refresh
+
+        private var lastIconRevision = 0
+
+        /// Redraws every marker when icon inputs (open/closed status) changed.
+        func syncIconRevision(_ revision: Int) {
+            guard revision != lastIconRevision else { return }
+            lastIconRevision = revision
+            clusterManager.cluster()
+            for (_, marker) in directMarkersById {
+                guard let item = marker.userData as? MapAnnotationItem else { continue }
+                configureDirectMarker(marker, for: item)
             }
         }
 

@@ -152,8 +152,9 @@ struct MapView: View {
         case .network, .community:
             guard let base, let placeId = item.placeId else { return base }
             hoursStore.prefetch([placeId])
-            if hoursStore.state(for: placeId)?.isOpen == true {
-                return MapMarkerImageFactory.shared.withOpenDot(base)
+            // Open = green dot, closed = gray dot, unknown hours = no dot.
+            if let state = hoursStore.state(for: placeId) {
+                return MapMarkerImageFactory.shared.withStatusDot(base, isOpen: state.isOpen)
             }
             return base
         default:
@@ -287,7 +288,8 @@ struct MapView: View {
                 },
                 annotationImageProvider: { item, isSelected in
                     annotationImage(for: item, isSelected: isSelected)
-                }
+                },
+                iconRevision: hoursStore.revision
             )
             .ignoresSafeArea()
             .onChange(of: recenterMap) { oldValue, newValue in
