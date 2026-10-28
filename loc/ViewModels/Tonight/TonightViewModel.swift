@@ -284,3 +284,4 @@ extension TonightViewModel {
             return false
         }
     }
+}
