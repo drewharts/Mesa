@@ -51,10 +51,13 @@ class PlaceListService {
         var start = 0
         while start < placeIds.count {
             let chunk = Array(placeIds[start..<min(start + 80, placeIds.count)])
+            // places.id is TEXT and stored uppercase; callers pass lowercased keys, so an exact
+            // .in() matched nothing and no tile ever showed open/closed. Query both casings.
+            let values = Array(Set(chunk.flatMap { [$0.uppercased(), $0.lowercased()] }))
             let rows: [HoursRow] = try await supabase.client
                 .from("places")
                 .select("id, open_hours")
-                .in("id", values: chunk)
+                .in("id", values: values)
                 .execute()
                 .value
             for row in rows {

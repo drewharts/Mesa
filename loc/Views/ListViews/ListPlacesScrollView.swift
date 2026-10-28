@@ -36,6 +36,13 @@ struct ListPlacesScrollView: View {
 
     private var isCollapsed: Bool { sheetVM.detent == .peek }
 
+    /// One tile per place. Duplicate ids (same place reached twice, sometimes with different id
+    /// casing) gave LazyVGrid duplicate identities, which left a blank cell and broke the 2-column flow.
+    private var uniquePlaces: [LightweightPlace] {
+        var seen = Set<String>()
+        return places.filter { seen.insert($0.place_id.lowercased()).inserted }
+    }
+
     private func isSelected(_ place: LightweightPlace) -> Bool {
         guard let focusedPlaceId else { return false }
         return focusedPlaceId.caseInsensitiveCompare(place.place_id) == .orderedSame
@@ -103,7 +110,7 @@ struct ListPlacesScrollView: View {
                 ListPlaceTileSkeleton(width: tileWidth)
             }
         } else {
-            ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
+            ForEach(Array(uniquePlaces.enumerated()), id: \.element.id) { index, place in
                 ListPlaceTileView(
                     place: place,
                     locationText: locationText(place.place_id),
@@ -129,7 +136,7 @@ struct ListPlacesScrollView: View {
                 }
                 .onAppear {
                     onRowAppear(place)
-                    if index >= places.count - 3 {
+                    if index >= uniquePlaces.count - 3 {
                         onLoadMore()
                     }
                 }
@@ -183,7 +190,7 @@ struct ListPlaceTileView: View {
                 .scaleEffect(isSelected ? 1.0 : 0.985)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(place.name)
+                Text(LightweightPlace.displayName(place.name))
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
