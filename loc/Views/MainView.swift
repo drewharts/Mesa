@@ -565,6 +565,16 @@ struct MainView: View {
     /// Tonight sheet: 3 instant picks from the user's and friends' saves.
     private var tonightSheet: some View {
         TonightSheet(userSession: userSession, locationManager: locationManager, onOpenPlace: openPlaceFromSheet)
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(locationManager)
+            .environmentObject(userSession)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(notificationManager)
+            .environmentObject(profileViewModel)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(mapDisplayCoordinatorViewModel)
+            .environmentObject(serviceContainer)
+            .environmentObject(dataManager)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
     }
@@ -579,6 +589,16 @@ struct MainView: View {
     /// Group pick sheet: live one-tap voting with an automatic winner.
     private func groupPickSheet(pickId: String) -> some View {
         GroupPickSheet(pickId: pickId, userId: userSession.currentUserId, locationManager: locationManager, onOpenPlace: openPlaceFromSheet)
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(locationManager)
+            .environmentObject(userSession)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(notificationManager)
+            .environmentObject(profileViewModel)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(mapDisplayCoordinatorViewModel)
+            .environmentObject(serviceContainer)
+            .environmentObject(dataManager)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
     }
