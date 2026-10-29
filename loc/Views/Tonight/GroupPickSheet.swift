@@ -265,7 +265,7 @@ struct GroupPickSheet: View {
                     item: url,
                     // Short line above the rich card; the card (server OG image) carries the details.
                     message: Text(viewModel.pick?.isPlanned == true ? "Rank your top 3 👇" : "Vote on where we eat 👇"),
-                    preview: SharePreview(viewModel.pick?.title ?? "Where should we eat?", image: Image("AppIcon"))
+                    preview: SharePreview(viewModel.pick?.title ?? "Where should we eat?", image: Image("MesaAppIcon"))
                 ) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 18))
