@@ -45,8 +45,11 @@ struct ProfilePhotoOnboardingView: View {
                 showSheet = true
             }
         }
-        .sheet(isPresented: $viewModel.showImagePicker) {
-            ImagePicker(images: $viewModel.pickerImages, selectionLimit: 1)
+        .profilePhotoEditor(showPicker: $viewModel.showImagePicker,
+                            editRequest: $viewModel.editRequest,
+                            source: "onboarding",
+                            userId: viewModel.userIdForCrop) { cropped, original in
+            viewModel.applyCrop(cropped: cropped, original: original)
         }
         .onChange(of: viewModel.isOnboardingComplete) { _, isComplete in
             if isComplete {
@@ -126,11 +129,24 @@ struct ProfilePhotoOnboardingView: View {
                 .frame(width: 120, height: 120)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(subtleGray.opacity(0.4), lineWidth: 1))
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "crop")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(7)
+                        .background(Circle().fill(mesaCharcoal))
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                }
+                .contentShape(Circle())
+                .onTapGesture { viewModel.adjustCrop() }
+                .accessibilityLabel("Adjust photo crop")
         } else {
             Circle()
                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
                 .foregroundColor(subtleGray)
                 .frame(width: 120, height: 120)
+                .contentShape(Circle())
+                .onTapGesture { viewModel.showImagePicker = true }
                 .overlay(
                     Image(systemName: "camera.fill")
                         .font(.system(size: 32))
