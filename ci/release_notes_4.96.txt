@@ -1,0 +1,8 @@
+What's new in Mesa 4.96:
+
+• Lists open map-first, with big photo tiles and pins that stay in sync with the list.
+• See at a glance which places are open or closed right now.
+• Group picks now decide on their own and notify everyone, and you can plan a group pick for a later date with ranked top-3 results.
+• Tap any pick in Tonight or a group pick to see the place's details, with real photos on every card.
+• Importing is smoother: search all your lists when saving, and fix or remove a wrongly detected place.
+• A new animated launch screen, faster map pins that never overlap, and lots of fixes.
