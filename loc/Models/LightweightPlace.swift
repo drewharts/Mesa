@@ -22,6 +22,13 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
 
     var id: String { place_id }
 
+    /// Hides junk names written by a bad enrichment result (literal "undefined"/"null"/blank).
+    /// Case-sensitive on purpose: "Undefined" is a real restaurant name.
+    static func displayName(_ name: String) -> String {
+        let t = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (t.isEmpty || t == "undefined" || t == "null") ? "Unnamed place" : t
+    }
+
     enum CodingKeys: String, CodingKey {
         case place_id
         case name

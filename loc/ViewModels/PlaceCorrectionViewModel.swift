@@ -180,6 +180,7 @@ class PlaceCorrectionViewModel: ObservableObject {
     /// Ensures the place exists in the places table and persists the external_places association.
     private func persistPlaceAssignment(detailPlace: DetailPlace) async {
         do {
+            let detailPlace = try await PlaceRepository.shared.ensureResolved(detailPlace)
             try await SupabasePlaceService.shared.ensurePlaceExists(place: detailPlace)
 
             let newPlaceId = detailPlace.id.uuidString

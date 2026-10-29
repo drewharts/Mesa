@@ -19,6 +19,8 @@ class OpenStatusViewModel: ObservableObject {
     @Published private(set) var displayText: String = ""
     @Published private(set) var isOpen: Bool = false
     @Published private(set) var shouldDisplay: Bool = false
+    /// "Closes 10 PM" / "Opens 9 AM", nil when unknown.
+    @Published private(set) var changeText: String?
 
     // MARK: - Private Properties
 
@@ -27,7 +29,19 @@ class OpenStatusViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init() {}
+    private var hoursSub: AnyCancellable?
+
+    init() {
+        // When the detail's own DetailPlace has no usable hours (e.g. it came from a search
+        // result without them), fall back to the shared store, which reads places.open_hours.
+        hoursSub = PlaceHoursStore.shared.$revision
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.status == .unknown, let place = self.currentPlace else { return }
+                self.updateStatus(for: place)
+            }
+    }
 
     deinit {
         refreshTimer?.invalidate()
@@ -52,8 +66,21 @@ class OpenStatusViewModel: ObservableObject {
             return
         }
         
-        let newStatus = OpenStatusService.getStatus(for: place)
+        var newStatus = OpenStatusService.getStatus(for: place)
+        var newChange = newStatus.shouldDisplay ? OpenStatusService.changeText(for: place) : nil
+        let store = PlaceHoursStore.shared
+        let id = place.id.uuidString
+        store.seed(placeId: id, weekdayText: place.openHours)
+        if newStatus == .unknown {
+            if let state = store.state(for: id) {
+                newStatus = state.isAlwaysOpen ? .alwaysOpen : (state.isOpen ? .open : .closed)
+                newChange = state.isAlwaysOpen ? nil : store.changeText(for: id)
+            } else {
+                store.prefetch([id])
+            }
+        }
         applyStatus(newStatus)
+        changeText = newChange
         
         // Schedule refresh for time-sensitive statuses
         scheduleRefreshIfNeeded(for: newStatus)
@@ -71,12 +98,13 @@ class OpenStatusViewModel: ObservableObject {
         displayText = ""
         isOpen = false
         shouldDisplay = false
+        changeText = nil
     }
     
     /// Schedules automatic refresh for time-sensitive statuses (closing/opening soon)
     private func scheduleRefreshIfNeeded(for status: OpenStatus) {
         switch status {
-        case .closingSoon, .openingSoon:
+        case .closingSoon, .openingSoon, .open, .closed:
             // Refresh every minute for time-sensitive statuses
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in

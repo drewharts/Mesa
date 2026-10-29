@@ -6,6 +6,7 @@
 
 import SwiftUI
 import MapKit
+import Combine
 
 struct MapView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -18,6 +19,14 @@ struct MapView: View {
     @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
+
+    /// Map-first list sheet: which list row/pin is focused and where the camera should go.
+    @ObservedObject private var listSheetVM = ListMapSheetViewModel.shared
+    /// Stored opening hours, for the small "open now" dot on place pins.
+    @ObservedObject private var hoursStore = PlaceHoursStore.shared
+    /// Mirrors MapPhotoViewModel.imagesRevision (not forwarded through MapViewModel) so baked
+    /// avatar pins reach the map as soon as they exist.
+    @State private var photoRevision = 0
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
@@ -123,6 +132,12 @@ struct MapView: View {
     private func isAnnotationSelected(_ item: MapAnnotationItem) -> Bool {
         switch item.layer {
         case .network, .community:
+            // A place focused from the list sheet (row tap or pin tap) gets the selected-pin styling.
+            if let focusedId = listSheetVM.focusedPlaceId,
+               let itemPlaceId = item.placeId,
+               itemPlaceId.caseInsensitiveCompare(focusedId) == .orderedSame {
+                return true
+            }
             guard let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString else { return false }
             return item.placeId == selectedId
         case .trip(let trip):
@@ -136,6 +151,23 @@ struct MapView: View {
     /// precomputed profile-photo composite cache where available and MapMarkerImageFactory
     /// for everything else.
     private func annotationImage(for item: MapAnnotationItem, isSelected: Bool) -> UIImage? {
+        let base = baseAnnotationImage(for: item, isSelected: isSelected)
+        switch item.layer {
+        case .network, .community:
+            guard let base, let placeId = item.placeId else { return base }
+            PlaceTimeZoneCache.shared.registerCoordinate(placeId: placeId, latitude: item.coordinate.latitude, longitude: item.coordinate.longitude)
+            hoursStore.prefetch([placeId])
+            // Open = green dot, closed = gray dot, unknown hours = no dot.
+            if let state = hoursStore.state(for: placeId) {
+                return MapMarkerImageFactory.shared.withStatusDot(base, isOpen: state.isOpen)
+            }
+            return base
+        default:
+            return base
+        }
+    }
+
+    private func baseAnnotationImage(for item: MapAnnotationItem, isSelected: Bool) -> UIImage? {
         switch item.layer {
         case .network(let annotation):
             if mapViewModel.showEmojiAnnotations {
@@ -222,7 +254,9 @@ struct MapView: View {
         }
     }
     
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Map") }
+
+    @ViewBuilder private var analyticsBody: some View {
         ZStack {
             GoogleMapView(
                 mapPosition: $mapPosition,
@@ -261,9 +295,12 @@ struct MapView: View {
                 },
                 annotationImageProvider: { item, isSelected in
                     annotationImage(for: item, isSelected: isSelected)
-                }
+                },
+                iconRevision: hoursStore.revision,
+                photoRevision: photoRevision
             )
             .ignoresSafeArea()
+            .onReceive(mapViewModel.photoViewModel.$imagesRevision.removeDuplicates()) { photoRevision = $0 }
             .onChange(of: recenterMap) { oldValue, newValue in
                 if newValue {
                     let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
@@ -384,17 +421,7 @@ struct MapView: View {
                 )
             }
         }
-        .task {
-            // Load profile photos for annotation rendering
-            // Viewport annotations load via onMapCameraChange(.onEnd) — no need to duplicate here
-            guard let userId = profile.user?.id else { return }
-            if !mapViewModel.hasLoadedPhotos {
-                await mapViewModel.loadFollowedUsersPhotos(
-                    userId: userId,
-                    currentUserPhotoUrl: profile.user?.profilePhotoURL
-                )
-            }
-        }
+        // (Initial photo load is handled by .task(id: scenePhase) above, which also runs on appear.)
         .onChange(of: profile.user?.id) { oldValue, newValue in
             // When user profile becomes available (nil → value), load annotation photos
             // Viewport annotations load via onMapCameraChange(.onEnd)
@@ -415,7 +442,7 @@ struct MapView: View {
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userProfileNavigationVM)
                 .environmentObject(userSession)
-                .presentationDragIndicator(.visible)
+                .applyListMapSheetPresentation()
         }
         .onChange(of: selectedPlaceVM.selectedPlace?.id) { oldValue, newValue in
             if newValue == nil {
@@ -432,6 +459,36 @@ struct MapView: View {
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, shouldAnimate in
             if shouldAnimate, let place = selectedPlaceVM.selectedPlace {
                 mapViewModel.setPreservedAnnotation(for: place)
+            }
+        }
+        // Map-first list sheet: fit to the list's pins, or center a focused pin above the sheet.
+        .onChange(of: listSheetVM.cameraRequest) { _, request in
+            guard let request else { return }
+            applyListCameraRequest(request)
+        }
+    }
+
+    /// Applies a camera request from the list sheet through the existing mapPosition binding.
+    private func applyListCameraRequest(_ request: ListMapSheetViewModel.CameraRequest) {
+        switch request.target {
+        case .region(let region):
+            withAnimation(.easeInOut(duration: 0.45)) {
+                mapPosition = .region(region)
+            }
+        case .point(let coordinate, let sheetFraction):
+            // Keep the current zoom when sensible; zoom in if the whole list is in view.
+            let currentSpan = currentMapRegion?.span ?? MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+            let latitudeDelta = min(max(currentSpan.latitudeDelta, 0.004), 0.03)
+            let scale = currentSpan.latitudeDelta > 0 ? latitudeDelta / currentSpan.latitudeDelta : 1
+            let longitudeDelta = max(currentSpan.longitudeDelta * scale, 0.004)
+            // Shift the center south so the pin sits in the middle of the map area above the sheet.
+            let centerLatitude = coordinate.latitude - latitudeDelta * Double(sheetFraction) / 2
+            let region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: centerLatitude, longitude: coordinate.longitude),
+                span: MKCoordinateSpan(latitudeDelta: latitudeDelta, longitudeDelta: longitudeDelta)
+            )
+            withAnimation(.easeInOut(duration: 0.35)) {
+                mapPosition = .region(region)
             }
         }
     }

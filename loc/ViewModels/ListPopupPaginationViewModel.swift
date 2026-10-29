@@ -83,6 +83,38 @@ class ListPopupPaginationViewModel: ObservableObject {
         }
     }
 
+    /// Largest number of places fetched in one request when loading a whole list for the map.
+    private static let maxFullLoadCount = 300
+
+    /// Loads every place of a list in a single request so each pin on the map has a matching row.
+    /// Keeps optimistic local inserts, and leaves infinite-scroll pagination as a fallback for huge lists.
+    func loadAllPlaces(for listId: String, expectedCount: Int) async {
+        guard let listsVM = listsVM else { return }
+        initializeStateIfNeeded(for: listId)
+
+        let loadedCount = listsVM.lightweightPlaceListPlaces[listId]?.count ?? 0
+        guard expectedCount > loadedCount, paginationStates[listId]?.isLoadingMore != true else { return }
+
+        updateState(for: listId) { state in state.isLoadingMore = true }
+        let pageSize = min(max(expectedCount + 10, 20), Self.maxFullLoadCount)
+
+        do {
+            let fetched = try await listsVM.loadMorePlacesForList(listId: listId, page: 1, pageSize: pageSize)
+            let fetchedIds = Set(fetched.map { $0.place_id })
+            let localOnly = (listsVM.lightweightPlaceListPlaces[listId] ?? []).filter { !fetchedIds.contains($0.place_id) }
+            listsVM.setPlacesForList(listId: listId, places: fetched + localOnly)
+
+            updateState(for: listId) { state in
+                state.currentPage = max(1, fetched.count / 6)
+                state.hasMorePlaces = fetched.count >= pageSize
+                state.isLoadingMore = false
+            }
+        } catch {
+            updateState(for: listId) { state in state.isLoadingMore = false }
+            print("❌ [ListPopupPaginationViewModel] Error loading all places: \(error.localizedDescription)")
+        }
+    }
+
     /// Resets pagination state for a specific list.
     func resetState(for listId: String) {
         paginationStates[listId] = ListPaginationState()

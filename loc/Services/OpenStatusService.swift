@@ -87,7 +87,37 @@ struct OpenStatusService {
             return .unknown
         }
         
+        // Special statuses first ("temporarily_closed" etc.), then the time-zone-aware evaluator.
+        switch openHours.first?.lowercased() ?? "" {
+        case "temporarily_closed": return .temporarilyClosed
+        case "permanently_closed": return .permanentlyClosed
+        default: break
+        }
+        if let c = place.coordinate {
+            PlaceTimeZoneCache.shared.registerCoordinate(placeId: place.id.uuidString, latitude: c.latitude, longitude: c.longitude)
+        }
+        if let hours = PlaceHours(weekdayText: openHours) {
+            let tz = PlaceTimeZoneCache.shared.timeZone(for: place.id.uuidString)
+            let state = hours.state(at: Date(), timeZone: tz)
+            if state.isAlwaysOpen { return .alwaysOpen }
+            let minutes = state.nextChange.map { Int(($0.timeIntervalSinceNow / 60).rounded(.up)) }
+            if state.isOpen {
+                if let minutes, minutes <= closingSoonThresholdMinutes { return .closingSoon(minutesRemaining: max(minutes, 1)) }
+                return .open
+            }
+            if let minutes, minutes <= openingSoonThresholdMinutes { return .openingSoon(minutesRemaining: max(minutes, 1)) }
+            return .closed
+        }
         return calculateStatus(from: openHours)
+    }
+
+    /// "Closes 10 PM" / "Opens 9 AM" for the detail view; nil when hours are unknown.
+    static func changeText(for place: DetailPlace) -> String? {
+        guard let openHours = place.openHours, let hours = PlaceHours(weekdayText: openHours) else { return nil }
+        let tz = PlaceTimeZoneCache.shared.timeZone(for: place.id.uuidString)
+        let state = hours.state(at: Date(), timeZone: tz)
+        if state.isAlwaysOpen { return nil } // badge already says "Open 24/7"
+        return PlaceHours.changeText(for: state, timeZone: tz)
     }
     
     /// Determines if a place is currently open (simple boolean check).

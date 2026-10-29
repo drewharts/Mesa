@@ -50,6 +50,12 @@ enum TonightVibe: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    /// Maps a stored group pick title (a `headline`) back to its vibe, if it is one of ours.
+    static func from(headline: String?) -> TonightVibe? {
+        guard let headline else { return nil }
+        return allCases.first { $0.headline == headline }
+    }
+
     /// Returns the vibe that best fits the given local hour (0-23).
     static func inferred(forHour hour: Int) -> TonightVibe {
         switch hour {

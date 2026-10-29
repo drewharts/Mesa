@@ -19,7 +19,9 @@ struct TripsListView: View {
 
     @State private var navigationPath = NavigationPath()
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Trips") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationStack(path: $navigationPath) {
             Group {
                 if viewModel.isLoading && viewModel.trips.isEmpty {
@@ -119,11 +121,23 @@ struct TripsListView: View {
     private var tripsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(viewModel.trips) { trip in
-                    NavigationLink(value: trip.tripId) {
-                        TripCardView(trip: trip)
+                if viewModel.currentTrips.isEmpty {
+                    Text("No upcoming trips")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                }
+                ForEach(viewModel.currentTrips) { trip in
+                    tripLink(trip)
+                }
+                if !viewModel.pastTrips.isEmpty {
+                    pastTripsHeader
+                    if viewModel.isPastExpanded {
+                        ForEach(viewModel.pastTrips) { trip in
+                            tripLink(trip)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal)
@@ -134,5 +148,31 @@ struct TripsListView: View {
                 await viewModel.loadTrips(userId: userId)
             }
         }
+    }
+
+    private func tripLink(_ trip: LightweightTrip) -> some View {
+        NavigationLink(value: trip.tripId) {
+            TripCardView(trip: trip)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var pastTripsHeader: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { viewModel.togglePastExpanded() }
+        } label: {
+            HStack {
+                Text("Past trips (\(viewModel.pastTrips.count))")
+                    .font(.headline)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .rotationEffect(.degrees(viewModel.isPastExpanded ? 180 : 0))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(viewModel.isPastExpanded ? "Collapse past trips" : "Expand past trips")
     }
 }

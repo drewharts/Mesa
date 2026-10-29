@@ -63,6 +63,16 @@ class ProfileFavoritesViewModel: ObservableObject {
 
     /// Adds a place to favorites with server-side validation.
     func addFavoritePlace(place: DetailPlace) {
+        if place.hasPlaceholderID {
+            Task { @MainActor [weak self] in
+                guard let resolved = try? await PlaceRepository.shared.ensureResolved(place) else {
+                    print("❌ [ProfileFavoritesViewModel] Place still loading; not favorited")
+                    return
+                }
+                self?.addFavoritePlace(place: resolved)
+            }
+            return
+        }
         guard let userId = userSession?.currentUserId else {
             print("⚠️ [ProfileFavoritesViewModel] Cannot add favorite: no user ID")
             return

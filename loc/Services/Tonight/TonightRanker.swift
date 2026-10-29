@@ -58,6 +58,29 @@ struct TonightRanker {
         return Array(eligible.sorted(by: Self.ordering).prefix(limit))
     }
 
+    /// When nothing is open: eligible places that are only closed for now, soonest opening first,
+    /// with an "Opens 8 AM" reason. Uses each place's own time zone.
+    func openingLater(candidates: [TonightCandidate], places: [String: DetailPlace], limit: Int = TonightRanker.resultCount) -> [TonightPick] {
+        var out: [(Date, TonightPick)] = []
+        for candidate in candidates {
+            guard let place = places[candidate.placeId.lowercased()] else { continue }
+            let status = openStatus(place)
+            switch status { case .closed, .openingSoon: break; default: continue }
+            if !Self.isFoodOrDrink(place) || vibeScore(for: place) <= 0 { continue }
+            let distance = distanceMeters(to: place)
+            if let distance, distance > Self.radiusSteps[1] { continue }
+            guard let lines = place.openHours, let hours = PlaceHours(weekdayText: lines) else { continue }
+            let tz = PlaceTimeZoneCache.shared.timeZone(for: place.id.uuidString)
+            let state = hours.state(at: Date(), timeZone: tz)
+            guard !state.isOpen, let next = state.nextChange, next.timeIntervalSinceNow < 18 * 3600 else { continue }
+            let opens = PlaceHours.changeText(for: state, timeZone: tz) ?? "Opens later"
+            let base = evaluate(candidate: candidate, place: place).pick
+            out.append((next, TonightPick(placeId: base.placeId, place: place, distanceMeters: distance,
+                                          isOpenNow: false, score: base.score, reason: opens)))
+        }
+        return out.sorted { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1.score > $1.1.score }.prefix(limit).map(\.1)
+    }
+
     // MARK: - Scoring
 
     /// `.fallback` is no longer produced: ineligible places are never used to fill slots.

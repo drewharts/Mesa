@@ -19,7 +19,6 @@ struct FullScreenListsView: View {
     @FocusState private var isSearchFocused: Bool
 
     @State private var placeColors: [UUID: Color] = [:]
-    @State private var selectedListIndex: Int? = nil
     @State private var showingNewListSheet = false
     @State private var showingGoogleMapsImport = false
     @State private var showingCreateTrip = false
@@ -60,8 +59,8 @@ struct FullScreenListsView: View {
                 onImportCompleted: { listId in
                     Task {
                         await listsVM.reloadListsAfterSearch()
-                        if let index = listsVM.filteredPlaceLists.firstIndex(where: { $0.list_id == listId }) {
-                            selectedListIndex = index
+                        if listsVM.filteredPlaceLists.contains(where: { $0.list_id == listId }) {
+                            openListOnMap(listId: listId)
                         }
                     }
                 }
@@ -71,23 +70,15 @@ struct FullScreenListsView: View {
             CreateTripView { _ in showingCreateTrip = false }
                 .environmentObject(userSession)
         }
-        .sheet(item: Binding<ListCardIndex?>(
-            get: { selectedListIndex.map { ListCardIndex(value: $0) } },
-            set: { selectedListIndex = $0?.value }
-        )) { item in
-            LightweightListPopupView(
-                lists: listsVM.filteredPlaceLists,
-                initialListIndex: item.value,
-                listsVM: listsVM,
-                reviewsVM: profile.reviewsViewModel,
-                onViewOnMap: {
-                    let listId = listsVM.filteredPlaceLists[item.value].list_id
-                    selectedListIndex = nil
-                    profile.selectedListIdForMap = listId
-                    dismiss()
-                }
-            )
-        }
+    }
+
+    // MARK: - Open List
+
+    /// Opens a list map-first: the profile closes and the map shows the list's pins with the list sheet.
+    private func openListOnMap(listId: String) {
+        isSearchFocused = false
+        profile.selectedListIdForMap = listId
+        dismiss()
     }
 
     // MARK: - Search Header
@@ -148,8 +139,8 @@ struct FullScreenListsView: View {
                 placeColors: $placeColors,
                 userId: profile.user?.id ?? "",
                 onListTap: { index in
-                    isSearchFocused = false
-                    selectedListIndex = index
+                    guard listsVM.filteredPlaceLists.indices.contains(index) else { return }
+                    openListOnMap(listId: listsVM.filteredPlaceLists[index].list_id)
                 }
             )
         } else if hasSearchText {

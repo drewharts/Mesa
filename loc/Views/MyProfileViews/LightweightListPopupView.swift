@@ -20,9 +20,13 @@ struct LightweightListPopupView: View {
     @StateObject private var paginationVM = ListPopupPaginationViewModel()
     @StateObject private var storyViewModel = ListStoryCardViewModel()
 
+    /// Map-first coordination: sheet height, focused place, camera requests.
+    @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
+    /// Category/neighborhood line data for rows.
+    @ObservedObject private var placeMeta = ListPlaceMetaStore.shared
+
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
-    let onViewOnMap: (() -> Void)?
 
     @ObservedObject var listsVM: ProfileListsViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
@@ -40,23 +44,21 @@ struct LightweightListPopupView: View {
     @State private var hasInitiallyAppeared = false
 
     // Convenience initializer for single list (backward compatibility)
-    init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = [], onViewOnMap: (() -> Void)? = nil) {
+    init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = []) {
         self.lists = [list]
         self.initialListIndex = 0
         self._currentListIndex = State(initialValue: 0)
         self.listsVM = listsVM
         self.reviewsVM = reviewsVM
-        self.onViewOnMap = onViewOnMap
     }
 
     // Initializer for multiple lists with swiping
-    init(lists: [LightweightPlaceList], initialListIndex: Int, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, onViewOnMap: (() -> Void)? = nil) {
+    init(lists: [LightweightPlaceList], initialListIndex: Int, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel) {
         self.lists = lists
         self.initialListIndex = initialListIndex
         self._currentListIndex = State(initialValue: initialListIndex)
         self.listsVM = listsVM
         self.reviewsVM = reviewsVM
-        self.onViewOnMap = onViewOnMap
     }
 
     // Current list being displayed (uses passed lists, not profile.lightweightPlaceLists for filtered support)
@@ -83,6 +85,11 @@ struct LightweightListPopupView: View {
         return listsVM.lightweightPlaceListPlaces[currentList.list_id] ?? []
     }
 
+    /// Looks up a place of the current list by id (case-insensitive).
+    private func place(withId placeId: String) -> LightweightPlace? {
+        allPlaces.first { $0.place_id.caseInsensitiveCompare(placeId) == .orderedSame }
+    }
+
     /// Reactive place count that reflects optimistic cache updates, not the stale snapshot.
     private var displayedPlaceCount: Int {
         listsVM.lightweightPlaceListCounts[currentList.list_id] ?? currentList.place_count
@@ -94,10 +101,8 @@ struct LightweightListPopupView: View {
                 // Header fixed at top, not scrollable
                 headerSection
 
-                // Content scrolls vertically
-                ScrollView {
-                    contentSection
-                }
+                // Place rows scroll below the header
+                contentSection
             }
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { placeId in
@@ -109,13 +114,11 @@ struct LightweightListPopupView: View {
             }
         }
         .onReceive(presentationService.$pendingPlaceNavigation.compactMap { $0 }) { placeId in
-            // When map annotation is tapped while list sheet is open, navigate to that place.
+            // When a map pin is tapped while the list sheet is open, highlight and scroll to its row.
             // Uses onReceive (Combine) instead of onChange for reliable delivery even when
             // a navigation destination is pushed on the stack.
-            var newPath = NavigationPath()
-            newPath.append(placeId)
-            navigationPath = newPath
             presentationService.pendingPlaceNavigation = nil
+            handleMapPinTap(placeId)
         }
         .onAppear {
             // Clear navigation path only on the first appearance (when the sheet opens).
@@ -127,9 +130,18 @@ struct LightweightListPopupView: View {
             // Set dependencies for pagination ViewModel
             paginationVM.setDependencies(listsVM: listsVM, reviewsVM: reviewsVM)
 
-            // Load places for the current list if not already fully cached
+            // Start the map-first session (resets height/focus, tracks the open)
+            sheetVM.beginSession(
+                listId: currentList.list_id,
+                placeCount: displayedPlaceCount,
+                isExternal: false,
+                source: "map_sheet"
+            )
+
+            // Load the first page, then the rest so every pin has a row, then fit the map to the pins
             Task {
                 await listsVM.loadPlacesForListIfNeeded(listId: currentList.list_id, fallbackCount: currentList.place_count)
+                await loadFullListAndFitMap()
             }
 
             // Initialize pagination state and load reviewed IDs via ViewModel
@@ -142,6 +154,10 @@ struct LightweightListPopupView: View {
             Task {
                 await paginationVM.onListChanged(to: currentList.list_id)
             }
+            placeMeta.prefetchCities(for: newValue)
+        }
+        .onDisappear {
+            sheetVM.endSession()
         }
         .sheet(isPresented: $showCollaboratorsSheet) {
             if let userId = profile.user?.id {
@@ -249,23 +265,13 @@ struct LightweightListPopupView: View {
                     Text(currentList.name)
                         .font(.title2)
                         .fontWeight(.bold)
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
 
                     Spacer()
 
-                    // Action buttons: map and overflow menu
+                    // Action buttons: overflow menu
                     if let userId = profile.user?.id {
                         HStack(alignment: .center, spacing: 12) {
-                            // View on Map button (profile popups only)
-                            if let viewOnMap = onViewOnMap {
-                                Button(action: viewOnMap) {
-                                    Image(systemName: "map")
-                                        .font(.system(size: 20, weight: .regular))
-                                        .foregroundColor(.primary)
-                                }
-                                .frame(width: 44, height: 44)
-                            }
-
                             // Overflow menu consolidating add, share, and settings actions
                             Menu {
                                 Button {
@@ -351,31 +357,83 @@ struct LightweightListPopupView: View {
             .padding(.top, 12)
             
         }
-        .padding(.bottom, 28)
+        .padding(.bottom, 8)
     }
     
-    /// Content section displaying the current list's places.
-    /// Single Responsibility: Display list content without horizontal swiping.
+    /// Content section displaying the current list's places as rows.
+    /// Single Responsibility: Display list content, delegate selection to the map-first view model.
     private var contentSection: some View {
         let listId = currentList.list_id
         let paginationState = paginationVM.state(for: listId)
-        return VStack(alignment: .leading, spacing: 0) {
-            ListContentView(
-                list: currentList,
-                isLoadingMore: paginationState.isLoadingMore,
-                hasMorePlaces: paginationState.hasMorePlaces,
-                onLoadMore: { paginationVM.loadMoreIfNeeded(for: listId) },
-                onNavigateToPlace: { placeId in
-                    navigationPath.append(placeId)
-                },
-                onRemovePlace: { placeId in
-                    profile.listsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
-                },
-                listsVM: listsVM,
-                reviewsVM: reviewsVM
-            )
+        let isLoadingInitial = listsVM.isLoadingInitialPlaces(listId: listId)
+            || (allPlaces.isEmpty && paginationState.isLoadingMore)
+        return ListPlacesScrollView(
+            places: allPlaces,
+            isLoadingInitial: isLoadingInitial,
+            isLoadingMore: paginationState.isLoadingMore && !allPlaces.isEmpty,
+            showAddedBy: currentList.isCollaborative,
+            focusedPlaceId: sheetVM.focusedPlaceId,
+            scrollRequest: sheetVM.scrollRequest,
+            locationText: { placeMeta.location(for: $0) },
+            onRowAppear: { placeMeta.requestNeighborhood(for: $0) },
+            onLoadMore: { paginationVM.loadMoreIfNeeded(for: listId) },
+            onSelect: { handleRowTap($0) },
+            onOpenDetail: { openPlaceDetail($0) },
+            onRemove: { placeId in
+                profile.listsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
+            }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    // MARK: - Map-First Actions
+
+    /// Loads every place of the list, then fits the map to all pins and warms the location lines.
+    private func loadFullListAndFitMap() async {
+        await paginationVM.loadAllPlaces(for: currentList.list_id, expectedCount: displayedPlaceCount)
+        sheetVM.fitToPlaces(allPlaces)
+        placeMeta.prefetchCities(for: allPlaces)
+    }
+
+    /// Tile tap: open the place immediately and focus/center its pin, so the map is on it when details close.
+    private func handleRowTap(_ place: LightweightPlace) {
+        sheetVM.focus(place: place, source: .row)
+        openPlaceDetail(place)
+    }
+
+    /// Opens the place page inside the sheet.
+    private func openPlaceDetail(_ place: LightweightPlace) {
+        sheetVM.ensureAtLeastHalf()
+        navigationPath.append(place.place_id)
+    }
+
+    /// Pin tap: scroll to and highlight the row; a second tap on the same pin opens its details.
+    /// While a place page is open, a pin tap swaps to that place (previous behavior).
+    private func handleMapPinTap(_ placeId: String) {
+        let isShowingDetail = !navigationPath.isEmpty
+        guard let tapped = place(withId: placeId) else {
+            var newPath = NavigationPath()
+            newPath.append(placeId)
+            navigationPath = newPath
+            return
         }
-        .frame(maxWidth: .infinity, alignment: .top)
+        if isShowingDetail {
+            // Swap the open place page to the tapped pin's place.
+            sheetVM.focus(place: tapped, source: .pin)
+            replaceDetail(with: tapped.place_id)
+        } else if sheetVM.isFocused(tapped.place_id) {
+            replaceDetail(with: tapped.place_id)
+        } else {
+            sheetVM.focus(place: tapped, source: .pin)
+        }
+    }
+
+    /// Replaces the navigation stack with a single place page.
+    private func replaceDetail(with placeId: String) {
+        sheetVM.ensureAtLeastHalf()
+        var newPath = NavigationPath()
+        newPath.append(placeId)
+        navigationPath = newPath
     }
 
     // MARK: - Share Helpers
@@ -414,112 +472,6 @@ struct LightweightListPopupView: View {
                 shareService: ServiceContainer.shared.placeShareService
             )
         }
-    }
-}
-
-// MARK: - List Content View
-/// DUMB Component: Displays list places in grid, delegates actions via closures
-/// Single Responsibility: Render place grid with pagination, delegate loading
-struct ListContentView: View {
-    let list: LightweightPlaceList
-    let isLoadingMore: Bool
-    let hasMorePlaces: Bool
-    let onLoadMore: () -> Void
-    let onNavigateToPlace: ((String) -> Void)?
-    let onRemovePlace: ((String) -> Void)?
-
-    @ObservedObject var listsVM: ProfileListsViewModel
-    @ObservedObject var reviewsVM: ProfileReviewsViewModel
-
-    // Grid layout matching ProfileView lists (consistent spacing)
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
-    /// Returns all places for this list from profile state.
-    var allPlaces: [LightweightPlace] {
-        return listsVM.lightweightPlaceListPlaces[list.list_id] ?? []
-    }
-
-    /// Returns deduplicated places for this list.
-    var filteredPlaces: [LightweightPlace] {
-        var seenIds = Set<String>()
-        return allPlaces.filter { place in
-            guard !seenIds.contains(place.place_id) else { return false }
-            seenIds.insert(place.place_id)
-            return true
-        }
-    }
-
-    /// Whether this list's first page of places is still being fetched.
-    private var isLoadingInitial: Bool {
-        listsVM.isLoadingInitialPlaces(listId: list.list_id)
-    }
-
-    var body: some View {
-        if filteredPlaces.isEmpty && isLoadingInitial {
-            initialLoadingGrid
-        } else if !filteredPlaces.isEmpty {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
-                    PopupPlaceCard(
-                        place: place,
-                        preferExternalThumbnail: true,
-                        onNavigate: onNavigateToPlace,
-                        showAddedBy: list.isCollaborative
-                    )
-                    .contextMenu {
-                        if let onRemovePlace {
-                            Button(role: .destructive) {
-                                onRemovePlace(place.place_id)
-                            } label: {
-                                Label("Remove from list", systemImage: "trash")
-                            }
-                        }
-                    }
-                    .onAppear {
-                        // Load more when user scrolls to 3rd-to-last item
-                        if index == filteredPlaces.count - 3 {
-                            onLoadMore()
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-
-            // Loading indicator at bottom
-            if isLoadingMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .padding()
-                    Spacer()
-                }
-            }
-        } else {
-            VStack(spacing: 8) {
-                Spacer()
-                Text("No places in this list")
-                    .foregroundColor(.gray)
-                Spacer()
-            }
-            .padding(.vertical, 30)
-        }
-    }
-
-    /// Shimmering placeholder grid shown while the list's first page of places is loading,
-    /// shaped like the real grid (same columns/aspect ratio/corner radius as PopupPlaceCard)
-    /// so content doesn't visibly reflow once real places arrive.
-    private var initialLoadingGrid: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            ForEach(0..<6, id: \.self) { _ in
-                ShimmerView()
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-        .padding(.horizontal, 16)
     }
 }
 

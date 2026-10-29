@@ -17,6 +17,28 @@ class TripsListViewModel: ObservableObject {
     @Published var showCreateTrip = false
     @Published private(set) var error: String?
 
+    /// Past-trips section expanded state; persists for the app session only.
+    private static var sessionPastExpanded = false
+    @Published var isPastExpanded: Bool = TripsListViewModel.sessionPastExpanded {
+        didSet { Self.sessionPastExpanded = isPastExpanded }
+    }
+
+    /// Ongoing first, then upcoming soonest-first; undated trips count as upcoming (at the end).
+    var currentTrips: [LightweightTrip] {
+        let split = TripTimeline.split(trips)
+        return split.ongoing + split.upcoming
+    }
+
+    /// Past trips, most recent end date first.
+    var pastTrips: [LightweightTrip] { TripTimeline.split(trips).past }
+
+    func togglePastExpanded() {
+        isPastExpanded.toggle()
+        if isPastExpanded {
+            Analytics.track(.pastTripsExpanded, ["past_count": pastTrips.count])
+        }
+    }
+
     // MARK: - Dependencies
 
     private let tripService = ServiceContainer.shared.tripService
@@ -62,5 +84,39 @@ class TripsListViewModel: ObservableObject {
             self.error = error.localizedDescription
             print("[TripsListVM] Failed to delete trip: \(error)")
         }
+    }
+}
+
+/// Classifies trips as ongoing / upcoming / past against the user's local "today".
+enum TripTimeline {
+    struct Split {
+        var ongoing: [LightweightTrip] = []
+        var upcoming: [LightweightTrip] = []
+        var past: [LightweightTrip] = []
+    }
+
+    /// Today's local calendar day expressed as a UTC-midnight anchor, matching how trip dates are stored.
+    static func todayAnchor(now: Date = Date(), calendar: Calendar = .current) -> Date {
+        let c = calendar.dateComponents([.year, .month, .day], from: now)
+        return Trip.utcCalendar.date(from: c) ?? now
+    }
+
+    static func split(_ trips: [LightweightTrip], today: Date = todayAnchor()) -> Split {
+        var result = Split()
+        for trip in trips {
+            let start = trip.parsedStartDate
+            let end = trip.parsedEndDate ?? start
+            if let end, end < today {
+                result.past.append(trip)
+            } else if let start, start <= today {
+                result.ongoing.append(trip)
+            } else {
+                result.upcoming.append(trip)
+            }
+        }
+        result.ongoing.sort { ($0.parsedEndDate ?? .distantFuture) < ($1.parsedEndDate ?? .distantFuture) }
+        result.upcoming.sort { ($0.parsedStartDate ?? .distantFuture) < ($1.parsedStartDate ?? .distantFuture) }
+        result.past.sort { ($0.parsedEndDate ?? $0.startDate) > ($1.parsedEndDate ?? $1.startDate) }
+        return result
     }
 }

@@ -44,7 +44,9 @@ struct VisiblePlacesPopupView: View {
 
     // MARK: - Body
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Places In View") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 headerSection
@@ -57,7 +59,11 @@ struct VisiblePlacesPopupView: View {
                     .id(placeId)
             }
         }
-        .onAppear(perform: configureViewModel)
+        .onAppear {
+            configureViewModel()
+            sheetVM.beginSession(listId: "places_in_view", placeCount: viewModel.visiblePlaces.count, isExternal: false, source: "places_in_view")
+        }
+        .onDisappear { sheetVM.endSession() }
     }
     
     // MARK: - ViewModel Configuration
@@ -85,7 +91,7 @@ struct VisiblePlacesPopupView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 20)
-        .padding(.top, 24)
+        .padding(.top, 16)
     }
     
     // MARK: - Filter Picker
@@ -100,70 +106,48 @@ struct VisiblePlacesPopupView: View {
         .pickerStyle(.segmented)
         .padding(.horizontal, 20)
         .padding(.top, 12)
-        .padding(.bottom, 16)
+        .padding(.bottom, 8)
     }
     
     // MARK: - Content Section
-    
+
+    @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
+    @ObservedObject private var placeMeta = ListPlaceMetaStore.shared
+
     @ViewBuilder
     private var contentSection: some View {
-        if !viewModel.visiblePlaces.isEmpty {
-            placesGrid
-        } else if viewModel.showsLoadingIndicator {
-            loadingView
-        } else {
+        if viewModel.visiblePlaces.isEmpty && !viewModel.showsLoadingIndicator {
             emptyStateView
-        }
-    }
-
-    // MARK: - Loading State
-
-    private var loadingView: some View {
-        VStack {
-            Spacer()
-            ProgressView()
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-    
-    private var placesGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(Array(viewModel.visiblePlaces.enumerated()), id: \.element.id) { index, item in
-                    gridCell(for: item, at: index)
+                .onAppear {
+                    Analytics.track(.placesInViewEmpty, [
+                        "reason": viewModel.emptyReason,
+                        "filter": viewModel.selectedFilter.rawValue
+                    ])
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+        } else {
+            ListPlacesScrollView(
+                places: viewModel.tilePlaces,
+                isLoadingInitial: viewModel.showsLoadingIndicator,
+                isLoadingMore: false,
+                showAddedBy: false,
+                focusedPlaceId: sheetVM.focusedPlaceId,
+                scrollRequest: sheetVM.scrollRequest,
+                locationText: { placeMeta.location(for: $0) },
+                onRowAppear: { place in
+                    placeMeta.requestNeighborhood(for: place)
+                    if let index = viewModel.index(of: place.place_id) {
+                        viewModel.onCellAppear(index: index)
+                    }
+                },
+                onLoadMore: {},
+                onSelect: { handlePlaceTap($0) },
+                onOpenDetail: { handlePlaceTap($0) },
+                onRemove: nil
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
-    
-    // MARK: - Grid Cells (Dumb Components with Callbacks)
-    
-    @ViewBuilder
-    private func gridCell(for item: VisiblePlaceItem, at index: Int) -> some View {
-        Group {
-            switch item.source {
-            case .friends:
-                FriendsPlaceGridCell(
-                    item: item,
-                    image: viewModel.getImage(for: item.id),
-                    onTap: { handlePlaceTap(item) }
-                )
-            case .community:
-                CommunityPlaceGridCell(
-                    item: item,
-                    image: viewModel.getImage(for: item.id),
-                    onTap: { handlePlaceTap(item) }
-                )
-            }
-        }
-        .onAppear {
-            viewModel.onCellAppear(index: index)
-        }
-    }
-    
+
     // MARK: - Empty State
     
     private var emptyStateView: some View {
@@ -198,8 +182,12 @@ struct VisiblePlacesPopupView: View {
     
     // MARK: - Actions
     
-    /// Handle place tap — navigates to place detail within this sheet's navigation stack.
-    private func handlePlaceTap(_ item: VisiblePlaceItem) {
-        navigationPath.append(item.id)
+    /// Tile tap: open the place in this sheet and center its pin, so the map is on it afterwards.
+    private func handlePlaceTap(_ place: LightweightPlace) {
+        sheetVM.focus(place: place, source: .row)
+        sheetVM.ensureAtLeastHalf()
+        var path = NavigationPath()
+        path.append(place.place_id)
+        navigationPath = path
     }
 }

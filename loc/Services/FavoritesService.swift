@@ -69,6 +69,7 @@ class FavoritesService {
     ///   - placeId: The place to favorite
     /// - Returns: Result indicating success or specific failure reason
     func addFavorite(userId: String, placeId: String) async -> AddFavoriteResult {
+        if PlaceIdGuard.isPlaceholder(placeId) { return .error(PlaceIdError.stillLoading) }
         do {
             // Call the database function that handles atomic validation
             let response: String = try await supabase.client

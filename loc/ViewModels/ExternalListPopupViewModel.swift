@@ -143,7 +143,7 @@ class ExternalListPopupViewModel: ObservableObject {
             let places = try await userService.fetchPlacesForPlaceList(
                 listId: listId,
                 page: 1,
-                pageSize: 20  // Load more initially for better UX
+                pageSize: Self.initialPageSize(forExpectedCount: lists.first(where: { $0.list_id == listId })?.place_count ?? 0)
             )
 
             listPlaces[listId] = places
@@ -152,6 +152,11 @@ class ExternalListPopupViewModel: ObservableObject {
             // Set empty array to indicate we've attempted loading
             listPlaces[listId] = []
         }
+    }
+
+    /// Loads the whole list up front (up to a cap) so every map pin has a matching row.
+    private static func initialPageSize(forExpectedCount count: Int) -> Int {
+        min(max(count + 10, 20), 300)
     }
 
     /// Preloads places for adjacent lists (for smooth swiping).

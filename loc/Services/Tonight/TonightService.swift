@@ -77,10 +77,23 @@ final class TonightService {
     private func fetchCandidatesViaRPC(friendIds: [String]) async throws -> [TonightCandidate] {
         struct Params: Encodable { let p_user_ids: [String] }
         struct Row: Decodable { let place_id: String; let saver_ids: [String]? }
-        let rows: [Row] = try await supabase.client
-            .rpc("get_tonight_candidates", params: Params(p_user_ids: friendIds))
-            .execute()
-            .value
+        // PostgREST caps every response at 1000 rows (max_rows), so an unpaged call silently
+        // dropped an arbitrary slice of saves once user + friends passed 1000 places. Page through
+        // with a stable order until a short page comes back.
+        let pageSize = 1000
+        var rows: [Row] = []
+        var offset = 0
+        while offset < 20_000 {
+            let page: [Row] = try await supabase.client
+                .rpc("get_tonight_candidates", params: Params(p_user_ids: friendIds))
+                .order("place_id")
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute()
+                .value
+            rows += page
+            if page.count < pageSize { break }
+            offset += pageSize
+        }
         return rows.map { TonightCandidate(placeId: $0.place_id, saverIds: Set(($0.saver_ids ?? []).map { $0.lowercased() })) }
     }
 

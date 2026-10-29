@@ -1192,6 +1192,7 @@ extension SupabaseUserService {
     ///   - placeId: The place to add
     ///   - addedBy: The user ID of who is adding the place (for collaborative list attribution)
     func addPlaceToList(listId: String, placeId: String, addedBy: String) async throws {
+        try PlaceIdGuard.requireReal(placeId)
         // Get the current MIN sort_order so new places go at the TOP (most recent first)
         // This ensures new places appear on page 1 immediately (query uses ORDER BY sort_order ASC)
         let minOrderResponse = try await supabase.client
@@ -1307,6 +1308,7 @@ extension SupabaseUserService {
     ///   - userId: The user's ID for verification
     /// - Throws: Database errors if update fails
     func updateExternalPlaceAssociation(externalPlaceId: String, newPlaceId: String, userId: String) async throws {
+        try PlaceIdGuard.requireReal(newPlaceId)
         try await supabase.client
             .from("external_places")
             .update(["place_id": newPlaceId, "added_at": ISO8601DateFormatter().string(from: Date())])
@@ -1321,6 +1323,7 @@ extension SupabaseUserService {
 
     /// Inserts a new external_places record for a place assignment.
     func insertExternalPlace(userId: String, placeId: String, url: String) async throws {
+        try PlaceIdGuard.requireReal(placeId)
         let id = UUID().uuidString
         try await supabase.client
             .from("external_places")

@@ -21,20 +21,27 @@ struct LightweightTrip: Codable, Identifiable, Equatable {
     let isShared: Bool?
 
     // Stored as strings for reliable Supabase date decoding
-    private let startDateRaw: String
-    private let endDateRaw: String
+    // Optional so a trip with missing dates still decodes (treated as upcoming).
+    private let startDateRaw: String?
+    private let endDateRaw: String?
 
     var id: String { tripId }
 
     /// Parsed start date.
     var startDate: Date {
-        Trip.parseDate(startDateRaw) ?? Date()
+        parsedStartDate ?? Date()
     }
 
     /// Parsed end date.
     var endDate: Date {
-        Trip.parseDate(endDateRaw) ?? Date()
+        parsedEndDate ?? Date()
     }
+
+    /// Start date if present and valid (UTC-midnight anchor).
+    var parsedStartDate: Date? { startDateRaw.flatMap(Trip.parseDate) }
+
+    /// End date if present and valid (UTC-midnight anchor).
+    var parsedEndDate: Date? { endDateRaw.flatMap(Trip.parseDate) }
 
     /// Returns the inclusive number of days in this trip.
     var numberOfDays: Int {

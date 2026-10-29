@@ -23,7 +23,9 @@ struct PhoneOnboardingView: View {
         self._viewModel = StateObject(wrappedValue: PhoneOnboardingViewModel(userId: userId))
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Onboarding Phone") }
+
+    @ViewBuilder private var analyticsBody: some View {
         VStack(spacing: 0) {
             Spacer()
             bottomCard

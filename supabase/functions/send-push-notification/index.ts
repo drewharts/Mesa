@@ -35,6 +35,18 @@ async function generateAPNsJWT(): Promise<string> {
   }
 }
 
+// Short label for a group pick push title, from the pick title the app stores (TonightVibe.headline).
+function groupPickLabel(pickTitle?: string): string {
+  const labels: Record<string, string> = {
+    'Coffee right now': 'Coffee',
+    'Lunch spots': 'Lunch',
+    'Dinner tonight': 'Dinner',
+    'Drinks tonight': 'Drinks',
+    'Late night': 'Late night',
+  }
+  return (pickTitle && labels[pickTitle]) || pickTitle || 'Group pick'
+}
+
 serve(async (req) => {
   try {
     const { record } = await req.json()
@@ -228,6 +240,69 @@ serve(async (req) => {
         }
         notificationData.jobId = record.job_id
         notificationData.placeId = record.place_id
+        break
+      }
+
+      // ---- Tonight group picks (sent by the group-pick Postgres functions via pg_net) ----
+      case 'group_pick_decided': {
+        const label = groupPickLabel(record.pick_title)
+        const winner = record.place_name
+        if (record.mode === 'planned') {
+          // Ranked (Borda) pick closed at its deadline or when everyone ranked.
+          const top3 = Array.isArray(record.top3) ? record.top3 : []
+          if (record.outcome === 'no_match' || !winner) {
+            title = `${label}: voting closed`
+            body = 'Nobody ranked a place. Tap to see the options.'
+          } else {
+            title = `${label}: ${winner} won`
+            const medals = ['1st', '2nd', '3rd']
+            body = top3.length > 1
+              ? top3.map((t: any, i: number) => `${medals[i]} ${t.name ?? 'Unnamed place'} (${t.points})`).join(' · ')
+              : `${Number(record.yes_count ?? 0)} of ${Number(record.member_count ?? 0)} voted. Tap for details.`
+          }
+        } else if (record.outcome === 'no_match' || !winner) {
+          title = `${label}: no match`
+          body = 'Nobody liked the picks. Tap to add more options.'
+        } else {
+          title = `${label}: ${winner} won`
+          const yes = Number(record.yes_count ?? 0)
+          const total = Number(record.member_count ?? 0)
+          body = record.outcome === 'tie_break'
+            ? 'It was a tie, so we went with the best-ranked pick. Tap for details.'
+            : total > 1 && yes > 0
+              ? `${yes} of ${total} said yes. Tap for directions.`
+              : 'Tap for directions.'
+        }
+        notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
+        notificationData.placeId = record.place_id
+        break
+      }
+
+      case 'group_pick_invited': {
+        const inviter = record.actor_first_name || 'Someone'
+        title = `${groupPickLabel(record.pick_title)}: you're in`
+        body = `${inviter} wants your vote on where to go. Tap to vote.`
+        notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
+        break
+      }
+
+      case 'group_pick_waiting': {
+        title = `${groupPickLabel(record.pick_title)}: waiting on you`
+        body = 'Everyone else has voted. Tap to pick so we can decide.'
+        notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
+        break
+      }
+
+      case 'group_pick_options': {
+        const adder = record.actor_first_name || 'Someone'
+        const added = Number(record.added_count ?? 1)
+        title = `${groupPickLabel(record.pick_title)}: new option${added === 1 ? '' : 's'}`
+        body = `${adder} added ${added === 1 ? 'a place' : `${added} places`} to the vote. Tap to vote.`
+        notificationData.pickId = record.pick_id
+        notificationData.deepLink = `loc://pick/${record.pick_id}`
         break
       }
 

@@ -20,7 +20,8 @@ struct PlaceInsightsSection: View {
             if showTake, let take = viewModel.take {
                 takeSection(take)
             }
-            if viewModel.hasPeopleOrder {
+            // Dish chips only; the TikTok source rows duplicated the Videos section below.
+            if !viewModel.topDishes.isEmpty {
                 peopleOrderSection
             }
         }
@@ -78,9 +79,6 @@ struct PlaceInsightsSection: View {
                         }
                     }
                 }
-            }
-            ForEach(viewModel.mentions.prefix(3)) { mention in
-                MentionRow(mention: mention)
             }
         }
     }

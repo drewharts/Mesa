@@ -13,7 +13,14 @@ import Supabase
 
 @MainActor
 class LoginViewModel: ObservableObject {
-    @Published var errorMessage: String?
+    @Published var errorMessage: String? {
+        didSet {
+            // Only the stage prefix (before ":"), never the raw error text, which can contain user data.
+            guard let message = errorMessage, !message.isEmpty else { return }
+            let stage = message.split(separator: ":").first.map(String.init) ?? "unknown"
+            Analytics.track(.signInFailed, ["stage": String(stage.prefix(80))])
+        }
+    }
     private let userService: UserService
     private let dataManager: DataManager
     private let authService = SupabaseAuthService.shared

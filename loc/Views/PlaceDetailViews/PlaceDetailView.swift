@@ -35,7 +35,9 @@ struct PlaceDetailView: View {
         self.minSheetHeight = minSheetHeight
     }
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Place") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationView {
             ZStack {
                 mainContent
@@ -159,20 +161,21 @@ struct PlaceDetailView: View {
                 }
                 .padding(.bottom, 10)
 
-                // Loading indicator for content
-                VStack {
-                    Spacer()
-                        .frame(height: 60)
-                    ProgressView()
-                        .scaleEffect(1.2)
-                    Text("Loading details...")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .padding(.top, 8)
-                    Spacer()
+                // Skeleton sized like the About tab (photo strip, info rows) so the sheet
+                // doesn't jump when real content replaces it.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        SkeletonBlock(width: 140, height: 180, cornerRadius: 12)
+                        SkeletonBlock(width: 140, height: 180, cornerRadius: 12)
+                        SkeletonBlock(height: 180, cornerRadius: 12)
+                    }
+                    SkeletonBlock(height: 18, cornerRadius: 4)
+                    SkeletonBlock(width: 220, height: 18, cornerRadius: 4)
+                    SkeletonBlock(height: 56, cornerRadius: 12)
+                    SkeletonBlock(height: 56, cornerRadius: 12)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 200)
+                .frame(minHeight: 360, alignment: .top)
             }
             .padding(.horizontal, 24)
             .padding(.top, 24)

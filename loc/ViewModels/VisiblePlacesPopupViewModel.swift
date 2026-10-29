@@ -31,6 +31,28 @@ class VisiblePlacesPopupViewModel: ObservableObject {
     @Published private(set) var visiblePlaces: [VisiblePlaceItem] = []
     @Published private(set) var isLoadingPlaces: Bool = false
     @Published private(set) var placeImages: [String: UIImage] = [:]
+    /// place id -> resolved photo URL, used by the shared photo tiles.
+    @Published private(set) var imageUrls: [String: String] = [:]
+
+    /// Visible places as the shared tile model (photo URL when resolved, else colored placeholder).
+    var tilePlaces: [LightweightPlace] {
+        visiblePlaces.map { item in
+            LightweightPlace(
+                place_id: item.id,
+                name: item.name,
+                latitude: item.coordinate.latitude,
+                longitude: item.coordinate.longitude,
+                latest_review_photo: nil,
+                place_type: item.placeType,
+                thumbnail_url: imageUrls[item.id]
+            )
+        }
+    }
+
+    /// Index of a place in the visible list (for chunked photo loading).
+    func index(of placeId: String) -> Int? {
+        visiblePlaces.firstIndex { $0.id == placeId }
+    }
 
     // MARK: - Data Sources
 
@@ -88,6 +110,7 @@ class VisiblePlacesPopupViewModel: ObservableObject {
         communityMarkers = seedCommunityMarkers
 
         guard let bounds = viewportBounds, let userId else {
+            missingInput = mapRegion == nil ? "no_region" : "no_user"
             print("⚠️ [VisiblePlacesPopupVM] Cannot fetch places: missing region or userId")
             return
         }
@@ -96,6 +119,17 @@ class VisiblePlacesPopupViewModel: ObservableObject {
     }
 
     // MARK: - Computed Properties
+
+    /// Set when configure() could not start a fetch.
+    private var missingInput: String?
+
+    /// Why the grid is empty, for analytics.
+    var emptyReason: String {
+        if let missingInput { return missingInput }
+        if !hasConfigured { return "not_configured" }
+        let seeded = friendsAnnotations.count + communityMarkers.count
+        return seeded == 0 ? "no_places_in_viewport" : "filter_has_no_places"
+    }
 
     /// Returns true when places are still loading and there is nothing to show yet.
     var showsLoadingIndicator: Bool {
@@ -211,6 +245,7 @@ class VisiblePlacesPopupViewModel: ObservableObject {
             print("❌ [VisiblePlacesPopupVM] Error fetching place image URLs: \(error)")
             return
         }
+        imageUrls.merge(imageUrlMap) { _, new in new }
 
         let cache = imageCache
         let thumbnailSize = Self.thumbnailSize

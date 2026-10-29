@@ -209,7 +209,7 @@ struct MainView: View {
                     latitude: coordinate.latitude - span.latitudeDelta * 0.25,
                     longitude: coordinate.longitude
                 )
-                withAnimation(.easeOut(duration: 0.25)) {
+                withAnimation(.placeOpen) {
                     mapPosition = .region(MKCoordinateRegion(center: offsetCenter, span: span))
                 }
                 selectedPlaceVM.shouldAnimateMapToPlace = false
@@ -249,7 +249,7 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.fraction(0.75), .large])
                     .presentationDragIndicator(.visible)
 
             case .importJob(let jobId):
@@ -257,7 +257,7 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.fraction(0.75), .large])
                     .presentationDragIndicator(.visible)
 
             // Map Popups (User's Own Data)
@@ -339,7 +339,7 @@ struct MainView: View {
             .presentationBackground(Color.clear)
             .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
             .interactiveDismissDisabled(false)
-            .transaction { $0.animation = .spring(response: 0.25, dampingFraction: 0.9) }
+            .transaction { $0.animation = .placeOpen }
     }
 
     /// External place selection sheet content.
@@ -401,7 +401,7 @@ struct MainView: View {
             }
         }
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -409,7 +409,7 @@ struct MainView: View {
     private var externalPlacesSheet: some View {
         ExternalPlacesPopupView(externalContentVM: profileViewModel.externalContentViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -417,7 +417,7 @@ struct MainView: View {
     private var reviewsSheet: some View {
         ReviewsListPopupView(reviewsVM: profileViewModel.reviewsViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -425,7 +425,7 @@ struct MainView: View {
     private var favoritesSheet: some View {
         FavoritesPopupView(favoritesVM: profileViewModel.favoritesViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -433,7 +433,7 @@ struct MainView: View {
     private var myPlacesSheet: some View {
         MyPlacesListView(myPlacesVM: profileViewModel.myPlacesViewModel)
             .applyMapPopupEnvironment(from: self)
-            .applyMapPopupPresentation()
+            .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -443,7 +443,7 @@ struct MainView: View {
             mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -464,7 +464,7 @@ struct MainView: View {
             }
         }
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -474,7 +474,7 @@ struct MainView: View {
             mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
-        .applyMapPopupPresentation()
+        .applyListMapSheetPresentation()
         .onDisappear { handleMapPopupDisappear() }
     }
 
@@ -567,16 +567,17 @@ struct MainView: View {
 
     /// Group pick sheet: live one-tap voting with an automatic winner.
     private func groupPickSheet(pickId: String) -> some View {
-        GroupPickSheet(pickId: pickId, onOpenPlace: openPlaceFromSheet)
+        GroupPickSheet(pickId: pickId, userId: userSession.currentUserId, locationManager: locationManager, onOpenPlace: openPlaceFromSheet)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
     }
 
     /// Dismisses the current sheet and opens the place detail for the given place.
     private func openPlaceFromSheet(_ place: DetailPlace) {
-        PresentationService.shared.dismiss()
+        // Camera flight starts now; the sheet swap is sequenced (dismiss, then present) on the
+        // same spring so the two sheets never animate on top of each other.
         selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-        selectedPlaceVM.isDetailSheetPresented = true
+        PresentationService.shared.transition(to: .placeDetail)
     }
 
     /// Loading view for lists.

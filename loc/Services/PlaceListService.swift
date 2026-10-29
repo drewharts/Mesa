@@ -21,6 +21,82 @@ class PlaceListService {
     
     private init() {}
     
+    // MARK: - Place Location Metadata
+
+    /// Fetches stored opening hours (`places.open_hours`, Google weekday text) for each place id,
+    /// as lowercased id -> ["Monday: 11 AM–10 PM", ...]. Reads our DB only; no Places API calls.
+    func fetchPlaceHours(placeIds: [String]) async throws -> [String: [String]] {
+        struct DayHours: Decodable { let day: String?; let hours: String? }
+        struct HoursRow: Decodable {
+            let id: String
+            let lines: [String]?
+            enum CodingKeys: String, CodingKey { case id, open_hours }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = try c.decode(String.self, forKey: .id)
+                if let strings = try? c.decodeIfPresent([String].self, forKey: .open_hours) {
+                    lines = strings
+                } else if let objects = try? c.decodeIfPresent([DayHours].self, forKey: .open_hours) {
+                    lines = objects.compactMap { o in
+                        guard let d = o.day, let h = o.hours else { return nil }
+                        return "\(d): \(h)"
+                    }
+                } else {
+                    lines = nil
+                }
+            }
+        }
+        guard !placeIds.isEmpty else { return [:] }
+        var result: [String: [String]] = [:]
+        var start = 0
+        while start < placeIds.count {
+            let chunk = Array(placeIds[start..<min(start + 80, placeIds.count)])
+            // places.id is TEXT and stored uppercase; callers pass lowercased keys, so an exact
+            // .in() matched nothing and no tile ever showed open/closed. Query both casings.
+            let values = Array(Set(chunk.flatMap { [$0.uppercased(), $0.lowercased()] }))
+            let rows: [HoursRow] = try await supabase.client
+                .from("places")
+                .select("id, open_hours")
+                .in("id", values: values)
+                .execute()
+                .value
+            for row in rows {
+                if let lines = row.lines, !lines.isEmpty { result[row.id.lowercased()] = lines }
+            }
+            start += 80
+        }
+        return result
+    }
+
+    /// Fetches the city for each place id (lowercased id -> city). Used for the list row location line.
+    func fetchPlaceCities(placeIds: [String]) async throws -> [String: String] {
+        struct CityRow: Decodable {
+            let id: String
+            let city: String?
+        }
+        guard !placeIds.isEmpty else { return [:] }
+
+        var result: [String: String] = [:]
+        let chunkSize = 80
+        var start = 0
+        while start < placeIds.count {
+            let chunk = Array(placeIds[start..<min(start + chunkSize, placeIds.count)])
+            let rows: [CityRow] = try await supabase.client
+                .from("places")
+                .select("id, city")
+                .in("id", values: chunk)
+                .execute()
+                .value
+            for row in rows {
+                if let city = row.city?.trimmingCharacters(in: .whitespacesAndNewlines), !city.isEmpty {
+                    result[row.id.lowercased()] = city
+                }
+            }
+            start += chunkSize
+        }
+        return result
+    }
+
     // MARK: - Fetch Place Lists
     
     /// Fetch user's place lists sorted by proximity to a location

@@ -119,6 +119,7 @@ class AddPlaceToListViewModel: ObservableObject {
     /// Adds the place to the list via the user service.
     private func addPlaceToList(_ place: DetailPlace) async {
         do {
+            let place = try await PlaceRepository.shared.ensureResolved(place)
             let placeId = place.id.uuidString
 
             // Check if place already exists in the list

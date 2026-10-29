@@ -30,7 +30,9 @@ struct SearchPageView: View {
 
     // MARK: - Body
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Search") }
+
+    @ViewBuilder private var analyticsBody: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 SearchHeaderView(

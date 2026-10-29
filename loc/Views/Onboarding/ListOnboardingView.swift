@@ -13,7 +13,9 @@ struct ListOnboardingView: View {
 
     @State private var showContent = false
 
-    var body: some View {
+    var body: some View { analyticsBody.analyticsScreen("Onboarding Lists") }
+
+    @ViewBuilder private var analyticsBody: some View {
         GoogleMapsImportView(
             userId: userSession.currentUserId ?? "",
             onImportCompleted: { _ in

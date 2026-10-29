@@ -3,62 +3,256 @@
 //  loc
 //
 //  Live group vote. Everyone taps yes/no once per place; Mesa decides the
-//  winner automatically (everyone voted, or time ran out) and this sheet
-//  updates on its own to show it.
+//  winner automatically (everyone voted, a clear winner, or time ran out),
+//  pushes everyone, and this sheet updates on its own to show the result.
+//  "More options" swaps in the next best saves; "Add place" and "Invite"
+//  switch the same sheet to a sub-screen (no nested sheets).
 //
 
 import SwiftUI
+import UIKit
 
 struct GroupPickSheet: View {
     @StateObject private var viewModel: GroupPickViewModel
     let onOpenPlace: (DetailPlace) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    init(pickId: String, onOpenPlace: @escaping (DetailPlace) -> Void) {
-        _viewModel = StateObject(wrappedValue: GroupPickViewModel(pickId: pickId))
+    init(
+        pickId: String,
+        userId: String? = nil,
+        locationManager: LocationManager? = nil,
+        onOpenPlace: @escaping (DetailPlace) -> Void
+    ) {
+        _viewModel = StateObject(wrappedValue: GroupPickViewModel(pickId: pickId, userId: userId, locationManager: locationManager))
         self.onOpenPlace = onOpenPlace
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            if viewModel.isLoading {
-                VStack(spacing: 10) {
-                    ForEach(0..<3, id: \.self) { _ in TonightPickCardSkeleton() }
-                }
-                .padding(.horizontal, 20)
-            } else if let pick = viewModel.pick {
-                if let winner = viewModel.winner {
-                    winnerBanner(winner)
-                }
-                VStack(spacing: 10) {
-                    ForEach(pick.placeIds, id: \.self) { placeId in
-                        let place = viewModel.place(for: placeId)
-                        GroupPickVoteRow(
-                            name: place?.name ?? "Loading…",
-                            place: place,
-                            tally: pick.tally(for: placeId),
-                            myVote: pick.myVote(for: placeId),
-                            isWinner: pick.decidedPlaceId?.lowercased() == placeId.lowercased(),
-                            isDecided: pick.isDecided,
-                            onVote: { yes in Task { await viewModel.vote(placeId: placeId, yes: yes) } },
-                            onOpen: { if let place { onOpenPlace(place) } }
-                        )
-                    }
-                }
-                .padding(.horizontal, 20)
+    @State private var peekPlace: DetailPlace?
+
+    var body: some View { analyticsBody.analyticsScreen("Group Pick") }
+
+    @ViewBuilder private var analyticsBody: some View {
+        Group {
+            switch viewModel.mode {
+            case .vote:
+                voteScreen
+            case .addPlace:
+                GroupPickAddPlaceView(viewModel: viewModel)
+            case .invite:
+                GroupPickInviteView(viewModel: viewModel)
             }
-            if let error = viewModel.errorMessage {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 20)
-            }
-            Spacer(minLength: 0)
         }
-        .padding(.top, 16)
+        .placePeek($peekPlace, source: "group_pick", onShowOnMap: onOpenPlace)
         .task { await viewModel.start() }
         .onDisappear { viewModel.stop() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            Task { await viewModel.resume() }
+        }
+    }
+
+    // MARK: - Vote / result screen
+
+    private var voteScreen: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            header
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    content
+                    feedback
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+        }
+        .padding(.top, 16)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if viewModel.isLoading {
+            VStack(spacing: 10) {
+                ForEach(0..<3, id: \.self) { _ in TonightPickCardSkeleton() }
+            }
+        } else if let pick = viewModel.pick {
+            if !pick.members.isEmpty {
+                GroupPickMembersStrip(pick: pick, currentUserId: viewModel.currentUserId)
+            }
+            if pick.isPlanned {
+                plannedContent(pick)
+            } else if pick.hasWinner {
+                GroupPickResultView(
+                    pick: pick,
+                    winner: viewModel.winner,
+                    note: viewModel.decisionNote,
+                    currentUserId: viewModel.currentUserId,
+                    onOpenPlace: { place in
+                        Analytics.track(.groupPickPlaceOpened, ["source": "result"])
+                        onOpenPlace(place)
+                    },
+                    onDirections: { place in
+                        Analytics.track(.groupPickDirectionsTapped)
+                        PlaceDirections.open(place)
+                    }
+                )
+            } else if pick.isDecided {
+                noMatchCard
+            } else if let waiting = viewModel.waitingText {
+                Text(waiting)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            if !pick.isPlanned && pick.hasWinner {
+                Text("All options")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.top, 4)
+            }
+            if !pick.isPlanned { voteRows(pick) }
+            if !pick.isDecided {
+                actionRow
+            }
+        }
+    }
+
+    /// Planned pick: live/final podium, then every option with one-tap 1st/2nd/3rd badges.
+    @ViewBuilder
+    private func plannedContent(_ pick: GroupPick) -> some View {
+        GroupPickPodiumView(
+            pick: pick,
+            note: pick.isDecided ? viewModel.decisionNote : nil,
+            placeName: { viewModel.place(for: $0)?.name ?? "Loading…" },
+            winner: viewModel.winner,
+            onOpenWinner: {
+                guard let place = viewModel.winner else { return }
+                Analytics.track(.groupPickPlaceOpened, ["source": "planned_result"])
+                onOpenPlace(place)
+            },
+            onDirections: {
+                guard let place = viewModel.winner else { return }
+                Analytics.track(.groupPickDirectionsTapped)
+                PlaceDirections.open(place)
+            }
+        )
+        if let waiting = viewModel.waitingText {
+            Text(waiting).font(.subheadline).foregroundColor(.secondary)
+        }
+        VStack(spacing: 10) {
+            ForEach(pick.placeIds, id: \.self) { placeId in
+                let place = viewModel.place(for: placeId)
+                GroupPickRankRow(
+                    name: place?.name ?? "Loading…",
+                    place: place,
+                    standing: pick.standings.first { $0.placeId.lowercased() == placeId.lowercased() },
+                    myRank: pick.myRank(for: placeId),
+                    isWinner: pick.decidedPlaceId?.lowercased() == placeId.lowercased(),
+                    isDecided: pick.isDecided,
+                    onToggle: { Task { await viewModel.toggleRank(placeId: placeId) } },
+                    onOpen: { if let place { peekPlace = place } }
+                )
+            }
+        }
+    }
+
+    private func voteRows(_ pick: GroupPick) -> some View {
+        VStack(spacing: 10) {
+            ForEach(pick.placeIds, id: \.self) { placeId in
+                let place = viewModel.place(for: placeId)
+                GroupPickVoteRow(
+                    name: place?.name ?? "Loading…",
+                    place: place,
+                    tally: pick.tally(for: placeId),
+                    myVote: pick.myVote(for: placeId),
+                    isWinner: pick.decidedPlaceId?.lowercased() == placeId.lowercased(),
+                    isDecided: pick.isDecided,
+                    onVote: { yes in Task { await viewModel.vote(placeId: placeId, yes: yes) } },
+                    onOpen: { if let place { peekPlace = place } }
+                )
+            }
+        }
+    }
+
+    /// Closed with no yes votes: offer the two ways forward.
+    private var noMatchCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("No match yet 🤔")
+                .font(.title3.weight(.bold))
+            Text(viewModel.decisionNote ?? "Nobody said yes to any of these.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+            Button {
+                Task { await viewModel.suggestMoreOptions() }
+            } label: {
+                Label("Show 3 more options", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundColor(.white)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary))
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isWorking)
+            Button {
+                Task { await viewModel.beginAddPlace() }
+            } label: {
+                Label("Add a place", systemImage: "plus")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundColor(.primary)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.systemGray5)))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(.secondarySystemBackground)))
+    }
+
+    /// More options / Add place / Invite, one tap each.
+    private var actionRow: some View {
+        HStack(spacing: 8) {
+            actionButton("More options", systemImage: "arrow.triangle.2.circlepath") {
+                Task { await viewModel.suggestMoreOptions() }
+            }
+            .disabled(viewModel.isWorking || !viewModel.canAddMore)
+            actionButton("Add place", systemImage: "plus") {
+                Task { await viewModel.beginAddPlace() }
+            }
+            .disabled(!viewModel.canAddMore)
+            actionButton("Invite", systemImage: "person.badge.plus") {
+                Task { await viewModel.beginInvite() }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func actionButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.footnote.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .foregroundColor(.primary)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(.systemGray5)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var feedback: some View {
+        if viewModel.isWorking {
+            ProgressView().frame(maxWidth: .infinity)
+        }
+        if let notice = viewModel.notice {
+            Text(notice)
+                .font(.footnote)
+                .foregroundColor(.secondary)
+        }
+        if let error = viewModel.errorMessage {
+            Text(error)
+                .font(.footnote)
+                .foregroundColor(.red)
+        }
     }
 
     private var header: some View {
@@ -72,7 +266,7 @@ struct GroupPickSheet: View {
             }
             Spacer()
             if let url = GroupPickService.shared.shareURL(pickId: viewModel.pickId), viewModel.pick?.isDecided == false {
-                ShareLink(item: url, message: Text("Tap to vote on where we go")) {
+                ShareLink(item: url, message: Text(viewModel.pick?.isPlanned == true ? "Rank your top 3 for \(viewModel.pick?.title ?? "our plan")" : "Tap to vote on where we go")) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 18))
                         .foregroundColor(.primary)
@@ -86,33 +280,6 @@ struct GroupPickSheet: View {
                     .frame(width: 44, height: 44)
             }
         }
-        .padding(.horizontal, 20)
-    }
-
-    private func winnerBanner(_ winner: DetailPlace) -> some View {
-        Button { onOpenPlace(winner) } label: {
-            HStack(spacing: 14) {
-                TonightPlaceThumbnail(place: winner, size: 64)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("It's decided 🎉")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.green)
-                    Text(winner.name)
-                        .font(.title3.weight(.bold))
-                        .foregroundColor(.primary)
-                    if let address = winner.address {
-                        Text(address)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.green.opacity(0.12)))
-        }
-        .buttonStyle(.plain)
         .padding(.horizontal, 20)
     }
 }

@@ -49,6 +49,11 @@ class PlaceListSelectionViewModel: ObservableObject {
     // MARK: - Search State
     @Published var filteredLists: [LightweightPlaceList] = []
 
+    /// EVERY list the user can add to (all owned + shared/collaborative), unpaginated,
+    /// ordered last-used first then most recently updated. Used by the import picker
+    /// and to make search cover lists beyond the loaded proximity page.
+    @Published var allLists: [LightweightPlaceList] = []
+
     /// When non-empty, tapping a list adds ALL of these places (bulk "Add all to a list").
     var bulkPlaces: [DetailPlace] = []
     @Published var isSearching: Bool = false
@@ -213,8 +218,16 @@ class PlaceListSelectionViewModel: ObservableObject {
         async let ownedListsTask = fetchOwnedLists(userId: userId, coord: coord)
         async let sharedListsTask = fetchSharedLists(userId: userId)
         async let collaborativeOwnedTask = fetchCollaborativeOwnedLists(userId: userId)
+        async let allOwnedTask = fetchAllOwnedLists(userId: userId)
     
-        let (ownedLists, fetchedSharedLists, collaborativeOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask)
+        let (ownedLists, fetchedSharedLists, collaborativeOwnedLists, allOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask, allOwnedTask)
+
+        // Full, unpaginated set: owned (all, not just the first proximity page) + collaborative + shared.
+        allLists = Self.sortByRecent(deduplicateLists(
+            ownedLists: allOwnedLists + ownedLists,
+            collaborativeOwnedLists: collaborativeOwnedLists,
+            sharedLists: fetchedSharedLists
+        ))
     
         // Cache shared lists for later (they don't paginate)
         sharedLists = fetchedSharedLists
@@ -270,6 +283,37 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
     }
     
+    /// Fetches metadata for ALL lists the user owns (no pagination).
+    private func fetchAllOwnedLists(userId: String) async -> [LightweightPlaceList] {
+        do {
+            return try await placeListService.fetchAllListMetadata(userId: userId)
+        } catch {
+            print("❌ [PlaceListSelectionVM] Failed to fetch all list metadata: \(error)")
+            return []
+        }
+    }
+
+    /// Last-used list first, then most recently updated (falls back to created).
+    static func sortByRecent(_ source: [LightweightPlaceList]) -> [LightweightPlaceList] {
+        let lastUsed = lastUsedListId
+        return source.sorted { a, b in
+            let aLast = a.list_id == lastUsed
+            let bLast = b.list_id == lastUsed
+            if aLast != bLast { return aLast }
+            let ka = a.updated_at ?? a.created_at ?? ""
+            let kb = b.updated_at ?? b.created_at ?? ""
+            if ka != kb { return ka > kb }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
+    }
+
+    /// Lists from `allLists` whose name matches `query` (case/diacritic-insensitive).
+    func listsMatching(_ query: String) -> [LightweightPlaceList] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return allLists }
+        return allLists.filter { $0.name.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+    }
+
     /// Fetches lists shared with the user (where user is a collaborator)
     private func fetchSharedLists(userId: String) async -> [LightweightPlaceList] {
         do {
@@ -321,8 +365,16 @@ class PlaceListSelectionViewModel: ObservableObject {
                 await loadPlaceMembershipForLists(searchResults, placeId: placeId)
             }
 
+            // The server search only covers owned lists; add matching shared/collaborative
+            // lists (and any owned ones it missed) from the full local set.
+            let serverIds = Set(searchResults.map { $0.list_id })
+            let localExtras = listsMatching(searchText).filter { !serverIds.contains($0.list_id) }
+            if let placeId = currentPlace?.id.uuidString, !localExtras.isEmpty {
+                await loadPlaceMembershipForLists(localExtras, placeId: placeId)
+            }
+
             // Now apply local filters and update UI with membership data ready
-            filteredLists = applyLocalFilters(to: searchResults)
+            filteredLists = applyLocalFilters(to: searchResults + localExtras)
         } catch {
             // Fallback to local filtering on error
             filteredLists = applyLocalFilters(to: lists)
@@ -646,6 +698,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             
             // Update our own paginated view (independent from ProfileViewModel's state)
             lists.insert(lightweightList, at: 0)
+            allLists.insert(lightweightList, at: 0)
             
             // Update filtered lists to include the new list
             if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
