@@ -121,6 +121,12 @@ enum Analytics {
         case signInFailed = "sign_in_failed"
         case placesInViewEmpty = "places_in_view_empty"
         case placePeekOpened = "place_peek_opened"
+        case discoveryViewed = "discovery_viewed"
+        case discoveryCardViewed = "discovery_card_viewed"
+        case discoverySwiped = "discovery_swiped"
+        case discoverySaved = "discovery_saved"
+        case discoveryPlaceOpened = "discovery_place_opened"
+        case discoveryEmpty = "discovery_empty"
     }
 }
 
