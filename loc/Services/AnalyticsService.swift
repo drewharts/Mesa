@@ -118,6 +118,7 @@ enum Analytics {
         case mapPinsRendered = "map_pins_rendered"
         case mapCameraIdle = "map_camera_idle"
         case onboardingStep = "onboarding_step"
+        case profilePhotoCropped = "profile_photo_cropped"
         case signInFailed = "sign_in_failed"
         case placesInViewEmpty = "places_in_view_empty"
         case placePeekOpened = "place_peek_opened"

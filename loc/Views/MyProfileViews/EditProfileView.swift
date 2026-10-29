@@ -16,7 +16,8 @@ struct EditProfileView: View {
     private let originalUser: ProfileData
 
     @State private var showingImagePicker = false
-    @State private var inputImage: [UIImage] = []
+    @State private var editRequest: ProfilePhotoEditRequest?
+    @State private var showingOptions = false
 
     init(user: ProfileData, onSave: ((ProfileData) -> Void)? = nil) {
         self._viewModel = StateObject(wrappedValue: EditProfileViewModel(user: user))
@@ -44,15 +45,16 @@ struct EditProfileView: View {
                     saveButton
                 }
             }
-            .sheet(isPresented: $showingImagePicker) {
-                ImagePicker(images: $inputImage, selectionLimit: 1)
+            .confirmationDialog("Profile Photo", isPresented: $showingOptions, titleVisibility: .hidden) {
+                Button("Adjust Crop") { editRequest = profile.profilePhotoAdjustRequest() }
+                Button("Choose New Photo") { showingImagePicker = true }
+                Button("Cancel", role: .cancel) {}
             }
-            .onChange(of: inputImage) { _, newValue in
-                guard let newImage = newValue.first else { return }
-                Task {
-                    await profile.changeProfilePhoto(newImage)
-                    inputImage.removeAll()
-                }
+            .profilePhotoEditor(showPicker: $showingImagePicker,
+                                editRequest: $editRequest,
+                                source: "edit_profile",
+                                userId: profile.user?.id) { cropped, original in
+                Task { await profile.changeProfilePhoto(cropped: cropped, original: original) }
             }
         }
     }
@@ -80,7 +82,11 @@ struct EditProfileView: View {
                 }
                 .onTapGesture {
                     if !profile.isUploadingProfilePhoto {
-                        showingImagePicker = true
+                        if profile.userPicture != nil {
+                            showingOptions = true
+                        } else {
+                            showingImagePicker = true
+                        }
                     }
                 }
                 .overlay {
