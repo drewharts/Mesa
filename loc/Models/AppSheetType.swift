@@ -62,6 +62,8 @@ enum AppSheetType: Identifiable, Equatable {
     // MARK: - Tonight
 
     case tonight
+    /// Fresh finds: swipeable feed of recently imported places/videos (first-launch discovery).
+    case freshFinds
     case groupPick(pickId: String)
 
     // MARK: - Onboarding
@@ -112,6 +114,8 @@ enum AppSheetType: Identifiable, Equatable {
             return "tripsList"
         case .tonight:
             return "tonight"
+        case .freshFinds:
+            return "freshFinds"
         case .groupPick(let pickId):
             return "groupPick-\(pickId)"
         case .suggestedProfiles:
@@ -160,6 +164,8 @@ enum AppSheetType: Identifiable, Equatable {
         case (.tripsList, .tripsList):
             return true
         case (.tonight, .tonight):
+            return true
+        case (.freshFinds, .freshFinds):
             return true
         case (.groupPick(let lhsId), .groupPick(let rhsId)):
             return lhsId == rhsId
