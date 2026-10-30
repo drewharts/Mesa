@@ -119,22 +119,67 @@ final class TonightViewModel: ObservableObject {
             state = .empty("Sign in to see tonight's picks.")
             return
         }
-        state = .loading
-        origin = await currentLocation()
+        // Reopening within 10 minutes shows the last picks instantly, then refreshes quietly.
+        let cached = Self.cache.flatMap { $0.userId == userId && Date().timeIntervalSince($0.at) < 600 ? $0 : nil }
+        if let cached {
+            candidates = cached.candidates
+            details = cached.details
+            friendNames = cached.friendNames
+            origin = cached.origin
+            hasLocation = origin != nil
+            rerank(reportAnalytics: false)
+        } else {
+            state = .loading
+        }
+        let started = Date()
+
+        // Location and friends no longer wait on each other.
+        async let locationFix = currentLocation()
+        async let friendsLoad = tonightService.fetchFriends(userId: userId)
+        let friends = await friendsLoad
+        friendNames = Dictionary(friends.map { ($0.id.lowercased(), $0.firstName) }, uniquingKeysWith: { a, _ in a })
+        async let candidatesLoad = tonightService.fetchCandidates(userId: userId, friendIds: friends.map(\.id))
+        origin = await locationFix
         hasLocation = origin != nil
         // Learn the real time zone where the user is (the phone clock may be on home time while
         // travelling), so nearby places are judged open/closed in their own local time.
-        if let origin, let tz = try? await CLGeocoder().reverseGeocodeLocation(origin).first?.timeZone {
+        // Runs alongside the candidate fetch instead of before it.
+        let geocodeOrigin = origin
+        async let timeZoneLoad: TimeZone? = {
+            guard let geocodeOrigin else { return nil }
+            return try? await CLGeocoder().reverseGeocodeLocation(geocodeOrigin).first?.timeZone
+        }()
+        candidates = await candidatesLoad
+        if let origin, let tz = await timeZoneLoad {
             PlaceTimeZoneCache.shared.addAnchor(latitude: origin.coordinate.latitude,
                                                 longitude: origin.coordinate.longitude, timeZone: tz)
         }
 
-        let friends = await tonightService.fetchFriends(userId: userId)
-        friendNames = Dictionary(friends.map { ($0.id.lowercased(), $0.firstName) }, uniquingKeysWith: { a, _ in a })
-        candidates = await tonightService.fetchCandidates(userId: userId, friendIds: friends.map(\.id))
-        details = await tonightService.fetchDetails(for: candidates, near: origin)
+        let ids = await tonightService.detailIds(for: candidates, near: origin)
+        // Show picks from the nearest 30 places first, then fill in the rest.
+        let firstIds = Array(ids.prefix(30))
+        let restIds = Array(ids.dropFirst(30))
+        async let restLoad = tonightService.fetchDetailsParallel(ids: restIds)
+        let first = await tonightService.fetchDetailsParallel(ids: firstIds)
+        if cached == nil, !first.isEmpty {
+            details = first
+            rerank(reportAnalytics: false)
+            if case .loaded = state {} else if !restIds.isEmpty { state = .loading }
+        }
+        details = first.merging(await restLoad) { a, _ in a }
         rerank(reportAnalytics: true)
+        Self.cache = (userId, candidates, details, friendNames, origin, Date())
+        Analytics.track(.tonightLoaded, [
+            "ms": Int(Date().timeIntervalSince(started) * 1000),
+            "candidates": candidates.count,
+            "details": details.count,
+            "from_cache": cached != nil
+        ])
     }
+
+    /// Last Tonight load, so reopening the sheet is instant.
+    private static var cache: (userId: String, candidates: [TonightCandidate], details: [String: DetailPlace],
+                               friendNames: [String: String], origin: CLLocation?, at: Date)?
 
     /// Switches the vibe and re-ranks locally (no network).
     func selectVibe(_ newVibe: TonightVibe) {

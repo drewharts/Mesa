@@ -80,19 +80,34 @@ final class TonightService {
         // PostgREST caps every response at 1000 rows (max_rows), so an unpaged call silently
         // dropped an arbitrary slice of saves once user + friends passed 1000 places. Page through
         // with a stable order until a short page comes back.
+        // Fetch pages 4 at a time in parallel instead of one after another.
         let pageSize = 1000
+        let parallelPages = 4
         var rows: [Row] = []
         var offset = 0
-        while offset < 20_000 {
-            let page: [Row] = try await supabase.client
-                .rpc("get_tonight_candidates", params: Params(p_user_ids: friendIds))
-                .order("place_id")
-                .range(from: offset, to: offset + pageSize - 1)
-                .execute()
-                .value
-            rows += page
-            if page.count < pageSize { break }
-            offset += pageSize
+        outer: while offset < 20_000 {
+            let starts = (0..<parallelPages).map { offset + $0 * pageSize }
+            var pages: [Int: [Row]] = [:]
+            try await withThrowingTaskGroup(of: (Int, [Row]).self) { group in
+                for start in starts {
+                    group.addTask { @MainActor in
+                        let page: [Row] = try await self.supabase.client
+                            .rpc("get_tonight_candidates", params: Params(p_user_ids: friendIds))
+                            .order("place_id")
+                            .range(from: start, to: start + pageSize - 1)
+                            .execute()
+                            .value
+                        return (start, page)
+                    }
+                }
+                for try await (start, page) in group { pages[start] = page }
+            }
+            for start in starts {
+                let page = pages[start] ?? []
+                rows += page
+                if page.count < pageSize { break outer }
+            }
+            offset += parallelPages * pageSize
         }
         return rows.map { TonightCandidate(placeId: $0.place_id, saverIds: Set(($0.saver_ids ?? []).map { $0.lowercased() })) }
     }
@@ -159,40 +174,54 @@ final class TonightService {
 
     // MARK: - Places
 
-    /// Fetches full details for the candidates nearest the origin (or most-saved when there is no origin).
-    /// Returns details keyed by lowercased place id.
-    func fetchDetails(for candidates: [TonightCandidate], near origin: CLLocation?) async -> [String: DetailPlace] {
-        guard !candidates.isEmpty else { return [:] }
-        let chosenIds: [String]
-        if let origin {
-            var coordinates: [String: CLLocationCoordinate2D] = [:]
-            for chunk in candidates.map(\.placeId).chunked(into: 150) {
-                if let batch = try? await placeService.fetchPlaceCoordinates(placeIds: chunk) {
-                    coordinates.merge(batch) { a, _ in a }
-                }
-            }
-            chosenIds = coordinates
-                .map { (id: $0.key, meters: origin.distance(from: CLLocation(latitude: $0.value.latitude, longitude: $0.value.longitude))) }
-                .filter { $0.meters <= TonightRanker.maxDistanceMeters }
-                .sorted { $0.meters < $1.meters }
-                .prefix(Self.detailFetchLimit)
-                .map { $0.id }
-        } else {
-            chosenIds = candidates
+    /// Picks which candidates to load details for: the nearest within range (or most-saved when
+    /// there is no origin), nearest first. Coordinate lookups run in parallel.
+    func detailIds(for candidates: [TonightCandidate], near origin: CLLocation?) async -> [String] {
+        guard !candidates.isEmpty else { return [] }
+        guard let origin else {
+            return candidates
                 .sorted { $0.saverIds.count > $1.saverIds.count }
                 .prefix(Self.detailFetchLimit)
                 .map(\.placeId)
         }
-        guard !chosenIds.isEmpty else { return [:] }
+        var coordinates: [String: CLLocationCoordinate2D] = [:]
+        await withTaskGroup(of: [String: CLLocationCoordinate2D].self) { group in
+            for chunk in candidates.map(\.placeId).chunked(into: 150) {
+                group.addTask { @MainActor in
+                    (try? await self.placeService.fetchPlaceCoordinates(placeIds: chunk)) ?? [:]
+                }
+            }
+            for await batch in group { coordinates.merge(batch) { a, _ in a } }
+        }
+        return coordinates
+            .map { (id: $0.key, meters: origin.distance(from: CLLocation(latitude: $0.value.latitude, longitude: $0.value.longitude))) }
+            .filter { $0.meters <= TonightRanker.maxDistanceMeters }
+            .sorted { $0.meters < $1.meters }
+            .prefix(Self.detailFetchLimit)
+            .map { $0.id }
+    }
 
+    /// Fetches details for the given ids in parallel chunks of 30, keyed by lowercased place id.
+    func fetchDetailsParallel(ids: [String]) async -> [String: DetailPlace] {
+        guard !ids.isEmpty else { return [:] }
         var details: [String: DetailPlace] = [:]
-        for chunk in chosenIds.chunked(into: 30) {
-            guard let places = try? await placeService.fetchPlaceDetailsBatch(placeIds: chunk) else { continue }
-            for place in places {
-                details[place.id.uuidString.lowercased()] = place
+        await withTaskGroup(of: [DetailPlace].self) { group in
+            for chunk in ids.chunked(into: 30) {
+                group.addTask { @MainActor in
+                    (try? await self.placeService.fetchPlaceDetailsBatch(placeIds: chunk)) ?? []
+                }
+            }
+            for await places in group {
+                for place in places { details[place.id.uuidString.lowercased()] = place }
             }
         }
         return details
+    }
+
+    /// Fetches full details for the candidates nearest the origin (or most-saved when there is no origin).
+    /// Returns details keyed by lowercased place id.
+    func fetchDetails(for candidates: [TonightCandidate], near origin: CLLocation?) async -> [String: DetailPlace] {
+        await fetchDetailsParallel(ids: await detailIds(for: candidates, near: origin))
     }
 
     /// Fetches details for an explicit list of place ids (used by group picks), keyed by lowercased id.
