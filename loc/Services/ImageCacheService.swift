@@ -72,7 +72,10 @@ class ImageCacheService {
         let fileURL = cacheDirectory.appendingPathComponent(key)
         if fileManager.fileExists(atPath: fileURL.path),
            let data = try? Data(contentsOf: fileURL),
-           let image = UIImage(data: data) {
+           let raw = UIImage(data: data) {
+            // Decode now (we're off the main thread in fetchImage) so the first draw while
+            // scrolling doesn't pay for JPEG decoding on the main thread.
+            let image = raw.preparingForDisplay() ?? raw
             // Store in memory cache for faster access next time
             imageCache.setObject(image, forKey: key as NSString, cost: Self.decodedCost(of: image))
             return image
@@ -90,8 +93,11 @@ class ImageCacheService {
         
         // Also store in disk cache
         let fileURL = cacheDirectory.appendingPathComponent(key)
-        if let data = image.jpegData(compressionQuality: 0.8) {
-            try? data.write(to: fileURL)
+        // JPEG encode + write off the main thread.
+        DispatchQueue.global(qos: .utility).async {
+            if let data = image.jpegData(compressionQuality: 0.8) {
+                try? data.write(to: fileURL)
+            }
         }
     }
     
@@ -140,10 +146,12 @@ class ImageCacheService {
 
     /// Fetches an image with cache lookup, request deduplication, and optional downsampling.
     func fetchImage(for url: URL, targetSize: CGSize? = nil) async -> UIImage? {
-        if let cached = getImage(for: url, targetSize: targetSize) { return cached }
+        // Memory hit is cheap; disk read, decode and download all run off the main thread
+        // (callers are SwiftUI .task blocks, which inherit the main actor).
+        if let cached = memoryImage(for: url, targetSize: targetSize) { return cached }
 
         return await downloadCoordinator.fetch(url: Self.coordinatorURL(url, targetSize)) { [self] in
-            // Re-check cache (another task may have populated it)
+            await Task.detached(priority: .userInitiated) { [self] () -> UIImage? in
             if let cached = self.getImage(for: url, targetSize: targetSize) { return cached }
 
             do {
@@ -161,7 +169,13 @@ class ImageCacheService {
             } catch {
                 return nil
             }
+            }.value
         }
+    }
+
+    /// Memory-cache-only lookup (no disk I/O), safe on the main thread.
+    func memoryImage(for url: URL, targetSize: CGSize? = nil) -> UIImage? {
+        imageCache.object(forKey: cacheKey(for: url, targetSize: targetSize) as NSString)
     }
 
     /// Separate in-flight dedup entries per display size.
@@ -206,10 +220,16 @@ class ImageCacheService {
         // CGImageSource preserves RGBA even for opaque sources (JPEGs), which
         // doubles memory usage and triggers an ImageIO warning on JPEG encoding.
         let size = CGSize(width: cgImage.width, height: cgImage.height)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { _ in
+        // Scale 1: `size` is already in pixels. The default (screen scale) made a 3x-wide,
+        // 9x-pixel bitmap per thumbnail.
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        let drawn = renderer.image { _ in
             UIImage(cgImage: cgImage).draw(in: CGRect(origin: .zero, size: size))
         }
+        return drawn
     }
 
     // MARK: - Batch Loading (Parallel with Caching)

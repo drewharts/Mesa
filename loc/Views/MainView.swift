@@ -664,16 +664,6 @@ struct MainView: View {
                     }
                     .accessibilityLabel("Fresh finds")
 
-                    Button(action: { recenterMap = true }) {
-                        Image(systemName: "location.fill")
-                            .foregroundColor(.secondary)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                            .shadow(radius: 4)
-                    }
-
                     Menu {
                         Picker("Display", selection: $annotationDisplayMode) {
                             ForEach(AnnotationDisplayMode.allCases, id: \.self) { mode in
@@ -748,8 +738,29 @@ struct MainView: View {
     private var bottomNavigationBar: some View {
         Group {
             if shouldShowBottomNavigationBar {
-                VStack {
+                VStack(spacing: 10) {
                     Spacer()
+                    // Current-location button sits bottom-right just above the floating bar
+                    // (Apple Maps style). It lives in the same stack as the bar, so it stays in
+                    // the safe area, never overlaps it, and hides with it whenever a sheet is up.
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            Analytics.track(.navTapped, ["item": "recenter", "from": "map"])
+                            recenterMap = true
+                        }) {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.mesaAccent)
+                                .frame(width: 44, height: 44)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                .shadow(radius: 4)
+                        }
+                        .accessibilityLabel("Show my location")
+                        .padding(.trailing, 20)
+                    }
                     BottomNavigationBar(
                         showSearchPage: $showSearchPage,
                         shouldNavigateToProfile: $shouldNavigateToProfile

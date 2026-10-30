@@ -33,6 +33,9 @@ enum Analytics {
         config.sessionReplayConfig.maskAllTextInputs = true
         config.sessionReplayConfig.maskAllImages = false   // place photos are the point of the app
         config.sessionReplayConfig.maskAllSandboxedViews = true
+        // Screenshot mode snapshots the whole window on the main thread every `throttleDelay`
+        // seconds (default 1s), which showed up as a ~1s hitch during fast list scrolling.
+        config.sessionReplayConfig.throttleDelay = 3
         // Crash / exception autocapture (also gated by the project's error tracking setting).
         config.errorTrackingConfig.autoCapture = true
         PostHogSDK.shared.setup(config)
