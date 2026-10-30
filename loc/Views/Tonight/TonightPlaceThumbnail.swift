@@ -21,8 +21,9 @@ struct TonightPlaceThumbnail: View {
     private var placeKey: String { place.id.uuidString }
 
     private var storedPhotoURL: URL? {
-        let candidate = (place.photoUrls ?? []).first { url in
-            !url.isEmpty && !url.contains("googleapis.com")
+        // Only a stored photo here; Google links are tried later by the shared pipeline.
+        let candidate = DetailPlaceViewModel.rankedPhotoURLs(place.photoUrls ?? []).first { url in
+            !url.contains("googleapis.com") && !url.contains("googleusercontent.com")
         }
         return candidate.flatMap(URL.init(string:))
     }

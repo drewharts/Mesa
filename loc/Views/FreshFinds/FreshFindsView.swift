@@ -103,7 +103,7 @@ struct FreshFindsView: View {
     private func cardView(_ card: FreshFind, depth: Int) -> some View {
         let isTop = depth == 0
         let offset = isTop ? dragOffset : .zero
-        let rotation = isTop ? Double(dragOffset.width / 22) : 0
+        let rotation = isTop ? Double(dragOffset.width / 60) : 0
 
         ZStack(alignment: .bottomLeading) {
             GeometryReader { geo in
@@ -131,7 +131,6 @@ struct FreshFindsView: View {
             }
             .padding(20)
 
-            if isTop { swipeStamp }
         }
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(isTop ? 0.18 : 0.08), radius: 16, y: 8)
@@ -207,7 +206,7 @@ struct FreshFindsView: View {
     }
 
     private func saveCard(_ card: FreshFind, via: String) {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         Task {
             if await viewModel.save(card, userId: userId, via: via) {
                 withAnimation(.spring()) { savedToast = true }
