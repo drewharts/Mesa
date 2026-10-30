@@ -639,17 +639,9 @@ struct MainView: View {
 
     /// Presents the city discovery sheet on the user's first visit to the map.
     private func presentDiscoverySheetIfNeeded(location: CLLocation?) {
-        // New users get Fresh finds (recent imports from everyone) instead of an empty map.
-        // Doesn't need location, so it isn't held up by the permission prompt.
-        guard !UserDefaults.standard.bool(forKey: "hasSeenFreshFinds") else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            guard !UserDefaults.standard.bool(forKey: "hasSeenFreshFinds"),
-                  presentationService.activeSheet == nil,
-                  !deepLinkViewModel.showNoLocationAlert else { return }
-            UserDefaults.standard.set(true, forKey: "hasSeenFreshFinds")
-            UserDefaults.standard.set(true, forKey: "hasSeenDiscoverySheet")
-            presentationService.present(.freshFinds)
-        }
+        // Fresh finds is no longer auto-presented on launch or after updates;
+        // it lives only behind the ✨ map button.
+        UserDefaults.standard.set(true, forKey: "hasSeenDiscoverySheet")
     }
 
     // MARK: - UI Overlay Layer

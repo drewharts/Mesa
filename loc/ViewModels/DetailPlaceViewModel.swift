@@ -174,50 +174,49 @@ class DetailPlaceViewModel: ObservableObject {
 
     func fetchPlaceImage(for placeId: String) {
         guard placeImages[placeId] == nil else { return }
-        
-        // Set loading state to true when we start loading
         placeImageLoadingStates[placeId] = true
-        
-        // This method is for normal place tiles that get images from reviews OR place's own photoUrls
-        // External video place tiles use AsyncImage directly with thumbnail URLs
-        
-        // First, check if the place has its own photoUrls (for created places)
-        if let place = places[placeId], 
-           let photoUrls = place.photoUrls, 
-           !photoUrls.isEmpty {
-            ImageService.shared.fetchPhotosFromStorage(urls: photoUrls) { [weak self] images, error in
-                guard let self = self else { return }
-                
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("❌ [DetailPlaceViewModel] Error loading place's own images for \(placeId): \(error.localizedDescription)")
-                        self.placeImages[placeId] = UIImage()
-                    } else if let images = images, !images.isEmpty {
-                        self.placeImages[placeId] = images[0]
-                    } else {
-                        self.placeImages[placeId] = UIImage()
-                    }
-                    // Mark loading as complete
-                    self.placeImageLoadingStates[placeId] = false
-                }
-            }
-            return
-        }
-        
-        // If no place photoUrls, try to get images from reviews (for reviewed places)
-        // Get the current user ID
+
+        // Try every candidate in order and keep the first that actually loads.
+        // Previously a place with any photoUrls (often expired Google photo links) only tried
+        // those and gave up, never reaching the stored Supabase review photos.
         Task { @MainActor in
-            guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
-                print("Error: Current user ID is not available")
-                self.placeImages[placeId] = UIImage()
-                self.placeImageLoadingStates[placeId] = false
-                return
+            let ownUrls = Self.rankedPhotoURLs(places[placeId]?.photoUrls ?? [])
+            if let img = await self.firstLoadableImage(ownUrls, limit: 4) {
+                self.finishPlaceImage(placeId, img); return
             }
-            
-            self.fetchPlaceImageWithUserId(placeId: placeId, currentUserId: currentUserId)
+            var postUrls: [String] = []
+            if let result = try? await PostService.shared.fetchPosts(placeId: placeId, latestOnly: false) {
+                postUrls = Self.rankedPhotoURLs(result.0.flatMap { $0.images })
+            }
+            if let img = await self.firstLoadableImage(postUrls, limit: 8) {
+                self.finishPlaceImage(placeId, img); return
+            }
+            self.tryExternalThumbnailAsCover(placeId: placeId)
         }
     }
-    
+
+    /// Stored (non-Google) URLs first, Google links last since they often expire. De-duplicated.
+    nonisolated static func rankedPhotoURLs(_ urls: [String]) -> [String] {
+        var seen = Set<String>()
+        let clean = urls.filter { !$0.isEmpty && !$0.contains("firebasestorage.googleapis.com") && seen.insert($0).inserted }
+        let isGoogle: (String) -> Bool = { $0.contains("googleapis.com") || $0.contains("googleusercontent.com") || $0.contains("gstatic.com") }
+        return clean.filter { !isGoogle($0) } + clean.filter(isGoogle)
+    }
+
+    private func firstLoadableImage(_ urls: [String], limit: Int) async -> UIImage? {
+        for s in urls.prefix(limit) {
+            guard let url = URL(string: s) else { continue }
+            if let img = await ImageCacheService.shared.fetchImage(for: url, targetSize: CGSize(width: 600, height: 600)),
+               img.size.width > 0 { return img }
+        }
+        return nil
+    }
+
+    @MainActor private func finishPlaceImage(_ placeId: String, _ img: UIImage) {
+        placeImages[placeId] = img
+        placeImageLoadingStates[placeId] = false
+    }
+
     private func fetchPlaceImageWithUserId(placeId: String, currentUserId: String) {
         
         // Fetch ALL posts for this place (not just friends' posts) to get images for tiles

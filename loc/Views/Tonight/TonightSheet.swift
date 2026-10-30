@@ -25,7 +25,14 @@ struct TonightSheet: View {
 
     var body: some View { analyticsBody.analyticsScreen("Tonight") }
 
-    @ViewBuilder private var analyticsBody: some View {
+    private var analyticsBody: some View {
+        NavigationStack {
+            stackRoot
+                .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    @ViewBuilder private var stackRoot: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
             ScrollView {
