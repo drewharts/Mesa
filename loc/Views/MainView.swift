@@ -194,6 +194,7 @@ struct MainView: View {
         }
         .onAppear {
             locationManager.requestLocationPermission()
+            presentDiscoverySheetIfNeeded(location: nil)
         }
         .onChange(of: locationManager.currentLocation) { _, newLocation in
             presentDiscoverySheetIfNeeded(location: newLocation)
@@ -309,6 +310,9 @@ struct MainView: View {
             // Tonight
             case .tonight:
                 tonightSheet
+
+            case .freshFinds:
+                freshFindsSheet
 
             case .groupPick(let pickId):
                 groupPickSheet(pickId: pickId)
@@ -575,6 +579,13 @@ struct MainView: View {
             .presentationDragIndicator(.visible)
     }
 
+    /// Fresh finds: recently imported places as a swipeable card stack.
+    private var freshFindsSheet: some View {
+        FreshFindsView(userId: userSession.currentUserId, onShowOnMap: openPlaceFromSheet)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+    }
+
     /// Group pick sheet: live one-tap voting with an automatic winner.
     private func groupPickSheet(pickId: String) -> some View {
         GroupPickSheet(pickId: pickId, userId: userSession.currentUserId, locationManager: locationManager, onOpenPlace: openPlaceFromSheet)
@@ -628,27 +639,9 @@ struct MainView: View {
 
     /// Presents the city discovery sheet on the user's first visit to the map.
     private func presentDiscoverySheetIfNeeded(location: CLLocation?) {
-        guard !UserDefaults.standard.bool(forKey: "hasSeenDiscoverySheet"),
-              let location = location,
-              presentationService.activeSheet == nil else { return }
-
+        // Fresh finds is no longer auto-presented on launch or after updates;
+        // it lives only behind the ✨ map button.
         UserDefaults.standard.set(true, forKey: "hasSeenDiscoverySheet")
-
-        let geocoder = CLGeocoder()
-        geocoder.reverseGeocodeLocation(location) { placemarks, _ in
-            let cityName = placemarks?.first?.locality ?? "Your Area"
-            let coordinate = location.coordinate
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                if presentationService.activeSheet == nil {
-                    presentationService.present(.cityOverview(
-                        cityName: cityName,
-                        coordinate: coordinate,
-                        annotation: nil
-                    ))
-                }
-            }
-        }
     }
 
     // MARK: - UI Overlay Layer
@@ -657,6 +650,20 @@ struct MainView: View {
             HStack {
                 Spacer()
                 VStack(spacing: 10) {
+                    Button(action: {
+                        Analytics.track(.navTapped, ["item": "fresh_finds", "from": "map"])
+                        PresentationService.shared.present(.freshFinds)
+                    }) {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.orange)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .shadow(radius: 4)
+                    }
+                    .accessibilityLabel("Fresh finds")
+
                     Button(action: { recenterMap = true }) {
                         Image(systemName: "location.fill")
                             .foregroundColor(.secondary)
