@@ -1,7 +1,7 @@
 What's new in Mesa 4.97:
 
 • Crop and reposition your profile photo, and tap it anytime to adjust.
-• Fresh finds: tap ✨ on the map to explore places recently imported from TikTok and Instagram.
+• Fresh finds: tap the sparkle button on the map to explore places recently imported from TikTok and Instagram.
 • Place details in Tonight and group picks now open right inside the sheet, with a back button to your list.
 • More place photos load in Tonight and group picks.
 • Fixed a crash when opening Tonight or a group pick.
