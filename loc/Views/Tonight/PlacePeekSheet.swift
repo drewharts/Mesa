@@ -9,6 +9,13 @@
 
 import SwiftUI
 
+/// Hashable wrapper (by id) so DetailPlace can drive navigationDestination(item:).
+private struct PeekedPlace: Hashable {
+    let place: DetailPlace
+    static func == (a: PeekedPlace, b: PeekedPlace) -> Bool { a.place.id == b.place.id }
+    func hash(into h: inout Hasher) { h.combine(place.id) }
+}
+
 private struct PlacePeekModifier: ViewModifier {
     @Binding var place: DetailPlace?
     let source: String
@@ -32,7 +39,11 @@ private struct PlacePeekModifier: ViewModifier {
             }
             // Pushed inside the host's NavigationStack (same sheet, system back button),
             // so popping returns to the candidate list exactly where it was.
-            .navigationDestination(item: $place) { peeked in
+            .navigationDestination(item: Binding(
+                get: { place.map(PeekedPlace.init) },
+                set: { place = $0?.place }
+            )) { (peekedItem: PeekedPlace) in
+                let peeked = peekedItem.place
                 PlaceDetailViewInNavigation(placeId: peeked.id.uuidString, minSheetHeight: 250, shouldAnimateMap: false)
                     .toolbar(.visible, for: .navigationBar)
                     .toolbar {
