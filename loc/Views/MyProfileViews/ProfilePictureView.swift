@@ -13,8 +13,8 @@ struct ProfilePictureView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @State private var showingImagePicker = false
     @State private var showingFullScreen = false
-    @State private var inputImage: [UIImage] = []
-    @State private var hasProcessedImage = false
+    @State private var editRequest: ProfilePhotoEditRequest?
+    @State private var showingOptions = false
 
     // MARK: - Constants
     private let profileSize: CGFloat = 96
@@ -54,16 +54,23 @@ struct ProfilePictureView: View {
                     if profile.userPicture == nil {
                         showingImagePicker = true
                     } else {
-                        showingFullScreen = true
+                        showingOptions = true
                     }
                 }
             }
             .contextMenu {
+                if !profile.isUploadingProfilePhoto && profile.userPicture != nil {
+                    Button {
+                        editRequest = profile.profilePhotoAdjustRequest()
+                    } label: {
+                        Label("Adjust Crop", systemImage: "crop")
+                    }
+                }
                 if !profile.isUploadingProfilePhoto {
                     Button {
                         showingImagePicker = true
                     } label: {
-                        Label("Change Photo", systemImage: "photo")
+                        Label("Choose New Photo", systemImage: "photo")
                     }
                 }
             }
@@ -80,25 +87,17 @@ struct ProfilePictureView: View {
                     )
             }
         }
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(images: $inputImage, selectionLimit: 1)
+        .confirmationDialog("Profile Photo", isPresented: $showingOptions, titleVisibility: .hidden) {
+            Button("Adjust Crop") { editRequest = profile.profilePhotoAdjustRequest() }
+            Button("Choose New Photo") { showingImagePicker = true }
+            Button("View Photo") { showingFullScreen = true }
+            Button("Cancel", role: .cancel) {}
         }
-        .onChange(of: inputImage) { oldValue, newValue in
-            // Prevent multiple processing of the same image
-            guard !newValue.isEmpty, !hasProcessedImage, let newImage = newValue.first else { return }
-            
-            hasProcessedImage = true
-            
-            // Start upload - ProfileViewModel handles loading state
-            Task {
-                await profile.changeProfilePhoto(newImage)
-                
-                // Reset local state after upload completes
-                await MainActor.run {
-                    hasProcessedImage = false
-                    inputImage.removeAll() // Clear the processed image
-                }
-            }
+        .profilePhotoEditor(showPicker: $showingImagePicker,
+                            editRequest: $editRequest,
+                            source: "profile",
+                            userId: profile.user?.id) { cropped, original in
+            Task { await profile.changeProfilePhoto(cropped: cropped, original: original) }
         }
         .fullScreenCover(isPresented: $showingFullScreen) {
             if let profilePhoto = profile.userPicture {

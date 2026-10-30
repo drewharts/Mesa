@@ -14,7 +14,9 @@ class ProfilePhotoOnboardingViewModel: ObservableObject {
     @Published var isUploading: Bool = false
     @Published var errorMessage: String?
     @Published var showImagePicker: Bool = false
-    @Published var pickerImages: [UIImage] = []
+    @Published var editRequest: ProfilePhotoEditRequest?
+    /// Uncropped photo the user picked, kept so the crop can be re-adjusted.
+    private(set) var originalImage: UIImage?
     @Published var isOnboardingComplete = false
 
     private let userId: String
@@ -23,18 +25,20 @@ class ProfilePhotoOnboardingViewModel: ObservableObject {
     /// Initializes the view model with the current user's ID and sets up the image picker binding.
     init(userId: String) {
         self.userId = userId
-        setupPickerBinding()
     }
 
-    /// Syncs the first image from the picker binding to selectedImage.
-    private func setupPickerBinding() {
-        $pickerImages
-            .dropFirst()
-            .compactMap { $0.first }
-            .sink { [weak self] image in
-                self?.selectedImage = image
-            }
-            .store(in: &cancellables)
+    var userIdForCrop: String { userId }
+
+    /// Called by the shared crop editor when the user taps Done.
+    func applyCrop(cropped: UIImage, original: UIImage) {
+        selectedImage = cropped
+        originalImage = original
+    }
+
+    /// Re-open the crop editor on the original photo.
+    func adjustCrop() {
+        guard let original = originalImage else { return }
+        editRequest = ProfilePhotoEditRequest(image: original, isNewPhoto: false, restoreSavedState: true)
     }
 
     /// Whether the user can proceed (has selected a photo).
@@ -60,6 +64,9 @@ class ProfilePhotoOnboardingViewModel: ObservableObject {
         errorMessage = nil
 
         do {
+            if let originalImage {
+                ProfilePhotoOriginalStore.save(originalImage, userId: userId)
+            }
             let croppedImage = cropToSquare(imageToUpload)
             let photoURL = try await ImageService.shared.updateProfilePhoto(userId: userId, image: croppedImage)
             try await updateProfilePhotoInDatabase(photoURL: photoURL)

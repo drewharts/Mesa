@@ -380,6 +380,24 @@ class ProfileViewModel: ObservableObject {
         }.store(in: &cancellables)
     }
 
+     /// Saves the uncropped original on-device (for re-adjusting later) and uploads the cropped photo.
+     func changeProfilePhoto(cropped: UIImage, original: UIImage) async {
+        if let userId = user?.id {
+            ProfilePhotoOriginalStore.save(original, userId: userId)
+        }
+        await changeProfilePhoto(cropped)
+     }
+
+     /// Request to re-adjust the current photo: uses the stored original if this device has it,
+     /// otherwise re-crops the current (already cropped) picture.
+     func profilePhotoAdjustRequest() -> ProfilePhotoEditRequest? {
+        if let userId = user?.id, let original = ProfilePhotoOriginalStore.load(userId: userId) {
+            return ProfilePhotoEditRequest(image: original, isNewPhoto: false, restoreSavedState: true)
+        }
+        guard let current = userPicture else { return nil }
+        return ProfilePhotoEditRequest(image: current, isNewPhoto: false)
+     }
+
      func changeProfilePhoto(_ newImage: UIImage) async {
         // Set loading state and update UI immediately on main thread
         await MainActor.run {
