@@ -30,8 +30,8 @@ struct ListPlacesScrollView: View {
     static let rowTileSize: CGFloat = 150
 
     private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.flexible(), spacing: 12, alignment: .top),
+        GridItem(.flexible(), spacing: 12, alignment: .top)
     ]
 
     private var isCollapsed: Bool { sheetVM.detent == .peek }
@@ -171,7 +171,9 @@ struct ListPlaceTileView: View {
     @ObservedObject private var hoursStore = PlaceHoursStore.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        // Compute hours state once per render (it was evaluated three times per tile).
+        let hoursState = hoursStore.state(for: place.place_id)
+        return VStack(alignment: .leading, spacing: 6) {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .overlay(
@@ -181,7 +183,7 @@ struct ListPlaceTileView: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 .overlay(alignment: .bottomLeading) {
-                    if let state = hoursStore.state(for: place.place_id) {
+                    if let state = hoursState {
                         OpenNowPill(isOpen: state.isOpen)
                             .padding(7)
                     }
@@ -200,7 +202,9 @@ struct ListPlaceTileView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                if let state = hoursStore.state(for: place.place_id) {
+                // Every line is always laid out (blank when missing) so all tiles in a row
+                // are the same height and the grid stays aligned.
+                if let state = hoursState {
                     // Glanceable status line: "Open · Closes 10 PM" / "Closed · Opens 9 AM".
                     HStack(spacing: 4) {
                         Text(state.isOpen ? "Open" : "Closed")
@@ -212,17 +216,20 @@ struct ListPlaceTileView: View {
                     }
                     .font(.caption)
                     .lineLimit(1)
+                } else {
+                    Text(" ").font(.caption).lineLimit(1).accessibilityHidden(true)
                 }
-                if let meta = meta {
-                    Text(meta)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
+                Text(meta ?? " ")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(.horizontal, 2)
         }
         .frame(width: width)
+        .frame(maxWidth: width == nil ? .infinity : nil, alignment: .topLeading)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
@@ -272,6 +279,7 @@ struct ListPlaceTileSkeleton: View {
             SkeletonBlock(width: 80, height: 10, cornerRadius: 5)
         }
         .frame(width: width)
+        .frame(maxWidth: width == nil ? .infinity : nil, alignment: .topLeading)
         .accessibilityHidden(true)
     }
 }
