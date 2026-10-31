@@ -114,6 +114,7 @@ enum Analytics {
         case groupPickPlaceAdded = "group_pick_place_added"
         case groupPickInvited = "group_pick_invited"
         case groupPickPushOpened = "group_pick_push_opened"
+        case groupPickLinkOpened = "group_pick_link_opened"
         case groupPickActionFailed = "group_pick_action_failed"
         case tonightMoreOptions = "tonight_more_options"
         case tonightPicksRowShown = "tonight_picks_row_shown"

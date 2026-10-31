@@ -195,6 +195,14 @@ struct MainView: View {
         .onAppear {
             locationManager.requestLocationPermission()
             presentDiscoverySheetIfNeeded(location: nil)
+            openPendingGroupPickIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: DeepLinkManager.pendingGroupPickNotification)) { _ in
+            openPendingGroupPickIfNeeded()
+        }
+        .onChange(of: userSession.currentUserId) { _, newId in
+            // A pick link opened before sign-up opens right after the account exists.
+            if newId != nil { openPendingGroupPickIfNeeded() }
         }
         .onChange(of: locationManager.currentLocation) { _, newLocation in
             presentDiscoverySheetIfNeeded(location: newLocation)
@@ -582,6 +590,16 @@ struct MainView: View {
     /// Fresh finds: recently imported places as a swipeable card stack.
     private var freshFindsSheet: some View {
         FreshFindsView(userId: userSession.currentUserId, onShowOnMap: openPlaceFromSheet)
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(locationManager)
+            .environmentObject(userSession)
+            .environmentObject(userProfileNavigationViewModel)
+            .environmentObject(notificationManager)
+            .environmentObject(profileViewModel)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(mapDisplayCoordinatorViewModel)
+            .environmentObject(serviceContainer)
+            .environmentObject(dataManager)
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
     }
@@ -601,6 +619,14 @@ struct MainView: View {
             .environmentObject(dataManager)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+    }
+
+    /// Opens a group pick from a shared link once a signed-in user is on the map.
+    private func openPendingGroupPickIfNeeded() {
+        guard userSession.currentUserId != nil,
+              let pickId = DeepLinkManager.takePendingGroupPickId() else { return }
+        Analytics.track(.groupPickLinkOpened)
+        PresentationService.shared.transition(to: .groupPick(pickId: pickId))
     }
 
     /// Dismisses the current sheet and opens the place detail for the given place.
