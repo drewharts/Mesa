@@ -91,11 +91,9 @@ class EditProfileViewModel: ObservableObject {
                 .execute()
 
             isSaving = false
-            Analytics.track(.profileSaved, ["fields": Array(updates.keys).sorted().joined(separator: ",")])
             return true
         } catch {
-            saveError = "Couldn't save your changes. Check your connection and try again."
-            Analytics.track(.profileSaveFailed, ["error": String(describing: type(of: error))])
+            saveError = error.localizedDescription
             isSaving = false
             return false
         }
