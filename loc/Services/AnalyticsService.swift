@@ -101,6 +101,7 @@ enum Analytics {
         case tripOpened = "trip_opened"
         case pastTripsExpanded = "past_trips_expanded"
         case tonightOpened = "tonight_opened"
+        case tonightLoaded = "tonight_loaded"
         case navTapped = "nav_tapped"
         case tonightResultsShown = "tonight_results_shown"
         case groupPickCreated = "group_pick_created"
