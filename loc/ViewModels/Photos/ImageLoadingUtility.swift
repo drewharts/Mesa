@@ -46,7 +46,9 @@ enum ImageLoadingUtility {
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
                 return nil
             }
-            return UIImage(data: data)
+            // Downsample off the main thread (this static async func is nonisolated);
+            // 1600px covers a full-width 4:5 card on 3x screens.
+            return ImageCacheService.decodeDownsampled(data: data, maxPixelSize: 1600)
         } catch {
             return nil
         }
