@@ -43,7 +43,11 @@ struct LoginView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3)) {
+            // Sign-up is the first thing a new install sees: show the Apple/Google sheet right away.
+            let firstLaunch = !UserDefaults.standard.bool(forKey: "hasSeenLogin")
+            UserDefaults.standard.set(true, forKey: "hasSeenLogin")
+            Analytics.track(.loginShown, ["first_launch": firstLaunch])
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 showSheet = true
             }
         }
@@ -109,6 +113,7 @@ struct LoginView: View {
         VStack(spacing: 12) {
             // Apple Sign In Button
             SignInWithAppleButton(.continue, onRequest: { request in
+                Analytics.track(.signInTapped, ["provider": "apple"])
                 viewModel.prepareAppleSignIn(request: request)
             }, onCompletion: { result in
                 viewModel.handleAppleSignIn(result: result, userSession: userSession)
@@ -119,6 +124,7 @@ struct LoginView: View {
             
             // Google Sign In Button
             Button(action: {
+                Analytics.track(.signInTapped, ["provider": "google"])
                 viewModel.signInWithGoogle(userSession: userSession)
             }) {
                 HStack(spacing: 12) {
