@@ -189,7 +189,20 @@ class DeepLinkManager: ObservableObject {
     private func handleGroupPickDeepLink(_ url: URL) {
         let pickId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard !pickId.isEmpty else { return }
-        PresentationService.shared.present(.groupPick(pickId: pickId))
+        // Stash first so the pick survives a cold launch, sign-up, or onboarding;
+        // MainView opens it once the signed-in root is on screen.
+        UserDefaults.standard.set(pickId, forKey: Self.pendingGroupPickKey)
+        NotificationCenter.default.post(name: Self.pendingGroupPickNotification, object: nil)
+    }
+
+    static let pendingGroupPickKey = "pendingGroupPickId"
+    static let pendingGroupPickNotification = Notification.Name("PendingGroupPickChanged")
+
+    /// Returns and clears a group pick id waiting to be opened.
+    static func takePendingGroupPickId() -> String? {
+        guard let id = UserDefaults.standard.string(forKey: pendingGroupPickKey), !id.isEmpty else { return nil }
+        UserDefaults.standard.removeObject(forKey: pendingGroupPickKey)
+        return id
     }
 
     /// Extracts the invite token from the URL and redeems it, or stashes it for post-login redemption.

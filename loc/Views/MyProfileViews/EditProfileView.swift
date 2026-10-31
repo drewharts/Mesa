@@ -18,6 +18,7 @@ struct EditProfileView: View {
     @State private var showingImagePicker = false
     @State private var editRequest: ProfilePhotoEditRequest?
     @State private var showingOptions = false
+    @State private var didSave = false
 
     init(user: ProfileData, onSave: ((ProfileData) -> Void)? = nil) {
         self._viewModel = StateObject(wrappedValue: EditProfileViewModel(user: user))
@@ -28,10 +29,10 @@ struct EditProfileView: View {
     var body: some View {
         NavigationView {
             Form {
+                errorSection
                 profilePhotoSection
                 nameSection
                 socialLinksSection
-                errorSection
             }
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
@@ -165,22 +166,51 @@ struct EditProfileView: View {
         }
     }
 
+    /// Save → spinner → green "✓ Saved" with a success haptic, then the sheet closes after ~0.8s.
     private var saveButton: some View {
+        SaveStatusButton(isSaving: viewModel.isSaving,
+                         didSave: didSave,
+                         isEnabled: viewModel.hasChanges) {
+            Task {
+                let success = await viewModel.saveProfile()
+                if success {
+                    let updated = viewModel.updatedProfileData(from: originalUser)
+                    onSave?(updated)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { didSave = true }
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    dismiss()
+                } else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                }
+            }
+        }
+    }
+}
+
+/// Toolbar save button with clear states: "Save", a spinner while saving, then a green checkmark + "Saved".
+struct SaveStatusButton: View {
+    let isSaving: Bool
+    let didSave: Bool
+    var isEnabled: Bool = true
+    var title: String = "Save"
+    let action: () -> Void
+
+    var body: some View {
         Group {
-            if viewModel.isSaving {
+            if didSave {
+                Label("Saved", systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(.green)
+                    .transition(.scale.combined(with: .opacity))
+                    .accessibilityLabel("Saved")
+            } else if isSaving {
                 ProgressView()
             } else {
-                Button("Save") {
-                    Task {
-                        let success = await viewModel.saveProfile()
-                        if success {
-                            let updated = viewModel.updatedProfileData(from: originalUser)
-                            onSave?(updated)
-                            dismiss()
-                        }
-                    }
-                }
-                .disabled(!viewModel.hasChanges)
+                Button(title, action: action)
+                    .fontWeight(.semibold)
+                    .disabled(!isEnabled)
             }
         }
     }
