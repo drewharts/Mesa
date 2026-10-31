@@ -1,3 +1,4 @@
+- Tonight picks load much faster, and reopening shows your picks instantly.
 - List photo grids now line up neatly, with every card the same size.
 - Smoother scrolling through long place lists.
 - The current-location button now sits at the bottom right of the map, just above the menu bar.

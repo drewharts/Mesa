@@ -98,7 +98,7 @@ struct FeedCardFrontView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 0) {
                         ForEach(0..<item.imageUrls.count, id: \.self) { index in
-                            CachedAsyncImage(url: URL(string: item.imageUrls[index]), targetSize: nil) {
+                            CachedAsyncImage(url: URL(string: item.imageUrls[index]), targetSize: CGSize(width: width, height: height)) {
                                 Rectangle()
                                     .fill(Color(.systemGray5))
                                     .overlay(ProgressView())
