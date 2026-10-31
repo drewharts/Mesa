@@ -133,10 +133,6 @@ enum Analytics {
         case discoverySaved = "discovery_saved"
         case discoveryPlaceOpened = "discovery_place_opened"
         case discoveryEmpty = "discovery_empty"
-        case profileSaved = "profile_saved"
-        case profileSaveFailed = "profile_save_failed"
-        case loginShown = "login_shown"
-        case signInTapped = "sign_in_tapped"
     }
 }
 
