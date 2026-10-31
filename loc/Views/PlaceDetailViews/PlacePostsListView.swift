@@ -31,6 +31,15 @@ struct PlacePostsListView: View {
                         Color.blue.opacity(0.1) : Color.white)
             .cornerRadius(10)
             .animation(.easeInOut(duration: 0.3), value: viewModel.highlightedPostId)
+            .task(id: viewModel.highlightedPostId == post.id) {
+                // Brief deep-link highlight: fade it out ~2s after the post appears.
+                guard viewModel.highlightedPostId == post.id else { return }
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled, viewModel.highlightedPostId == post.id else { return }
+                withAnimation(.easeOut(duration: 0.6)) {
+                    viewModel.clearHighlightedPost()
+                }
+            }
             .onLongPressGesture(minimumDuration: 0.5) {
                 // Only allow deletion if this is the user's own post
                 if post.userId == userSession.currentUserId {

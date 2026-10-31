@@ -27,6 +27,7 @@ struct PlacePostView: View {
 
     @State private var selectedMediaIndex: Int?
     @State private var showCommentsSheet = false
+    @State private var currentMediaPage: Int? = 0
 
     /// Converts selectedMediaIndex to an Identifiable binding for fullScreenCover.
     private var selectedMediaBinding: Binding<IdentifiableIndex?> {
@@ -36,8 +37,14 @@ struct PlacePostView: View {
         )
     }
 
+    /// Full width of the card (list rows have minimal outer padding).
     private var mediaWidth: CGFloat {
-        UIScreen.main.bounds.width - 56
+        UIScreen.main.bounds.width - 32
+    }
+
+    /// Instagram-style 4:5 portrait media.
+    private var mediaHeight: CGFloat {
+        mediaWidth * 5.0 / 4.0
     }
 
     private var postPhotos: [UIImage] {
@@ -204,20 +211,48 @@ struct PlacePostView: View {
     private var loadedMediaContent: some View {
         let photos = postPhotos
 
-        if !photos.isEmpty || !post.videoUrls.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    // Image items (backed by loaded UIImages)
-                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photo in
-                        imageMediaCell(photo: photo, index: index)
+        let totalCount = photos.count + post.videoUrls.count
+
+        if totalCount > 0 {
+            ZStack(alignment: .bottom) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 0) {
+                        // Image items (backed by loaded UIImages)
+                        ForEach(Array(photos.enumerated()), id: \.offset) { index, photo in
+                            imageMediaCell(photo: photo, index: index)
+                                .id(index)
+                        }
+                        // Video items
+                        ForEach(Array(post.videoUrls.enumerated()), id: \.element) { index, videoUrlString in
+                            let thumbnail = index < post.videoThumbnailUrls.count ? post.videoThumbnailUrls[index] : nil
+                            videoMediaCell(urlString: videoUrlString, thumbnailUrlString: thumbnail, videoIndex: index)
+                                .id(photos.count + index)
+                        }
                     }
-                    // Video items
-                    ForEach(Array(post.videoUrls.enumerated()), id: \.element) { index, videoUrlString in
-                        let thumbnail = index < post.videoThumbnailUrls.count ? post.videoThumbnailUrls[index] : nil
-                        videoMediaCell(urlString: videoUrlString, thumbnailUrlString: thumbnail, videoIndex: index)
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $currentMediaPage)
+                .frame(width: mediaWidth, height: mediaHeight)
+
+                if totalCount > 1 {
+                    HStack(spacing: 6) {
+                        ForEach(0..<totalCount, id: \.self) { i in
+                            Circle()
+                                .fill(i == (currentMediaPage ?? 0) ? Color.white : Color.white.opacity(0.5))
+                                .frame(width: 6, height: 6)
+                        }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.black.opacity(0.3)))
+                    .padding(.bottom, 10)
+                    .allowsHitTesting(false)
                 }
             }
+            .frame(width: mediaWidth, height: mediaHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -225,9 +260,9 @@ struct PlacePostView: View {
         Image(uiImage: photo)
             .resizable()
             .scaledToFill()
-            .frame(width: mediaWidth, height: mediaWidth)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .shadow(radius: 2)
+            .frame(width: mediaWidth, height: mediaHeight)
+            .clipped()
+            .contentShape(Rectangle())
             .onTapGesture {
                 selectedMediaIndex = index
             }
@@ -245,8 +280,8 @@ struct PlacePostView: View {
             InlineVideoPlayerView(url: videoURL, thumbnailURL: thumbURL) {
                 selectedMediaIndex = post.images.count + videoIndex
             }
-            .frame(width: mediaWidth, height: mediaWidth)
-            .shadow(radius: 2)
+            .frame(width: mediaWidth, height: mediaHeight)
+            .clipped()
         }
     }
 
