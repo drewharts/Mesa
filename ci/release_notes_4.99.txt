@@ -1,0 +1,3 @@
+- Fixed a crash that could happen when opening Fresh finds.
+- Fixed a crash when opening a Group Pick from a shared link.
+- Group Pick invite links now open smoothly, even if you sign up first.
