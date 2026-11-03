@@ -767,6 +767,42 @@ class SupabasePlaceService: ObservableObject {
         }
     }
 
+    /// Lightweight row for Tonight: location plus the fields the category classifier needs,
+    /// so places can be filtered by vibe before full details are fetched.
+    struct TonightLocator {
+        let id: String
+        let coordinate: CLLocationCoordinate2D?
+        let name: String
+        let categories: [String]?
+        let userCorrectedCategory: String?
+    }
+
+    func fetchTonightLocators(placeIds: [String]) async throws -> [TonightLocator] {
+        guard !placeIds.isEmpty else { return [] }
+        struct Row: Decodable {
+            let id: String
+            let name: String?
+            let categories: [String]?
+            let user_corrected_category: String?
+            let location: Point?
+            struct Point: Decodable { let coordinates: [Double] }
+        }
+        let rows: [Row] = try await supabase.client
+            .from("places")
+            .select("id, name, categories, user_corrected_category, location")
+            .in("id", values: placeIds)
+            .execute()
+            .value
+        return rows.map { row in
+            var coordinate: CLLocationCoordinate2D?
+            if let c = row.location?.coordinates, c.count >= 2 {
+                coordinate = CLLocationCoordinate2D(latitude: c[1], longitude: c[0]) // PostGIS is [lng, lat]
+            }
+            return TonightLocator(id: row.id, coordinate: coordinate, name: row.name ?? "",
+                                  categories: row.categories, userCorrectedCategory: row.user_corrected_category)
+        }
+    }
+
     // MARK: - Viewport Queries
 
     /// Fetch place annotations for map markers within a geographic viewport

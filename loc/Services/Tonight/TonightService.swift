@@ -18,7 +18,7 @@ final class TonightService {
     static let shared = TonightService()
 
     /// Max places whose full details are fetched per Tonight load.
-    static let detailFetchLimit = 150 // Supabase only (no Google); enough for Coffee to find 3
+    nonisolated static let detailFetchLimit = 150 // Supabase only (no Google); enough for Coffee to find 3
 
     private let supabase = SupabaseManager.shared
     private let placeService = SupabasePlaceService.shared
@@ -174,8 +174,11 @@ final class TonightService {
 
     // MARK: - Places
 
-    /// Picks which candidates to load details for: the nearest within range (or most-saved when
-    /// there is no origin), nearest first. Coordinate lookups run in parallel.
+    /// Picks which candidates to load details for. Without an origin: the most-saved.
+    /// With one: the nearest `detailFetchLimit` places of any kind, plus the nearest
+    /// `perVibeLimit` places that fit each vibe (checked from categories before details load).
+    /// Without the per-vibe part, dense areas filled the cap with restaurants within ~1 km and
+    /// cafes just beyond it (e.g. PARK at KIMS, 1.3 km) never reached Coffee.
     func detailIds(for candidates: [TonightCandidate], near origin: CLLocation?) async -> [String] {
         guard !candidates.isEmpty else { return [] }
         guard let origin else {
@@ -184,21 +187,47 @@ final class TonightService {
                 .prefix(Self.detailFetchLimit)
                 .map(\.placeId)
         }
-        var coordinates: [String: CLLocationCoordinate2D] = [:]
-        await withTaskGroup(of: [String: CLLocationCoordinate2D].self) { group in
+        var locators: [SupabasePlaceService.TonightLocator] = []
+        await withTaskGroup(of: [SupabasePlaceService.TonightLocator].self) { group in
             for chunk in candidates.map(\.placeId).chunked(into: 150) {
                 group.addTask { @MainActor in
-                    (try? await self.placeService.fetchPlaceCoordinates(placeIds: chunk)) ?? [:]
+                    (try? await self.placeService.fetchTonightLocators(placeIds: chunk)) ?? []
                 }
             }
-            for await batch in group { coordinates.merge(batch) { a, _ in a } }
+            for await batch in group { locators += batch }
         }
-        return coordinates
-            .map { (id: $0.key, meters: origin.distance(from: CLLocation(latitude: $0.value.latitude, longitude: $0.value.longitude))) }
-            .filter { $0.meters <= TonightRanker.maxDistanceMeters }
+        return Self.selectDetailIds(locators: locators, origin: origin)
+    }
+
+    /// Nearest places to load per vibe (in addition to the overall nearest `detailFetchLimit`).
+    nonisolated static let perVibeLimit = 40
+
+    /// Pure selection used by `detailIds` (unit tested). Nearest first, deduplicated.
+    nonisolated static func selectDetailIds(locators: [SupabasePlaceService.TonightLocator], origin: CLLocation,
+                                overallLimit: Int = detailFetchLimit, perVibe: Int = perVibeLimit) -> [String] {
+        let nearby: [(loc: SupabasePlaceService.TonightLocator, meters: Double)] = locators
+            .compactMap { loc in
+                guard let c = loc.coordinate else { return nil }
+                let m = origin.distance(from: CLLocation(latitude: c.latitude, longitude: c.longitude))
+                return m <= TonightRanker.maxDistanceMeters ? (loc, m) : nil
+            }
             .sorted { $0.meters < $1.meters }
-            .prefix(Self.detailFetchLimit)
-            .map { $0.id }
+        var chosen = Set<String>()
+        var out: [(String, Double)] = []
+        func take(_ item: (loc: SupabasePlaceService.TonightLocator, meters: Double)) {
+            if chosen.insert(item.loc.id.lowercased()).inserted { out.append((item.loc.id, item.meters)) }
+        }
+        nearby.prefix(overallLimit).forEach(take)
+        for vibe in TonightVibe.allCases {
+            var count = 0
+            for item in nearby where count < perVibe {
+                var probe = DetailPlace(id: UUID(), name: item.loc.name, address: nil, city: nil)
+                probe.categories = item.loc.categories
+                probe.userCorrectedCategory = item.loc.userCorrectedCategory
+                if TonightCategoryClassifier.fit(probe, vibe: vibe) > 0 { take(item); count += 1 }
+            }
+        }
+        return out.sorted { $0.1 < $1.1 }.map(\.0)
     }
 
     /// Fetches details for the given ids in parallel chunks of 30, keyed by lowercased place id.
