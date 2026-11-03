@@ -196,7 +196,8 @@ final class TonightViewModel: ObservableObject {
         let picks = ranker.rank(candidates: candidates, places: details)
         // Default stays the top 3; extra pages come from a wider ranking, minus what's already shown.
         let shown = Set(picks.map(\.placeId))
-        let extras = ranker.rank(candidates: candidates, places: details, limit: 12).filter { !shown.contains($0.placeId) }
+        // No cap: "More options" pages through every eligible place, best first.
+        let extras = ranker.rank(candidates: candidates, places: details, limit: .max).filter { !shown.contains($0.placeId) }
         pages = picks.isEmpty ? [] : [picks] + extras.chunked(into: 3)
         pageIndex = 0
         canShowMore = pages.count > 1

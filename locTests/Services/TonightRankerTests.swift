@@ -223,4 +223,33 @@ final class TonightRankerTests: XCTestCase {
         XCTAssertEqual(pick.myVote(for: "p1"), true)
         XCTAssertEqual(pick.tally(for: "p2").yes, 0)
     }
+
+    // MARK: - Detail selection (regression: PARK at KIMS / La Cabra missing from Coffee)
+
+    private func locator(_ name: String, _ categories: [String], meters: Double) -> SupabasePlaceService.TonightLocator {
+        // ~111,000 m per degree of latitude.
+        SupabasePlaceService.TonightLocator(
+            id: UUID().uuidString, coordinate: CLLocationCoordinate2D(latitude: 40.7128 + meters / 111_000, longitude: -74.0060),
+            name: name, categories: categories, userCorrectedCategory: nil)
+    }
+
+    func testFarCafeLoadsWhenNearbyRestaurantsFillTheCap() {
+        let restaurants = (0..<200).map { locator("R\($0)", ["Italian restaurant"], meters: 50 + Double($0) * 4) }
+        let cafe = locator("PARK at KIMS", ["cafe", "establishment", "food", "point_of_interest", "store"], meters: 1_300)
+        let ids = TonightService.selectDetailIds(locators: restaurants + [cafe], origin: origin)
+        XCTAssertTrue(ids.contains(cafe.id), "coffee place past the overall cap was dropped")
+        XCTAssertEqual(ids.first, restaurants.first?.id, "results stay nearest-first for progressive loading")
+    }
+
+    func testMoreOptionsIsNotCappedAtTwelve() {
+        let cafes = (0..<20).map { place(name: "C\($0)", categories: ["Coffee shop"], dLat: 0.001 * Double($0 + 1)) }
+        let all = rankAll(.coffee, cafes)
+        XCTAssertEqual(all.count, 20)
+    }
+
+    private func rankAll(_ vibe: TonightVibe, _ places: [DetailPlace]) -> [TonightPick] {
+        let map = Dictionary(uniqueKeysWithValues: places.map { ($0.id.uuidString.lowercased(), $0) })
+        let candidates = places.map { TonightCandidate(placeId: $0.id.uuidString.lowercased(), saverIds: ["me"]) }
+        return ranker(vibe).rank(candidates: candidates, places: map, limit: .max)
+    }
 }
