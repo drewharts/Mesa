@@ -145,12 +145,14 @@ struct GroupPickPodiumView: View {
             if pick.isDecided, winner != nil {
                 HStack(spacing: 8) {
                     Button(action: onOpenWinner) {
-                        Text("View place")
+                        Label("View on map", systemImage: "map")
                             .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .foregroundColor(.primary)
                             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(.systemGray5)))
+                            .accessibilityLabel("View on map")
                     }
                     Button(action: onDirections) {
                         Text("Directions")

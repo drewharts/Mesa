@@ -66,6 +66,7 @@ struct ProfileFavoritesPopupView: View {
                                 .foregroundColor(.primary)
                         }
                         .frame(width: 44, height: 44)
+                        .accessibilityLabel("View on map")
 
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()
