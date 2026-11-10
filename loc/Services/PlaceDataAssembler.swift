@@ -121,9 +121,12 @@ enum PlaceDataAssembler {
         place.googlePlaceId = dto.googlePlacesId
         place.aiSuggestionReason = dto.aiSuggestionReason
 
+        var urls = dto.photoUrls ?? []
         if let thumbnailUrl = dto.thumbnailUrl, !thumbnailUrl.isEmpty {
-            place.photoUrls = [thumbnailUrl]
+            urls.insert(thumbnailUrl, at: 0)
         }
+        let ranked = ImageLoadingUtility.rankedPhotoURLs(urls)
+        place.photoUrls = ranked.isEmpty ? nil : ranked
     }
 
     /// Parses coordinate from a BackendPlaceDTO, trying coordinate then location fields.
@@ -169,6 +172,13 @@ enum PlaceDataAssembler {
 
         if merged.openHours == nil || merged.openHours?.isEmpty == true {
             merged.openHours = base.openHours
+        }
+
+        // Keep the richer photo set: a backend overlay that only has a thumbnail
+        // must not wipe stored review / place photos already on the base.
+        let rankedPhotos = ImageLoadingUtility.rankedPhotoURLs((overlay.photoUrls ?? []) + (base.photoUrls ?? []))
+        if !rankedPhotos.isEmpty {
+            merged.photoUrls = rankedPhotos
         }
 
         return merged

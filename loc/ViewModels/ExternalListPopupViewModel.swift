@@ -51,6 +51,11 @@ class ExternalListPopupViewModel: ObservableObject {
         return listPlaces[currentList.list_id] ?? []
     }
 
+    /// Place count that never reports fewer places than are already loaded.
+    var displayedPlaceCount: Int {
+        ListPlaceCount.displayed(cached: nil, metadata: currentList.place_count, loaded: currentPlaces.count)
+    }
+
     /// Returns places for a list at a specific index.
     func places(forListAt index: Int) -> [LightweightPlace] {
         guard index >= 0 && index < lists.count else { return [] }

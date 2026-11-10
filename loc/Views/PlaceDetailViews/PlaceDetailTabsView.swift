@@ -52,6 +52,7 @@ struct PlaceDetailTabsView: View {
                 
                 tabBar
                 tabContent
+                    .transaction { $0.animation = nil }
             }
             .padding(.horizontal, 24)
             .padding(.top, 24)

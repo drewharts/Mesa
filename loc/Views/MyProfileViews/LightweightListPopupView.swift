@@ -82,7 +82,9 @@ struct LightweightListPopupView: View {
 
     // Get all places for the current list (from profile state) - used for filtering logic
     var allPlaces: [LightweightPlace] {
-        return listsVM.lightweightPlaceListPlaces[currentList.list_id] ?? []
+        return listsVM.lightweightPlaceListPlaces[ListPlaceCount.normalizedId(currentList.list_id)]
+            ?? listsVM.lightweightPlaceListPlaces[currentList.list_id]
+            ?? []
     }
 
     /// Looks up a place of the current list by id (case-insensitive).
@@ -90,9 +92,9 @@ struct LightweightListPopupView: View {
         allPlaces.first { $0.place_id.caseInsensitiveCompare(placeId) == .orderedSame }
     }
 
-    /// Reactive place count that reflects optimistic cache updates, not the stale snapshot.
+    /// Reactive place count: cache/metadata, but never below the places already loaded.
     private var displayedPlaceCount: Int {
-        listsVM.lightweightPlaceListCounts[currentList.list_id] ?? currentList.place_count
+        listsVM.displayedPlaceCount(forListId: currentList.list_id, metadataCount: currentList.place_count)
     }
     
     var body: some View {
@@ -142,6 +144,7 @@ struct LightweightListPopupView: View {
             Task {
                 await listsVM.loadPlacesForListIfNeeded(listId: currentList.list_id, fallbackCount: currentList.place_count)
                 await loadFullListAndFitMap()
+                consumePendingHighlight()
             }
 
             // Initialize pagination state and load reviewed IDs via ViewModel
@@ -393,6 +396,13 @@ struct LightweightListPopupView: View {
         await paginationVM.loadAllPlaces(for: currentList.list_id, expectedCount: displayedPlaceCount)
         sheetVM.fitToPlaces(allPlaces)
         placeMeta.prefetchCities(for: allPlaces)
+    }
+
+    /// Scrolls to and highlights a place queued before this list opened (e.g. after import).
+    private func consumePendingHighlight() {
+        guard let placeId = presentationService.pendingPlaceNavigation else { return }
+        presentationService.pendingPlaceNavigation = nil
+        handleMapPinTap(placeId)
     }
 
     /// Tile tap: open the place immediately and focus/center its pin, so the map is on it when details close.

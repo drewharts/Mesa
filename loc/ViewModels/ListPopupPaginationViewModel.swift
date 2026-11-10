@@ -92,21 +92,33 @@ class ListPopupPaginationViewModel: ObservableObject {
         guard let listsVM = listsVM else { return }
         initializeStateIfNeeded(for: listId)
 
-        let loadedCount = listsVM.lightweightPlaceListPlaces[listId]?.count ?? 0
-        guard expectedCount > loadedCount, paginationStates[listId]?.isLoadingMore != true else { return }
+        let loadedCount = listsVM.lightweightPlaceListPlaces[ListPlaceCount.normalizedId(listId)]?.count
+            ?? listsVM.lightweightPlaceListPlaces[listId]?.count
+            ?? 0
+        let alreadyComplete = paginationStates[listId]?.hasMorePlaces == false && loadedCount > 0
+        guard !alreadyComplete, paginationStates[listId]?.isLoadingMore != true else { return }
 
         updateState(for: listId) { state in state.isLoadingMore = true }
-        let pageSize = min(max(expectedCount + 10, 20), Self.maxFullLoadCount)
+        // Fetch enough to outgrow a stale expectedCount (e.g. metadata said 1 but 6 places exist).
+        let pageSize = min(max(max(expectedCount, loadedCount) + 10, 20), Self.maxFullLoadCount)
 
         do {
             let fetched = try await listsVM.loadMorePlacesForList(listId: listId, page: 1, pageSize: pageSize)
-            let fetchedIds = Set(fetched.map { $0.place_id })
-            let localOnly = (listsVM.lightweightPlaceListPlaces[listId] ?? []).filter { !fetchedIds.contains($0.place_id) }
+            let fetchedIds = Set(fetched.map { $0.place_id.lowercased() })
+            let localOnly = (listsVM.lightweightPlaceListPlaces[ListPlaceCount.normalizedId(listId)]
+                ?? listsVM.lightweightPlaceListPlaces[listId]
+                ?? []).filter { !fetchedIds.contains($0.place_id.lowercased()) }
             listsVM.setPlacesForList(listId: listId, places: fetched + localOnly)
+            let knownComplete = fetched.count < pageSize
+            listsVM.dataViewModel.syncLoadedPlaceCount(
+                listId: listId,
+                loaded: fetched.count + localOnly.count,
+                knownComplete: knownComplete
+            )
 
             updateState(for: listId) { state in
                 state.currentPage = max(1, fetched.count / 6)
-                state.hasMorePlaces = fetched.count >= pageSize
+                state.hasMorePlaces = !knownComplete
                 state.isLoadingMore = false
             }
         } catch {

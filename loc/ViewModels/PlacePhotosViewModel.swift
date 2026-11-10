@@ -192,9 +192,17 @@ class PlacePhotosViewModel: ObservableObject {
         externalReviewPhotosVM.loadMoreExternalReviewPhotosIfNeeded(currentIndex: currentIndex)
     }
 
-    /// Reports a failed external image load to trigger batched refresh.
+    /// Reports a failed image load: drop the broken URL immediately, then try a backend refresh.
     func reportExternalImageLoadFailure(url: String) {
+        removeFailedGalleryPhoto(url: url)
         externalReviewPhotosVM.reportImageLoadFailure(url: url)
+    }
+
+    /// Removes a photo that failed to load so the next one can become the hero instead of a grey box.
+    private func removeFailedGalleryPhoto(url: String) {
+        guard let placeId = place?.id.uuidString else { return }
+        placePhotoItems[placeId]?.removeAll { $0.url == url }
+        priorityPhotoURLs.removeAll { $0 == url }
     }
 
     /// Deletes an external review photo (delegated to child VM).
@@ -326,7 +334,7 @@ class PlacePhotosViewModel: ObservableObject {
         // Fall back to place-level cached photos (e.g. Google Places API photos)
         // when no user post photos are available
         if uniqueURLs.isEmpty, let placePhotos = place?.photoUrls {
-            for url in placePhotos {
+            for url in ImageLoadingUtility.rankedPhotoURLs(placePhotos) {
                 guard !loadedURLs.contains(url), !seenURLs.contains(url) else { continue }
                 seenURLs.insert(url)
                 uniqueURLs.append(url)

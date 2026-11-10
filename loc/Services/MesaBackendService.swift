@@ -107,6 +107,7 @@ struct BackendPlaceDTO: Codable {
     let isCustom: Bool?
     let googlePlacesId: String?
     let thumbnailUrl: String?
+    let photoUrls: [String]?
     let coordinate: BackendCoordinateDTO?
     let location: BackendCoordinateDTO?
     let aiSuggestionReason: String?
@@ -116,7 +117,7 @@ struct BackendPlaceDTO: Codable {
         case phone, priceLevel, rating, ratingCount, reservable
         case servesBreakfast, servesLunch, servesDinner
         case instagram, twitter, menuUrl, website
-        case isCustom, googlePlacesId, thumbnailUrl
+        case isCustom, googlePlacesId, thumbnailUrl, photoUrls
         case coordinate, location, aiSuggestionReason
     }
 
@@ -152,6 +153,7 @@ struct BackendPlaceDTO: Codable {
         isCustom = try container.decodeIfPresent(Bool.self, forKey: .isCustom)
         googlePlacesId = try container.decodeIfPresent(String.self, forKey: .googlePlacesId)
         thumbnailUrl = try container.decodeIfPresent(String.self, forKey: .thumbnailUrl)
+        photoUrls = try container.decodeIfPresent([String].self, forKey: .photoUrls)
         coordinate = try container.decodeIfPresent(BackendCoordinateDTO.self, forKey: .coordinate)
         location = try container.decodeIfPresent(BackendCoordinateDTO.self, forKey: .location)
         aiSuggestionReason = try container.decodeIfPresent(String.self, forKey: .aiSuggestionReason)

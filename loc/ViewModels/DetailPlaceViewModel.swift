@@ -197,10 +197,7 @@ class DetailPlaceViewModel: ObservableObject {
 
     /// Stored (non-Google) URLs first, Google links last since they often expire. De-duplicated.
     nonisolated static func rankedPhotoURLs(_ urls: [String]) -> [String] {
-        var seen = Set<String>()
-        let clean = urls.filter { !$0.isEmpty && !$0.contains("firebasestorage.googleapis.com") && seen.insert($0).inserted }
-        let isGoogle: (String) -> Bool = { $0.contains("googleapis.com") || $0.contains("googleusercontent.com") || $0.contains("gstatic.com") }
-        return clean.filter { !isGoogle($0) } + clean.filter(isGoogle)
+        ImageLoadingUtility.rankedPhotoURLs(urls)
     }
 
     private func firstLoadableImage(_ urls: [String], limit: Int) async -> UIImage? {

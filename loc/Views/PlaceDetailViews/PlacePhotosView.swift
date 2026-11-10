@@ -16,30 +16,18 @@ struct PlacePhotosView: View {
     @State private var fullscreenVideoURL: URL?
 
     var body: some View {
-        VStack(spacing: 16) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if viewModel.place != nil {
-                        switch viewModel.photoLoadingState {
-                        case .idle, .loading:
-                            photoGalleryContent
+        VStack(alignment: .leading, spacing: 16) {
+            if viewModel.place != nil {
+                switch viewModel.photoLoadingState {
+                case .idle, .loading, .loaded:
+                    photoGalleryContent
 
-                        case .loaded:
-                            photoGalleryContent
-
-                        case .error(let error):
-                            Text("Failed to load photos: \(error.localizedDescription)")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .foregroundColor(.red)
-                        }
-                    } else {
-                        Text("No Place Selected")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                    }
+                case .error(let error):
+                    Text("Failed to load photos: \(error.localizedDescription)")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .foregroundColor(.red)
                 }
-                .padding(.bottom, 20)
             }
         }
         .onAppear {
@@ -78,8 +66,6 @@ struct PlacePhotosView: View {
             )
         } else if viewModel.isAnyPhotosLoading {
             photoShimmerPlaceholder
-        } else {
-            emptyStateView
         }
     }
 
@@ -87,20 +73,10 @@ struct PlacePhotosView: View {
 
     /// Shimmer placeholder matching the ModernPhotoGallery layout (hero + double row).
     private var photoShimmerPlaceholder: some View {
-        VStack(spacing: 8) {
-            ShimmerView()
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            HStack(spacing: 8) {
-                ShimmerView()
-                    .aspectRatio(5/4, contentMode: .fill)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                ShimmerView()
-                    .aspectRatio(5/4, contentMode: .fill)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-        }
+        ShimmerView()
+            .frame(maxWidth: .infinity)
+            .frame(height: 280)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Empty State View

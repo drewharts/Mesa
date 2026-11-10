@@ -258,32 +258,81 @@ class ListsDataViewModel: ObservableObject {
         hasMorePlaceLists = newLists.count >= pageSize
     }
 
+    /// Returns places stored for a list, matching UUID keys regardless of casing.
+    func places(forListId listId: String) -> [LightweightPlace]? {
+        let key = ListPlaceCount.normalizedId(listId)
+        return lightweightPlaceListPlaces[key] ?? lightweightPlaceListPlaces[listId]
+    }
+
+    /// Stores places for a list under a normalized key so later lookups cannot miss by UUID casing.
+    func storePlaces(_ places: [LightweightPlace], forListId listId: String) {
+        let key = ListPlaceCount.normalizedId(listId)
+        lightweightPlaceListPlaces[key] = places
+        if listId != key {
+            lightweightPlaceListPlaces.removeValue(forKey: listId)
+        }
+    }
+
+    /// Returns the cached place count for a list, matching UUID keys regardless of casing.
+    func cachedCount(forListId listId: String) -> Int? {
+        let key = ListPlaceCount.normalizedId(listId)
+        return lightweightPlaceListCounts[key] ?? lightweightPlaceListCounts[listId]
+    }
+
+    /// Stores a place count under a normalized key so later lookups cannot miss by UUID casing.
+    func storeCount(_ count: Int, forListId listId: String) {
+        let key = ListPlaceCount.normalizedId(listId)
+        lightweightPlaceListCounts[key] = count
+        if listId != key {
+            lightweightPlaceListCounts.removeValue(forKey: listId)
+        }
+    }
+
+    /// Returns the number that should be shown for a list: never below the places already loaded.
+    func displayedPlaceCount(forListId listId: String, metadataCount: Int) -> Int {
+        ListPlaceCount.displayed(
+            cached: cachedCount(forListId: listId),
+            metadata: metadataCount,
+            loaded: places(forListId: listId)?.count ?? 0
+        )
+    }
+
     /// Initializes place counts from list metadata for lists that don't already have a cached count.
     func initializePlaceCountsFromMetadata(for lists: [LightweightPlaceList]) {
         for list in lists {
-            if lightweightPlaceListCounts[list.list_id] == nil {
-                lightweightPlaceListCounts[list.list_id] = list.place_count
+            if cachedCount(forListId: list.list_id) == nil {
+                storeCount(list.place_count, forListId: list.list_id)
             }
         }
     }
 
-    /// Sets places for a list with deduplication.
+    /// Sets places for a list with deduplication and keeps the visible count at least as high as loaded places.
     func setPlacesForList(listId: String, places: [LightweightPlace]) {
         var seenIds = Set<String>()
         let uniquePlaces = places.filter { place in
-            if seenIds.contains(place.place_id) {
+            let normalizedPlaceId = place.place_id.lowercased()
+            if seenIds.contains(normalizedPlaceId) {
                 return false
             }
-            seenIds.insert(place.place_id)
+            seenIds.insert(normalizedPlaceId)
             return true
         }
 
-        lightweightPlaceListPlaces[listId] = uniquePlaces
-        // Only set count if we don't already have one from list metadata (which has the true total).
-        // The places array here is paginated (e.g. page size 6), so using its count would
-        // overwrite the correct total with a capped value.
-        if lightweightPlaceListCounts[listId] == nil {
-            lightweightPlaceListCounts[listId] = uniquePlaces.count
+        storePlaces(uniquePlaces, forListId: listId)
+        // Metadata/cache can be stale (e.g. 1 after more places were added). Raise it to
+        // match what is loaded, but never lower it — the first page is capped (page size 6)
+        // and may be smaller than the true total.
+        let existing = cachedCount(forListId: listId) ?? 0
+        storeCount(max(existing, uniquePlaces.count), forListId: listId)
+    }
+
+    /// Writes the authoritative count after a full list load finishes.
+    func syncLoadedPlaceCount(listId: String, loaded: Int, knownComplete: Bool) {
+        guard loaded >= 0 else { return }
+        if knownComplete {
+            storeCount(loaded, forListId: listId)
+        } else {
+            storeCount(max(cachedCount(forListId: listId) ?? 0, loaded), forListId: listId)
         }
     }
 
@@ -291,14 +340,15 @@ class ListsDataViewModel: ObservableObject {
     func appendPlacesForList(listId: String, newPlaces: [LightweightPlace]) {
         guard !newPlaces.isEmpty else { return }
 
-        var existingPlaces = lightweightPlaceListPlaces[listId] ?? []
-        let existingIds = Set(existingPlaces.map { $0.place_id })
+        var existingPlaces = places(forListId: listId) ?? []
+        let existingIds = Set(existingPlaces.map { $0.place_id.lowercased() })
 
-        let uniqueNewPlaces = newPlaces.filter { !existingIds.contains($0.place_id) }
+        let uniqueNewPlaces = newPlaces.filter { !existingIds.contains($0.place_id.lowercased()) }
 
         if !uniqueNewPlaces.isEmpty {
             existingPlaces.append(contentsOf: uniqueNewPlaces)
-            lightweightPlaceListPlaces[listId] = existingPlaces
+            storePlaces(existingPlaces, forListId: listId)
+            storeCount(max(cachedCount(forListId: listId) ?? 0, existingPlaces.count), forListId: listId)
         }
     }
 

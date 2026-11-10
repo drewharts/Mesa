@@ -18,6 +18,8 @@ struct AsyncPhotoItemView: View {
 
     /// Tracks whether the size-optimized Google CDN URLs failed, triggering a raw-URL fallback.
     @State private var progressiveLoadFailed = false
+    /// Forces AsyncImage to try again after a transient failure.
+    @State private var retryToken = 0
 
     private var isGoogleCDN: Bool {
         item.url.contains("lh3.googleusercontent.com")
@@ -60,7 +62,6 @@ struct AsyncPhotoItemView: View {
                 switch phase {
                 case .success(let image):
                     image.resizable().scaledToFill()
-                        .transition(.opacity.animation(.easeIn(duration: 0.3)))
                 case .failure:
                     Color.clear
                 default:
@@ -83,16 +84,21 @@ struct AsyncPhotoItemView: View {
                 image
                     .resizable()
                     .scaledToFill()
-                    .transition(.opacity.animation(.easeIn(duration: 0.2)))
 
             case .failure:
-                failedView
-                    .onAppear { onLoadFailed?(item.url) }
+                if retryToken < 1 {
+                    ShimmerView()
+                        .onAppear { retryToken += 1 }
+                } else {
+                    failedView
+                        .onAppear { onLoadFailed?(item.url) }
+                }
 
             @unknown default:
                 ShimmerView()
             }
         }
+        .id("\(item.url)-\(retryToken)")
     }
 
     // MARK: - Failed View
