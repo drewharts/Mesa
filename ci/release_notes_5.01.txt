@@ -1,0 +1,4 @@
+- Place photos now prefer saved photo URLs over a single Google thumbnail, so a broken link no longer leaves a grey placeholder.
+- Place details load more smoothly, without jumpy photo animations.
+- List headers now show at least as many places as you can already see.
+- After you import a place and add it to a list, Mesa opens that list and scrolls to the new place.
