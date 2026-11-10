@@ -364,6 +364,11 @@ class ProfileListsViewModel: ObservableObject {
         mutationsViewModel.placeCount(forListId: listId)
     }
 
+    /// Returns the number of places that should be shown for a list, never below loaded places.
+    func displayedPlaceCount(forListId listId: String, metadataCount: Int) -> Int {
+        dataViewModel.displayedPlaceCount(forListId: listId, metadataCount: metadataCount)
+    }
+
     /// Checks if a place is in a specific list.
     func isPlaceInList(listId: UUID, placeId: String) -> Bool {
         mutationsViewModel.isPlaceInList(listId: listId, placeId: placeId)

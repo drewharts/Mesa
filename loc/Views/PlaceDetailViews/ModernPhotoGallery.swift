@@ -20,7 +20,7 @@ struct ModernPhotoGallery: View {
     @State private var photoToDelete: PhotoItem?
 
     // Configuration
-    private let heroImageHeight: CGFloat = 200
+    private let heroImageHeight: CGFloat = 280
     private let gridSpacing: CGFloat = 8
     private let cornerRadius: CGFloat = 12
 
@@ -165,19 +165,14 @@ struct ModernPhotoGallery: View {
 
     private var photoGalleryView: some View {
         ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(spacing: gridSpacing) {
-                    heroImageView
+            VStack(spacing: gridSpacing) {
+                heroImageView
 
-                    ForEach(staggeredLayoutItems) { item in
-                        staggeredItemView(item)
-                    }
-
-                    loadingIndicator
-
-                    Color.clear.frame(height: 20)
+                ForEach(staggeredLayoutItems) { item in
+                    staggeredItemView(item)
                 }
-                .animation(.easeOut(duration: 0.3), value: items.count)
+
+                loadingIndicator
             }
 
             refreshIndicator
@@ -214,7 +209,6 @@ struct ModernPhotoGallery: View {
                     }
                 }
             }
-            .transition(.opacity.combined(with: .scale))
         }
     }
 
@@ -264,7 +258,6 @@ struct ModernPhotoGallery: View {
                 photosViewModel.loadMorePhotos()
             }
         }
-        .transition(.opacity.combined(with: .scale(scale: 0.9)))
     }
 
     // MARK: - Double Photo Row
@@ -297,8 +290,7 @@ struct ModernPhotoGallery: View {
                         }
                     }
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
-            }
+                    }
         }
     }
 

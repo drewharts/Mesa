@@ -300,7 +300,7 @@ struct ImportProgressView: View {
         Task { @MainActor in await vm.loadInitialLists(for: first) }
     }
 
-    /// Saves all (checked) places to the given list, then closes the sheet.
+    /// Saves all (checked) places to the given list, then opens that list and highlights the newest place.
     private func saveToList(_ list: LightweightPlaceList) {
         guard let listViewModel, !isSaving, !placesToSave.isEmpty else { return }
         let places = placesToSave
@@ -309,12 +309,13 @@ struct ImportProgressView: View {
             let result = await listViewModel.addAllAndWait(places, to: list)
             isSaving = false
             Analytics.track(.importSavedToList, ["places": places.count, "added": result.added])
-            let message = result.added == 0 && result.skipped > 0
-                ? "Already in \(list.name)"
-                : "Added \(result.added) place\(result.added == 1 ? "" : "s") to \(list.name)"
-            showAddAllConfirmation(message)
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            // Each add inserts at the front, so the last saved place is at the top of the list.
+            if let highlightId = places.last?.id.uuidString {
+                PresentationService.shared.pendingPlaceNavigation = highlightId
+            }
+            profile.selectedListIdForMap = list.list_id
             viewModel.dismiss()
+            PresentationService.shared.transition(to: .list(listId: list.list_id))
         }
     }
 

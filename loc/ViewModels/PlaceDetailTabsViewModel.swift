@@ -481,17 +481,25 @@ class PlaceDetailTabsViewModel: ObservableObject {
         }
     }
 
-    /// Hits the backend to trigger the Google Places photo fallback for places with no cached photos.
+    /// Hits the backend to fetch/store photos when the place has none, or only expiring Google links.
     private func triggerPhotoFallbackIfNeeded(_ place: DetailPlace?) {
         guard let place = place,
               let googlePlaceId = place.googlePlaceId,
               !googlePlaceId.isEmpty,
-              place.isCustom != true,
-              (place.photoUrls ?? []).isEmpty
+              place.isCustom != true
         else { return }
 
+        let urls = place.photoUrls ?? []
+        let needsFallback = urls.isEmpty || urls.allSatisfy { ImageLoadingUtility.isTransientGoogleURL($0) }
+        guard needsFallback else { return }
+
         Task {
-            _ = try? await MesaBackendService.shared.fetchPlaceDetails(placeId: googlePlaceId, source: "google")
+            guard let refreshed = try? await MesaBackendService.shared.fetchPlaceDetails(placeId: googlePlaceId, source: "google") else { return }
+            let merged = PlaceDataAssembler.merge(base: place, overlay: refreshed)
+            await MainActor.run {
+                self.refreshPlaceData(merged)
+                self.onPlaceMetadataRefreshed?(merged)
+            }
         }
     }
 

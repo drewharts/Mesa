@@ -372,8 +372,9 @@ class ExternalReviewPhotosViewModel: ObservableObject {
 
     /// Collects individual image load failures and triggers a debounced refresh.
     func reportImageLoadFailure(url: String) {
-        guard url.contains("lh3.googleusercontent.com") else { return }
         guard let placeId = place?.id.uuidString else { return }
+        externalReviewPhotoItems[placeId]?.removeAll { $0.url == url }
+        guard ImageLoadingUtility.isTransientGoogleURL(url) else { return }
         guard !perImageRefreshAttempted.contains(placeId) else { return }
         guard !(isRefreshingImagesByPlace[placeId] ?? false) else { return }
 

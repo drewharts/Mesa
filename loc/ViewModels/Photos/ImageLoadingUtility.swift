@@ -9,6 +9,18 @@ import Foundation
 import UIKit
 
 enum ImageLoadingUtility {
+    /// Stored / permanent URLs first; Google CDN and Places photo links last since they often expire.
+    static func rankedPhotoURLs(_ urls: [String]) -> [String] {
+        var seen = Set<String>()
+        let clean = urls.filter { !$0.isEmpty && !$0.contains("firebasestorage.googleapis.com") && seen.insert($0).inserted }
+        return clean.filter { !isTransientGoogleURL($0) } + clean.filter { isTransientGoogleURL($0) }
+    }
+
+    /// Returns true for Google photo links that commonly expire or require a live API key.
+    static func isTransientGoogleURL(_ url: String) -> Bool {
+        url.contains("googleapis.com") || url.contains("googleusercontent.com") || url.contains("gstatic.com")
+    }
+
     /// Transforms a Google CDN URL to request higher resolution.
     static func getHighResGoogleURL(_ imageUrl: String, maxSize: Int = 1600) -> String {
         guard imageUrl.contains("lh3.googleusercontent.com") else {

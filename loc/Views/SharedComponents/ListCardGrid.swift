@@ -35,10 +35,12 @@ struct ListCardGrid: View {
             ForEach(Array(listsVM.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
                 LightweightProfileListSection(
                     list: list,
-                    places: listsVM.lightweightPlaceListPlaces[list.list_id] ?? [],
+                    places: listsVM.lightweightPlaceListPlaces[ListPlaceCount.normalizedId(list.list_id)]
+                        ?? listsVM.lightweightPlaceListPlaces[list.list_id]
+                        ?? [],
                     allLists: listsVM.filteredPlaceLists,
                     currentIndex: index,
-                    placeCount: listsVM.lightweightPlaceListCounts[list.list_id] ?? list.place_count,
+                    placeCount: listsVM.displayedPlaceCount(forListId: list.list_id, metadataCount: list.place_count),
                     placeColors: $placeColors,
                     onTap: { onListTap(index) }
                 )

@@ -182,11 +182,10 @@ class ListsLoadingViewModel: ObservableObject {
             dataVM.placeListsCurrentPage = 1
             dataVM.hasMorePlaceLists = lists.count >= 6
 
-            var updatedCounts: [String: Int] = [:]
             for list in lists {
-                updatedCounts[list.list_id] = dataVM.lightweightPlaceListCounts[list.list_id] ?? list.place_count
+                let resolved = dataVM.displayedPlaceCount(forListId: list.list_id, metadataCount: list.place_count)
+                dataVM.storeCount(resolved, forListId: list.list_id)
             }
-            dataVM.lightweightPlaceListCounts = updatedCounts
 
             await loadPlacesForLists(lists)
         } catch {
@@ -280,7 +279,7 @@ class ListsLoadingViewModel: ObservableObject {
     /// Loads the first page of places for a list if no places are cached yet.
     func loadPlacesForListIfNeeded(listId: String, fallbackCount: Int) async {
         guard let dataVM = dataViewModel else { return }
-        if dataVM.lightweightPlaceListPlaces[listId] == nil {
+        if dataVM.places(forListId: listId) == nil {
             listsLoadingInitialPlaces.insert(listId)
             defer { listsLoadingInitialPlaces.remove(listId) }
             await loadPlacesForList(listId: listId)

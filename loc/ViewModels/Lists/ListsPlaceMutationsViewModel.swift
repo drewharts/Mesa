@@ -115,25 +115,26 @@ class ListsPlaceMutationsViewModel: ObservableObject {
 
         // Update local lightweightPlaceListPlaces
         // Insert at index 0 so new places appear first (matches DB sort_order behavior)
-        if var existingPlaces = dataVM.lightweightPlaceListPlaces[listId] {
-            if !existingPlaces.contains(where: { $0.place_id == placeId }) {
+        if var existingPlaces = dataVM.places(forListId: listId) {
+            if !existingPlaces.contains(where: { $0.place_id.caseInsensitiveCompare(placeId) == .orderedSame }) {
                 existingPlaces.insert(lightweightPlace, at: 0)
-                dataVM.lightweightPlaceListPlaces[listId] = existingPlaces
+                dataVM.storePlaces(existingPlaces, forListId: listId)
                 didInsert = true
             }
         } else {
-            dataVM.lightweightPlaceListPlaces[listId] = [lightweightPlace]
+            dataVM.storePlaces([lightweightPlace], forListId: listId)
             didInsert = true
         }
 
         if didInsert {
             if let finalCount = updatedCount {
-                dataVM.lightweightPlaceListCounts[listId] = finalCount
+                dataVM.storeCount(finalCount, forListId: listId)
             } else {
-                let startingCount = dataVM.lightweightPlaceListCounts[listId]
-                    ?? dataVM.lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
-                    ?? 0
-                dataVM.lightweightPlaceListCounts[listId] = startingCount + 1
+                let metadata = dataVM.lightweightPlaceLists.first(where: {
+                    ListPlaceCount.normalizedId($0.list_id) == ListPlaceCount.normalizedId(listId)
+                })?.place_count
+                let startingCount = dataVM.cachedCount(forListId: listId) ?? metadata ?? 0
+                dataVM.storeCount(startingCount + 1, forListId: listId)
             }
         }
 
@@ -217,23 +218,24 @@ class ListsPlaceMutationsViewModel: ObservableObject {
         var didRemove = false
 
         // Update local lightweightPlaceListPlaces
-        if var places = dataVM.lightweightPlaceListPlaces[listId] {
+        if var places = dataVM.places(forListId: listId) {
             let originalCount = places.count
-            places.removeAll { $0.place_id == placeId }
+            places.removeAll { $0.place_id.caseInsensitiveCompare(placeId) == .orderedSame }
             if places.count != originalCount {
                 didRemove = true
             }
-            dataVM.lightweightPlaceListPlaces[listId] = places
+            dataVM.storePlaces(places, forListId: listId)
         }
 
         if didRemove {
             if let finalCount = updatedCount {
-                dataVM.lightweightPlaceListCounts[listId] = finalCount
+                dataVM.storeCount(finalCount, forListId: listId)
             } else {
-                let startingCount = dataVM.lightweightPlaceListCounts[listId]
-                    ?? dataVM.lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
-                    ?? 0
-                dataVM.lightweightPlaceListCounts[listId] = max(startingCount - 1, 0)
+                let metadata = dataVM.lightweightPlaceLists.first(where: {
+                    ListPlaceCount.normalizedId($0.list_id) == ListPlaceCount.normalizedId(listId)
+                })?.place_count
+                let startingCount = dataVM.cachedCount(forListId: listId) ?? metadata ?? 0
+                dataVM.storeCount(max(startingCount - 1, 0), forListId: listId)
             }
         }
 

@@ -42,7 +42,7 @@ struct LightweightListDescription: View {
 
     // Get total place count from the list (from SQL function)
     private var displayedPlaceCount: Int {
-        return listsVM.lightweightPlaceListCounts[list.list_id] ?? list.place_count
+        return listsVM.displayedPlaceCount(forListId: list.list_id, metadataCount: list.place_count)
     }
     
     private var ownerFirstName: String? {

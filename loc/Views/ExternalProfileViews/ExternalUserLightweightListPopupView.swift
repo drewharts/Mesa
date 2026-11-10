@@ -141,7 +141,7 @@ struct ExternalUserLightweightListPopupView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
 
-                Text("\(viewModel.currentList.place_count) place\(viewModel.currentList.place_count == 1 ? "" : "s")")
+                Text("\(viewModel.displayedPlaceCount) place\(viewModel.displayedPlaceCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
