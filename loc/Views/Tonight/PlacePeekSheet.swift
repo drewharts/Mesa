@@ -55,6 +55,7 @@ private struct PlacePeekModifier: ViewModifier {
                                 } label: {
                                     Label("Map", systemImage: "map")
                                 }
+                                .accessibilityLabel("View on map")
                             }
                         }
                     }

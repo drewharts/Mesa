@@ -127,10 +127,16 @@ struct KeywordResultsView: View {
                     Spacer()
 
                     Button(action: onViewAll) {
-                        Text("View on Map")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.accentColor)
+                        HStack(spacing: 4) {
+                            Image(systemName: "map")
+                            Text("View on map")
+                                .lineLimit(1)
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.accentColor)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("View on map")
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
