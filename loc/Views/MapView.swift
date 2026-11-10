@@ -350,7 +350,7 @@ struct MapView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "map")
                                 .font(.system(size: 14, weight: .medium))
-                            Text("View on map")
+                            Text("Places here")
                                 .font(.system(size: 14, weight: .medium))
                                 .lineLimit(1)
                         }
@@ -362,7 +362,7 @@ struct MapView: View {
                         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
                         .shadow(radius: 4)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("View on map")
+                        .accessibilityLabel("Places here")
                     }
                     .padding(.leading, 20)
                     .padding(.top, 70) // Position below top safe area
