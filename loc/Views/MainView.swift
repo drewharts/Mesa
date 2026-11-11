@@ -419,7 +419,10 @@ struct MainView: View {
 
     /// External places popup sheet content.
     private var externalPlacesSheet: some View {
-        ExternalPlacesPopupView(externalContentVM: profileViewModel.externalContentViewModel)
+        ExternalPlacesPopupView(
+            externalContentVM: profileViewModel.externalContentViewModel,
+            recentlyImportedVM: profileViewModel.recentlyImportedViewModel
+        )
             .applyMapPopupEnvironment(from: self)
             .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
@@ -658,6 +661,7 @@ struct MainView: View {
         profileViewModel.selectedListIdForMap = nil
         profileViewModel.pendingMapFilter = nil
         profileViewModel.externalContentViewModel.disableNearbyFilter()
+        profileViewModel.recentlyImportedViewModel.clearMapScope()
         // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
     }
 

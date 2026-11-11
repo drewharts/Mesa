@@ -276,7 +276,7 @@ struct MapContainerView: View {
     /// Handles showing external places on map
     private func handleExternalPlacesOnMap(_ newValue: Bool) {
         if newValue {
-            mapViewModel.selectExternalPlaces()
+            mapViewModel.selectExternalPlaces(near: profileViewModel.recentlyImportedViewModel.mapNearMeLocation)
             profileViewModel.showExternalPlacesOnMap = false
             if let userId = userSession.currentUserId {
                 let currentRegion = appCoordinator.currentMapRegion

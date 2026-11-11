@@ -18,7 +18,7 @@ final class RecentlyImportedViewModel: ObservableObject {
     // MARK: - Constants
 
     /// Radius used by "Near me": 20 miles.
-    static let nearbyRadiusMeters: CLLocationDistance = 32_187
+    nonisolated static let nearbyRadiusMeters: CLLocationDistance = 32_187
 
     /// Max imports fetched for "Near me" (the profile preview shows 6; the rest is headroom).
     private static let nearbyFetchLimit = 60
@@ -51,6 +51,9 @@ final class RecentlyImportedViewModel: ObservableObject {
 
     /// The last location used for "Near me"; nil until location is authorized and a fix arrives.
     @Published private(set) var currentLocation: CLLocation?
+
+    /// Set while the map is showing this tab's "Near me" results (opened from the profile grid).
+    @Published private(set) var mapNearMeLocation: CLLocation?
 
     // MARK: - Derived State
 
@@ -112,8 +115,19 @@ final class RecentlyImportedViewModel: ObservableObject {
         }
     }
 
+    /// Records whether the map about to open should match "Near me" (only when nearby results are showing).
+    func prepareMapScope() {
+        mapNearMeLocation = isShowingNearby ? currentLocation : nil
+    }
+
+    /// Stops the map matching "Near me"; called when the map's imports sheet closes.
+    func clearMapScope() {
+        mapNearMeLocation = nil
+    }
+
     /// Clears all per-user state; called on logout.
     func resetAllData() {
+        mapNearMeLocation = nil
         nearbyRequestId += 1
         nearbyPlaces = []
         isLoadingNearby = false

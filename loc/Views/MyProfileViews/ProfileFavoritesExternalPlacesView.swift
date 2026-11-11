@@ -81,6 +81,7 @@ struct ProfileFavoritesExternalPlacesView: View {
         case .externalPlaces:
             ExternalPlacesPopupView(
                 externalContentVM: externalContentVM,
+                recentlyImportedVM: recentlyImportedVM,
                 showNearbyFilter: false,
                 onViewOnMap: { requestMapNavigation(.externalPlaces) }
             )
@@ -103,6 +104,7 @@ struct ProfileFavoritesExternalPlacesView: View {
 
     /// Handles tap on external content section - shows popup over profile.
     private func handleExternalContentTap() {
+        recentlyImportedVM.prepareMapScope()
         openOnMap(.externalPlaces)
     }
 
