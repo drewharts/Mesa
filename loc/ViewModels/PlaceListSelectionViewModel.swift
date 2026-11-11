@@ -23,6 +23,7 @@ struct ListConfirmation: Equatable {
     enum ActionType {
         case added
         case removed
+        case failed
     }
 
     let message: String
@@ -84,6 +85,9 @@ class PlaceListSelectionViewModel: ObservableObject {
     private var searchCancellable: AnyCancellable?
     private var filterCancellable: AnyCancellable?
     private var confirmationDismissTask: Task<Void, Never>?
+    /// Lists with an add still being saved. Taps on these lists are ignored until it settles so a
+    /// quick second tap can't race the in-flight insert.
+    private var pendingAddListIds: Set<String> = []
     
     // MARK: - Init
     init(profile: ProfileViewModel,
@@ -563,6 +567,7 @@ class PlaceListSelectionViewModel: ObservableObject {
         // Prefer the freshest data from our paginated lists array, but fall back to the
         // passed-in list for search results that exist beyond the loaded page.
         let currentList = lists.first(where: { $0.list_id == list.list_id }) ?? list
+        guard !pendingAddListIds.contains(currentList.list_id) else { return }
 
         let wasInList = isPlace(place, in: currentList)
         
@@ -576,11 +581,26 @@ class PlaceListSelectionViewModel: ObservableObject {
         } else {
             // Calculate new count from CURRENT state (not stale parameter)
             let newCount = currentList.place_count + 1
-            updateLocalListCount(listId: currentList.list_id, delta: +1)
-            profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
-            placeMembership[currentList.list_id] = true
-            Self.lastUsedListId = currentList.list_id
-            showConfirmation("Saved to \(currentList.name)", type: .added)
+            let listId = currentList.list_id
+            let listName = currentList.name
+            updateLocalListCount(listId: listId, delta: +1)
+            placeMembership[listId] = true
+            pendingAddListIds.insert(listId)
+            // Only confirm once the row is saved; on failure undo the optimistic state and say so.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                defer { self.pendingAddListIds.remove(listId) }
+                do {
+                    try await self.profile.listsViewModel.addPlaceToLightweightListAndWait(listId: listId, place: place, updatedCount: newCount)
+                    PlaceListSelectionViewModel.lastUsedListId = listId
+                    self.showConfirmation("Saved to \(listName)", type: .added)
+                } catch {
+                    print("❌ [PlaceListSelectionViewModel] Add to \(listId) failed: \(error)")
+                    self.updateLocalListCount(listId: listId, delta: -1)
+                    self.placeMembership[listId] = false
+                    self.showConfirmation("Couldn't save to \(listName). Try again.", type: .failed)
+                }
+            }
         }
         
         // ✅ STAFF ENGINEER: Clear recently created flag on user interaction
@@ -604,17 +624,28 @@ class PlaceListSelectionViewModel: ObservableObject {
         Self.lastUsedListId = currentList.list_id
         var added = 0
         var skipped = 0
+        var failed = 0
         for place in places {
             let exists = (try? await PlaceListService.shared.isPlaceInList(listId: currentList.list_id, placeId: place.id.uuidString)) ?? false
             if exists { skipped += 1; continue }
-            profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place)
-            added += 1
+            do {
+                try await profile.listsViewModel.addPlaceToLightweightListAndWait(listId: currentList.list_id, place: place)
+                added += 1
+            } catch {
+                print("❌ [PlaceListSelectionViewModel] Bulk add of \(place.id.uuidString) failed: \(error)")
+                failed += 1
+            }
         }
         updateLocalListCount(listId: currentList.list_id, delta: added)
-        placeMembership[currentList.list_id] = true
+        if added > 0 || skipped > 0 { placeMembership[currentList.list_id] = true }
         var message = "Added \(added) place\(added == 1 ? "" : "s") to \(currentList.name)"
         if skipped > 0 { message += " (\(skipped) already there)" }
-        showConfirmation(message, type: .added)
+        if failed > 0 {
+            message += ". \(failed) couldn't be saved, try again."
+            showConfirmation(message, type: .failed)
+        } else {
+            showConfirmation(message, type: .added)
+        }
         profile.listsViewModel.clearRecentlyCreatedList()
         return (added, skipped)
     }
@@ -631,12 +662,13 @@ class PlaceListSelectionViewModel: ObservableObject {
         isFavorited.toggle()
     }
     
-    /// Shows a confirmation toast and auto-clears it after 1.5 seconds.
+    /// Shows a confirmation toast and auto-clears it after 1.5 seconds (3 seconds for failures).
     private func showConfirmation(_ message: String, type: ListConfirmation.ActionType) {
         confirmationDismissTask?.cancel()
         confirmation = ListConfirmation(message: message, type: type)
+        let displayNanoseconds: UInt64 = type == .failed ? 3_000_000_000 : 1_500_000_000
         confirmationDismissTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            try? await Task.sleep(nanoseconds: displayNanoseconds)
             if !Task.isCancelled {
                 self?.confirmation = nil
             }

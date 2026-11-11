@@ -386,6 +386,12 @@ class ProfileListsViewModel: ObservableObject {
         mutationsViewModel.addPlaceToLightweightList(listId: listId, place: place, updatedCount: updatedCount)
     }
 
+    /// Add a place to a lightweight list and wait for the save. Throws (after rolling back the
+    /// local insert) if it fails.
+    func addPlaceToLightweightListAndWait(listId: String, place: DetailPlace, updatedCount: Int? = nil) async throws {
+        try await mutationsViewModel.addPlaceToLightweightListAndWait(listId: listId, place: place, updatedCount: updatedCount)
+    }
+
     /// Add a place to a list (old UUID-based format).
     func addPlaceToList(listId: UUID, place: DetailPlace) {
         mutationsViewModel.addPlaceToList(listId: listId, place: place)

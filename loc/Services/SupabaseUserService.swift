@@ -1191,7 +1191,12 @@ extension SupabaseUserService {
     ///   - listId: The list to add the place to
     ///   - placeId: The place to add
     ///   - addedBy: The user ID of who is adding the place (for collaborative list attribution)
-    func addPlaceToList(listId: String, placeId: String, addedBy: String) async throws {
+    ///   - googlePlaceId: The place's Google Places id, used to recover when `placeId` has no
+    ///     `places` row (stale/phantom id) but the place exists under another id.
+    /// - Returns: The place id that was actually written. Differs from `placeId` only when the
+    ///   real id was resolved by `google_places_id`.
+    @discardableResult
+    func addPlaceToList(listId: String, placeId: String, addedBy: String, googlePlaceId: String? = nil) async throws -> String {
         try PlaceIdGuard.requireReal(placeId)
         // Get the current MIN sort_order so new places go at the TOP (most recent first)
         // This ensures new places appear on page 1 immediately (query uses ORDER BY sort_order ASC)
@@ -1205,44 +1210,106 @@ extension SupabaseUserService {
 
         let minOrder = (try? JSONDecoder().decode([SortOrder].self, from: minOrderResponse.data).first?.sort_order) ?? 1
         let nextOrder = minOrder - 1  // New places get lowest sort_order (appear first)
-        
-        // Create insert struct with added_by for attribution
-        struct PlaceListItem: Encodable {
-            let list_id: String
-            let place_id: String
-            let sort_order: Int
-            let added_by: String
-        }
-        
-        let newItem = PlaceListItem(
-            list_id: listId,
-            place_id: placeId,
-            sort_order: nextOrder,
-            added_by: addedBy
-        )
-        
+
         // Insert the new item (waits briefly if the place itself is still being saved)
-        try await insertListItemWaitingForPlace(newItem)
-        
-        print("✅ [Supabase] Added place \(placeId) to list \(listId) by user \(addedBy) at position \(nextOrder)")
+        let savedPlaceId = try await insertListItemWaitingForPlace(
+            listId: listId,
+            placeId: placeId,
+            sortOrder: nextOrder,
+            addedBy: addedBy,
+            googlePlaceId: googlePlaceId
+        )
+
+        print("✅ [Supabase] Added place \(savedPlaceId) to list \(listId) by user \(addedBy) at position \(nextOrder)")
+        return savedPlaceId
     }
 
-    /// Inserts a list item, retrying briefly when the place row doesn't exist yet.
-    /// Newly searched places are saved by the backend in the background after it returns their ID,
-    /// so an immediate insert can hit the place_list_items_place_id_fkey constraint (Postgres 23503).
-    private func insertListItemWaitingForPlace<Item: Encodable>(_ item: Item) async throws {
+    private struct PlaceListItemInsert: Encodable {
+        let list_id: String
+        let place_id: String
+        let sort_order: Int
+        let added_by: String
+    }
+
+    private struct PlaceIdRow: Decodable {
+        let id: String
+    }
+
+    /// Inserts a list item, retrying briefly when the place row doesn't exist yet (Postgres 23503 on
+    /// place_list_items_place_id_fkey). Two causes:
+    /// - Older backends save newly searched places in the background after returning their id, so
+    ///   the row can lag the response by a moment. Retrying covers this.
+    /// - The id refers to a row that was never created (the backend lost the insert to
+    ///   places_google_places_id_unique). The place exists under another id; resolve it by
+    ///   `google_places_id` and insert with that.
+    /// Returns the place id that was written.
+    private func insertListItemWaitingForPlace(
+        listId: String,
+        placeId: String,
+        sortOrder: Int,
+        addedBy: String,
+        googlePlaceId: String?
+    ) async throws -> String {
+        var currentPlaceId = placeId
         let retryDelaysMs: [UInt64] = [400, 800, 1_200, 1_600]
         for delayMs in retryDelaysMs {
             do {
-                try await supabase.client.from("place_list_items").insert(item).execute()
-                return
+                try await insertListItem(listId: listId, placeId: currentPlaceId, sortOrder: sortOrder, addedBy: addedBy)
+                return currentPlaceId
             } catch let error as PostgrestError where error.code == "23503" {
+                if let resolved = await resolvedPlaceId(googlePlaceId: googlePlaceId, differentFrom: currentPlaceId) {
+                    print("⚠️ [Supabase] Place \(currentPlaceId) not found; using \(resolved) resolved by google_places_id")
+                    currentPlaceId = resolved
+                    continue
+                }
                 try await Task.sleep(nanoseconds: delayMs * 1_000_000)
             }
         }
-        try await supabase.client.from("place_list_items").insert(item).execute()
+        do {
+            try await insertListItem(listId: listId, placeId: currentPlaceId, sortOrder: sortOrder, addedBy: addedBy)
+            return currentPlaceId
+        } catch let error as PostgrestError where error.code == "23503" {
+            guard let resolved = await resolvedPlaceId(googlePlaceId: googlePlaceId, differentFrom: currentPlaceId) else {
+                throw error
+            }
+            print("⚠️ [Supabase] Place \(currentPlaceId) not found; using \(resolved) resolved by google_places_id")
+            try await insertListItem(listId: listId, placeId: resolved, sortOrder: sortOrder, addedBy: addedBy)
+            return resolved
+        }
     }
-    
+
+    /// Single insert. A primary-key conflict (23505: this place is already in this list) counts as
+    /// success so callers that add twice (e.g. sheet insert + cache update) stay idempotent.
+    private func insertListItem(listId: String, placeId: String, sortOrder: Int, addedBy: String) async throws {
+        let item = PlaceListItemInsert(list_id: listId, place_id: placeId, sort_order: sortOrder, added_by: addedBy)
+        do {
+            try await supabase.client.from("place_list_items").insert(item).execute()
+        } catch let error as PostgrestError where error.code == "23505" {
+            print("ℹ️ [Supabase] Place \(placeId) already in list \(listId)")
+        }
+    }
+
+    /// Looks up the real `places.id` for a Google Places id. Returns nil when there is no
+    /// Google id, no matching row, the lookup fails, or the match is the id we already tried.
+    private func resolvedPlaceId(googlePlaceId: String?, differentFrom placeId: String) async -> String? {
+        guard let googlePlaceId, !googlePlaceId.isEmpty else { return nil }
+        do {
+            let response = try await supabase.client
+                .from("places")
+                .select("id")
+                .eq("google_places_id", value: googlePlaceId)
+                .limit(1)
+                .execute()
+            guard let id = try JSONDecoder().decode([PlaceIdRow].self, from: response.data).first?.id,
+                  id.caseInsensitiveCompare(placeId) != .orderedSame,
+                  !PlaceIdGuard.isPlaceholder(id) else { return nil }
+            return id
+        } catch {
+            print("❌ [Supabase] Could not resolve place by google_places_id: \(error)")
+            return nil
+        }
+    }
+
     /// Remove a place from a list
     func removePlaceFromList(listId: String, placeId: String) async throws {
         try await supabase.client
