@@ -125,7 +125,6 @@ struct ProfileView: View {
             ProfileContentView(
                 socialVM: profile.socialViewModel,
                 myPlacesVM: profile.myPlacesViewModel,
-                favoritesVM: profile.favoritesViewModel,
                 externalContentVM: profile.externalContentViewModel,
                 reviewsVM: profile.reviewsViewModel,
                 listsVM: profile.listsViewModel,

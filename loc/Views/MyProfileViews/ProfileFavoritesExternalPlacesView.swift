@@ -2,7 +2,8 @@
 //  ProfileFavoritesExternalPlacesView.swift
 //  loc
 //
-//  Displays the Favorites, Videos, Reviews, and My Places sections for the current user's profile.
+//  Displays the Recently imported, Reviews, and My Places sections for the current user's profile.
+//  (Favorites was removed from the profile; its map/popup plumbing is left in place.)
 //  Tapping a section shows a popup sheet over the profile. A "View on Map" button in the popup
 //  transitions to the map-layer sheet presentation.
 //
@@ -19,7 +20,7 @@ struct ProfileFavoritesExternalPlacesView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var places: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @ObservedObject var favoritesVM: ProfileFavoritesViewModel
+    @ObservedObject var recentlyImportedVM: RecentlyImportedViewModel
     @ObservedObject var externalContentVM: ProfileExternalContentViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
     @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
@@ -33,14 +34,15 @@ struct ProfileFavoritesExternalPlacesView: View {
     /// Data source for the shared section component.
     private var sectionData: ProfileFavoritesReviewsSectionData {
         ProfileFavoritesReviewsSectionData(
-            favorites: favoritesVM.lightweightFavorites,
-            externalPlaces: externalContentVM.lightweightExternalPlaces,
+            favorites: [],
+            externalPlaces: recentlyImportedVM.displayedPlaces,
             reviewedPlaces: reviewsVM.lightweightReviewedPlaces,
             myPlaces: myPlacesVM.lightweightMyPlaces,
-            isLoadingExternalPlaces: externalContentVM.isLoadingExternalPlaces,
+            isLoadingExternalPlaces: recentlyImportedVM.isLoading,
             isLoadingReviews: reviewsVM.isLoadingReviewedPlaces,
             isLoadingMyPlaces: myPlacesVM.isMyPlacesLoading,
-            isLoadingFavorites: favoritesVM.isLoadingFavorites
+            recentlyImportedScope: recentlyImportedVM.scope,
+            isRecentlyImportedLocationUnavailable: recentlyImportedVM.isLocationUnavailable
         )
     }
 
@@ -54,7 +56,8 @@ struct ProfileFavoritesExternalPlacesView: View {
             onExternalPlacesTap: handleExternalContentTap,
             onReviewsTap: handleReviewsTap,
             onMyPlacesTap: handleMyPlacesTap,
-            onExternalPlacesHelpTap: { activePopupSheet = .help }
+            onExternalPlacesHelpTap: { activePopupSheet = .help },
+            onRecentlyImportedScopeChange: { recentlyImportedVM.selectScope($0) }
         )
         .sheet(item: $activePopupSheet, onDismiss: handlePopupDismiss) { sheet in
             popupContent(for: sheet)
@@ -73,13 +76,12 @@ struct ProfileFavoritesExternalPlacesView: View {
                 onViewOnMap: { requestMapNavigation(.myPlaces) }
             )
         case .favorites:
-            FavoritesPopupView(
-                favoritesVM: favoritesVM,
-                onViewOnMap: { requestMapNavigation(.favorites) }
-            )
+            // Favorites is no longer reachable from the profile.
+            EmptyView()
         case .externalPlaces:
             ExternalPlacesPopupView(
                 externalContentVM: externalContentVM,
+                recentlyImportedVM: recentlyImportedVM,
                 showNearbyFilter: false,
                 onViewOnMap: { requestMapNavigation(.externalPlaces) }
             )
@@ -102,6 +104,7 @@ struct ProfileFavoritesExternalPlacesView: View {
 
     /// Handles tap on external content section - shows popup over profile.
     private func handleExternalContentTap() {
+        recentlyImportedVM.prepareMapScope()
         openOnMap(.externalPlaces)
     }
 

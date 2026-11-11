@@ -192,8 +192,8 @@ class MapViewModel: ObservableObject {
     }
 
     /// Sets the map to show only external places.
-    func selectExternalPlaces() {
-        filteringViewModel.selectExternalPlaces()
+    func selectExternalPlaces(near location: CLLocation? = nil) {
+        filteringViewModel.selectExternalPlaces(near: location)
         PresentationService.shared.present(.externalVideos)
     }
 
@@ -403,6 +403,7 @@ class MapViewModel: ObservableObject {
         return MapFilterState(
             selectedListId: filteringViewModel.selectedListId,
             showingExternalPlacesOnMap: filteringViewModel.showingExternalPlacesOnMap,
+            externalPlacesNearLocation: filteringViewModel.externalPlacesNearLocation,
             showingReviewsOnMap: filteringViewModel.showingReviewsOnMap,
             showingFavoritesOnMap: filteringViewModel.showingFavoritesOnMap,
             showingMyPlacesOnMap: filteringViewModel.showingMyPlacesOnMap,

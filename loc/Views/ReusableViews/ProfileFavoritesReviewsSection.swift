@@ -2,7 +2,7 @@
 //  ProfileFavoritesReviewsSection.swift
 //  loc
 //
-//  Unified tab section for profile Favorites/Videos/Reviews.
+//  Unified tab section for profile Recently imported/Reviews/My Places (Favorites is hidden).
 //  Shared between MyProfile and ExternalProfile with configurable behavior.
 //
 //  Single Responsibility: Display tabbed content grids with proper loading and empty states.
@@ -12,12 +12,14 @@ import SwiftUI
 
 /// Configuration for the profile favorites/reviews section.
 struct ProfileFavoritesReviewsSectionConfig {
+    let showFavoritesTab: Bool     // false everywhere: favorites were removed from profiles (UI only)
     let showExternalPlacesTab: Bool       // true for MyProfile, false for External
     let showMyPlacesTab: Bool      // true for MyProfile, false for External
     let ownerName: String?         // nil for MyProfile, user's name for External
     let isMyProfile: Bool          // Affects empty state messaging
 
     static let myProfile = ProfileFavoritesReviewsSectionConfig(
+        showFavoritesTab: false,
         showExternalPlacesTab: true,
         showMyPlacesTab: true,
         ownerName: nil,
@@ -26,6 +28,7 @@ struct ProfileFavoritesReviewsSectionConfig {
 
     static func external(ownerName: String) -> ProfileFavoritesReviewsSectionConfig {
         ProfileFavoritesReviewsSectionConfig(
+            showFavoritesTab: false,
             showExternalPlacesTab: false,
             showMyPlacesTab: false,
             ownerName: ownerName,
@@ -44,13 +47,17 @@ struct ProfileFavoritesReviewsSectionData {
     let isLoadingReviews: Bool
     let isLoadingMyPlaces: Bool
     var isLoadingFavorites: Bool = false
+    /// Scope picked on the Recently imported tab; nil hides the Near me / All toggle.
+    var recentlyImportedScope: RecentlyImportedScope? = nil
+    /// True when Near me is picked but location is unavailable, so All is shown with a note.
+    var isRecentlyImportedLocationUnavailable: Bool = false
 }
 
-/// Unified tab section for Favorites, External Places, and Reviews.
+/// Unified tab section for Recently imported (external places), Reviews, and My Places.
 struct ProfileFavoritesReviewsSection: View {
     let data: ProfileFavoritesReviewsSectionData
     let config: ProfileFavoritesReviewsSectionConfig
-    var initialTabId: String = "favorites"
+    var initialTabId: String? = nil
 
     // Callbacks
     let onFavoritesTap: () -> Void
@@ -58,15 +65,20 @@ struct ProfileFavoritesReviewsSection: View {
     let onReviewsTap: () -> Void
     let onMyPlacesTap: (() -> Void)?
     let onExternalPlacesHelpTap: (() -> Void)?
+    var onRecentlyImportedScopeChange: ((RecentlyImportedScope) -> Void)? = nil
 
-    @State private var selectedTabId: String = "favorites"
+    /// Tab the user tapped; nil until they tap one, so the first tab is the default.
+    @State private var pickedTabId: String? = nil
 
     // MARK: - Computed Properties
 
     private var tabs: [ProfileTab] {
-        var result: [ProfileTab] = [.favorites]
+        var result: [ProfileTab] = []
         if config.showExternalPlacesTab {
             result.append(.externalPlaces)
+        }
+        if config.showFavoritesTab {
+            result.append(.favorites)
         }
         result.append(.reviews)
         if config.showMyPlacesTab {
@@ -75,21 +87,40 @@ struct ProfileFavoritesReviewsSection: View {
         return result
     }
 
+    /// The selected tab: the one the user tapped, else the caller's initial tab, else the first tab.
+    private var selectedTabId: String {
+        if let pickedTabId, tabs.contains(where: { $0.id == pickedTabId }) { return pickedTabId }
+        if let initialTabId, tabs.contains(where: { $0.id == initialTabId }) { return initialTabId }
+        return tabs.first?.id ?? ProfileTab.reviews.id
+    }
+
+    private var selectedTabBinding: Binding<String> {
+        Binding(get: { selectedTabId }, set: { pickedTabId = $0 })
+    }
+
     // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ProfileTabHeader(
                 tabs: tabs,
-                selectedTabId: $selectedTabId,
+                selectedTabId: selectedTabBinding,
                 onHelpTap: config.showExternalPlacesTab ? onExternalPlacesHelpTap : nil
             )
+            if selectedTabId == ProfileTab.externalPlaces.id, let scope = data.recentlyImportedScope {
+                RecentlyImportedScopeToggle(
+                    selectedScope: scope,
+                    isLocationUnavailable: data.isRecentlyImportedLocationUnavailable,
+                    onSelect: { onRecentlyImportedScopeChange?($0) }
+                )
+                .padding(.horizontal, 16)
+            }
             contentGrid
             Divider()
                 .padding(.horizontal, 20)
         }
-        .onChange(of: initialTabId) { _, newValue in
-            selectedTabId = newValue
+        .onChange(of: initialTabId) { _, _ in
+            pickedTabId = nil
         }
     }
 
@@ -98,10 +129,12 @@ struct ProfileFavoritesReviewsSection: View {
     @ViewBuilder
     private var contentGrid: some View {
         ZStack(alignment: .top) {
-            favoritesContent
-                .opacity(selectedTabId == "favorites" ? 1 : 0)
-                .allowsHitTesting(selectedTabId == "favorites")
-                .accessibilityHidden(selectedTabId != "favorites")
+            if config.showFavoritesTab {
+                favoritesContent
+                    .opacity(selectedTabId == "favorites" ? 1 : 0)
+                    .allowsHitTesting(selectedTabId == "favorites")
+                    .accessibilityHidden(selectedTabId != "favorites")
+            }
 
             if config.showExternalPlacesTab {
                 externalPlacesContent
@@ -162,8 +195,8 @@ struct ProfileFavoritesReviewsSection: View {
     @ViewBuilder
     private var externalPlacesContent: some View {
         Group {
-            if data.isLoadingExternalPlaces {
-                loadingState(text: "Loading saved videos...")
+            if data.isLoadingExternalPlaces && data.externalPlaces.isEmpty {
+                loadingState(text: "Loading recent imports...")
             } else if data.externalPlaces.isEmpty {
                 emptyExternalPlacesState
             } else {
@@ -177,12 +210,19 @@ struct ProfileFavoritesReviewsSection: View {
     }
 
     private var emptyExternalPlacesState: some View {
-        ProfileEmptyState(
+        if data.recentlyImportedScope == .nearMe && !data.isRecentlyImportedLocationUnavailable {
+            return ProfileEmptyState(
+                icon: "location",
+                title: "Nothing imported nearby",
+                message: "Places you import within 20 miles show up here"
+            )
+        }
+        return ProfileEmptyState(
             icon: "video",
-            title: "No saved videos yet",
+            title: "Nothing imported yet",
             message: config.isMyProfile
                 ? "Add places from videos to see them here"
-                : "This user hasn't added any video places yet"
+                : "This user hasn't imported any places yet"
         )
     }
 

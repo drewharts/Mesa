@@ -13,23 +13,35 @@ struct ExternalPlacesPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var appCoordinator: AppCoordinator
     @ObservedObject var externalContentVM: ProfileExternalContentViewModel
+    /// Supplies the profile's "Near me" results when the map was opened from the grid with Near me on.
+    @ObservedObject var recentlyImportedVM: RecentlyImportedViewModel
     var showNearbyFilter: Bool = true
     var onViewOnMap: (() -> Void)? = nil
 
+    /// Whether this sheet mirrors the profile's "Near me" toggle instead of the full import list.
+    private var isNearMe: Bool { recentlyImportedVM.mapNearMeLocation != nil }
+
     var body: some View {
         PlaceListPopupView(
-            title: "Saved Videos",
-            count: externalContentVM.totalExternalPlacesCount,
-            isLoading: externalContentVM.isLoadingExternalPlaces,
-            isLoadingMore: externalContentVM.isLoadingMoreExternalPlaces,
-            places: externalContentVM.lightweightExternalPlaces,
-            hasMore: externalContentVM.hasMoreExternalPlaces,
+            title: isNearMe ? "Imported near me" : "Saved Videos",
+            count: isNearMe ? recentlyImportedVM.nearbyPlaces.count : externalContentVM.totalExternalPlacesCount,
+            isLoading: isNearMe
+                ? recentlyImportedVM.isLoadingNearby && recentlyImportedVM.nearbyPlaces.isEmpty
+                : externalContentVM.isLoadingExternalPlaces,
+            isLoadingMore: isNearMe ? false : externalContentVM.isLoadingMoreExternalPlaces,
+            places: isNearMe ? recentlyImportedVM.nearbyPlaces : externalContentVM.lightweightExternalPlaces,
+            hasMore: isNearMe ? false : externalContentVM.hasMoreExternalPlaces,
             emptyIcon: "video",
-            emptyTitle: externalContentVM.isNearbyFilterEnabled ? "No Nearby Videos" : "No Videos Yet",
-            emptyMessage: externalContentVM.isNearbyFilterEnabled
-                ? "No video places found in the current map area"
-                : "Places you add from shared videos will appear here",
-            loadMore: { await externalContentVM.loadMoreExternalPlaces() },
+            emptyTitle: isNearMe ? "Nothing imported nearby"
+                : (externalContentVM.isNearbyFilterEnabled ? "No Nearby Videos" : "No Videos Yet"),
+            emptyMessage: isNearMe ? "Places you import within 20 miles show up here"
+                : (externalContentVM.isNearbyFilterEnabled
+                    ? "No video places found in the current map area"
+                    : "Places you add from shared videos will appear here"),
+            loadMore: {
+                guard !isNearMe else { return }
+                await externalContentVM.loadMoreExternalPlaces()
+            },
             onViewOnMap: onViewOnMap,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
@@ -46,18 +58,18 @@ struct ExternalPlacesPopupView: View {
                 }
             },
             headerAccessory: {
-                if showNearbyFilter {
+                if showNearbyFilter && !isNearMe {
                     nearbyFilterToggle
                 }
             },
             onRemove: { place in
                 profile.externalContentViewModel.deleteExternalPlace(place)
             },
-            fitsMapToPlaces: !externalContentVM.isNearbyFilterEnabled
+            fitsMapToPlaces: isNearMe || !externalContentVM.isNearbyFilterEnabled
         )
         .onAppear {
             externalContentVM.currentMapRegion = appCoordinator.currentMapRegion
-            if externalContentVM.lightweightExternalPlaces.isEmpty {
+            if !isNearMe && externalContentVM.lightweightExternalPlaces.isEmpty {
                 profile.externalContentViewModel.refreshExternalPlacesAfterImport()
             }
         }
