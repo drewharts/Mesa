@@ -510,7 +510,13 @@ struct ListSelectionSheet: View {
     @ViewBuilder
     private var confirmationToast: some View {
         if let confirmation = viewModel.confirmation {
-            let icon = confirmation.type == .removed ? "minus.circle.fill" : "checkmark.circle.fill"
+            let icon: String = {
+                switch confirmation.type {
+                case .removed: return "minus.circle.fill"
+                case .failed: return "exclamationmark.circle.fill"
+                case .added: return "checkmark.circle.fill"
+                }
+            }()
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
