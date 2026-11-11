@@ -106,7 +106,7 @@ struct ExternalUserProfileContentView: View {
                         ExternalProfileLoadingSkeleton()
                             .padding(.top, 16)
                     } else {
-                        // Favorites & Reviews (hidden for curated/brand profiles)
+                        // Reviews (hidden for curated/brand profiles)
                         if !viewModel.isCuratedProfile {
                             ExternalUserProfileFavoritesReviewsView(viewModel: viewModel)
                                 .padding(.top, 16)
@@ -206,7 +206,7 @@ struct ExternalProfileEmptyStateCard: View {
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
                 Text(isFollowing
-                     ? "You'll see their favorite spots and lists here as soon as they save some."
+                     ? "You'll see their spots and lists here as soon as they save some."
                      : "No saved places yet. Follow \(firstName.isEmpty ? "them" : firstName) to see their spots and lists as soon as they add them.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -215,7 +215,6 @@ struct ExternalProfileEmptyStateCard: View {
             }
 
             HStack(spacing: 10) {
-                emptyHint(icon: "heart", text: "Favorites")
                 emptyHint(icon: "list.bullet", text: "Lists")
                 emptyHint(icon: "star", text: "Reviews")
             }

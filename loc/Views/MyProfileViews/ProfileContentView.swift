@@ -12,7 +12,6 @@ struct ProfileContentView: View {
     @EnvironmentObject var userSession: UserSession
     @ObservedObject var socialVM: ProfileSocialViewModel
     @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
-    @ObservedObject var favoritesVM: ProfileFavoritesViewModel
     @ObservedObject var externalContentVM: ProfileExternalContentViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
     @ObservedObject var listsVM: ProfileListsViewModel
@@ -91,7 +90,7 @@ struct ProfileContentView: View {
                             }
                         }
 
-                    // Favorites/Videos (tabbed) & Lists — hidden for curated profiles
+                    // Recently imported/Reviews/My Places (tabbed) & Lists — hidden for curated profiles
                     if listsVM.isLoadingInitialLists && listsVM.filteredPlaceLists.isEmpty
                         && myPlacesVM.isMyPlacesLoading && myPlacesVM.myPlaces.isEmpty {
                         // Same placeholder as other people's profiles while first load is in flight.
@@ -101,7 +100,7 @@ struct ProfileContentView: View {
                     } else {
                     if !profile.isCuratedProfile {
                         ProfileFavoritesExternalPlacesView(
-                            favoritesVM: favoritesVM,
+                            recentlyImportedVM: profile.recentlyImportedViewModel,
                             externalContentVM: externalContentVM,
                             reviewsVM: reviewsVM,
                             myPlacesVM: myPlacesVM

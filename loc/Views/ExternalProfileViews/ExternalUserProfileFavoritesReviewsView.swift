@@ -2,7 +2,7 @@
 //  ExternalUserProfileFavoritesReviewsView.swift
 //  loc
 //
-//  Favorites and Reviews tabs for external user profiles.
+//  Reviews tab for external user profiles (Favorites was removed from profiles; UI only).
 //  Uses shared ProfileFavoritesReviewsSection component for consistent UI.
 //
 
@@ -24,10 +24,7 @@ struct ExternalUserProfileFavoritesReviewsView: View {
     @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @EnvironmentObject var userSession: UserSession
 
-    @State private var showFavoritesPopup = false
     @State private var showReviewsPopup = false
-    @State private var hasSetInitialTab: Bool = false
-    @State private var computedInitialTab: String = "favorites"
 
     // MARK: - Computed Properties
 
@@ -56,23 +53,12 @@ struct ExternalUserProfileFavoritesReviewsView: View {
         ProfileFavoritesReviewsSection(
             data: sectionData,
             config: sectionConfig,
-            initialTabId: computedInitialTab,
-            onFavoritesTap: { showFavoritesPopup = true },
+            onFavoritesTap: {},  // Favorites tab is hidden on profiles
             onExternalPlacesTap: nil,  // No external places tab for external profiles
             onReviewsTap: { showReviewsPopup = true },
             onMyPlacesTap: nil,  // No My Places tab for external profiles
             onExternalPlacesHelpTap: nil
         )
-        .sheet(isPresented: $showFavoritesPopup) {
-            ProfileFavoritesPopupView(viewModel: viewModel)
-                .environmentObject(selectedPlaceVM)
-                .environmentObject(profileVM)
-                .environmentObject(locationManager)
-                .environmentObject(userProfileNavigationVM)
-                .environmentObject(mapDisplayCoordinatorVM)
-                .environmentObject(userSession)
-                .environmentObject(detailPlaceViewModel)
-        }
         .sheet(isPresented: $showReviewsPopup) {
             ProfileReviewsPopupView(viewModel: viewModel)
                 .environmentObject(selectedPlaceVM)
@@ -86,12 +72,6 @@ struct ExternalUserProfileFavoritesReviewsView: View {
         .onAppear {
             loadDataIfNeeded()
         }
-        .onChange(of: viewModel.isLoadingFavorites) { _, _ in
-            updateInitialTabIfReady()
-        }
-        .onChange(of: viewModel.isLoadingReviewedPlaces) { _, _ in
-            updateInitialTabIfReady()
-        }
     }
 
     // MARK: - Data Loading
@@ -102,18 +82,6 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             Task {
                 await viewModel.loadUserReviewedPlacesWithPagination()
             }
-        }
-    }
-
-    /// Selects the reviews tab when favorites are empty but reviews have content.
-    private func updateInitialTabIfReady() {
-        guard !hasSetInitialTab,
-              !viewModel.isLoadingFavorites,
-              !viewModel.isLoadingReviewedPlaces else { return }
-
-        hasSetInitialTab = true
-        if viewModel.userFavorites.isEmpty && !viewModel.lightweightReviewedPlaces.isEmpty {
-            computedInitialTab = "reviews"
         }
     }
 }
