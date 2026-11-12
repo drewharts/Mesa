@@ -43,11 +43,17 @@ struct PlaceDetailTabsView: View {
     @State private var showingNoteSheet = false
     @State private var showPlacePhotoSelector = false
     @State private var travelSelectorState: TravelTimeSelectorState?
+    /// PROTOTYPE (auto_sort_saved): "New York City · Restaurants" after a one-tap save; nil hides the banner.
+    @State private var quickSaveBanner: String?
+    @State private var quickSaveBannerTask: Task<Void, Never>?
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
                 headerRow
+                if let placement = quickSaveBanner {
+                    quickSaveBannerView(placement)
+                }
                 infoRow
                 
                 tabBar
@@ -172,7 +178,7 @@ struct PlaceDetailTabsView: View {
                         .cornerRadius(20)
                 }
             } else {
-                Button(action: onAddToList) {
+                Button(action: handleBookmarkTap) {
                     Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
                         .font(.title3)
                         .foregroundColor(.gray)
@@ -185,6 +191,65 @@ struct PlaceDetailTabsView: View {
         .padding(.bottom, 3)
     }
     
+    // MARK: - One-tap save (PROTOTYPE, auto_sort_saved)
+
+    /// With auto-sort on, the bookmark saves an unsaved place in one tap (it sorts itself into Saved);
+    /// otherwise, or when already saved, it opens the usual list picker.
+    private func handleBookmarkTap() {
+        let autoSort = SavedLibraryGate.isEnabled(userId: userSession.currentUserId)
+        switch SavedQuickSave.action(isSaved: viewModel.isPlaceInList, autoSortEnabled: autoSort, isDroppedPin: viewModel.isDroppedPin) {
+        case .openListPicker:
+            onAddToList()
+        case .saveNow:
+            guard let place = viewModel.currentPlace else { onAddToList(); return }
+            // Same write the picker's Saved row does (favorites table): no new tables, no migration.
+            profile.favoritesViewModel.addFavoritePlace(place: place)
+            viewModel.isPlaceInList = true
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            let placement = SavedQuickSave.placementLabel(
+                name: place.name, storedCity: place.city, address: place.address,
+                categories: place.categories ?? [], corrected: place.userCorrectedCategory
+            )
+            withAnimation(.easeOut(duration: 0.2)) { quickSaveBanner = placement }
+            quickSaveBannerTask?.cancel()
+            quickSaveBannerTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.2)) { quickSaveBanner = nil }
+            }
+        }
+    }
+
+    private func dismissQuickSaveBanner() {
+        quickSaveBannerTask?.cancel()
+        withAnimation(.easeOut(duration: 0.2)) { quickSaveBanner = nil }
+    }
+
+    /// Low-key confirmation under the title with the one secondary action: add it to a list too.
+    private func quickSaveBannerView(_ placement: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.mesaAccent)
+            Text("Saved to \(placement)")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Button("Add to list") {
+                dismissQuickSaveBanner()
+                onAddToList()
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundColor(.mesaAccent)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.mesaAccent.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.bottom, 6)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+        .onChange(of: viewModel.currentPlace?.id) { _, _ in dismissQuickSaveBanner() }
+    }
+
     // MARK: - Share Button (Conditional: Menu for custom places, simple button otherwise)
 
     @ViewBuilder

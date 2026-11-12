@@ -283,13 +283,18 @@ class MapViewportViewModel: ObservableObject {
                 listId: listId
             )
         } else if filterState.showingExternalPlacesOnMap {
-            return try await placeService.fetchExternalAnnotationsInViewport(
+            let annotations = try await placeService.fetchExternalAnnotationsInViewport(
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
                 westLng: bounds.westLng,
                 userId: userId
             )
+            guard let center = filterState.externalPlacesNearLocation else { return annotations }
+            return annotations.filter {
+                let location = CLLocation(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
+                return center.distance(from: location) <= RecentlyImportedViewModel.nearbyRadiusMeters
+            }
         } else if filterState.showingReviewsOnMap {
             return try await placeService.fetchReviewAnnotationsInViewport(
                 northLat: bounds.northLat,
@@ -433,6 +438,8 @@ extension ViewportBounds {
 struct MapFilterState {
     let selectedListId: String?
     let showingExternalPlacesOnMap: Bool
+    /// When set, external-place pins are limited to the "Near me" radius around this location.
+    let externalPlacesNearLocation: CLLocation?
     let showingReviewsOnMap: Bool
     let showingFavoritesOnMap: Bool
     let showingMyPlacesOnMap: Bool

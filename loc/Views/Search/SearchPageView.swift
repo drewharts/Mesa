@@ -38,6 +38,8 @@ struct SearchPageView: View {
                 SearchHeaderView(
                     searchText: searchTextBinding,
                     isFocused: $isSearchFocused,
+                    mode: viewModel.searchViewModel.mode,
+                    onModeChange: { viewModel.searchViewModel.selectMode($0) },
                     onCancel: {
                         isSearchFocused = false
                         viewModel.dismiss()
@@ -68,6 +70,7 @@ struct SearchPageView: View {
         }
         .onAppear {
             viewModel.searchViewModel.setupIfNeeded()
+            viewModel.searchViewModel.resetModeToPlaces()
             viewModel.searchViewModel.searchText = ""
             isSearchFocused = true
         }

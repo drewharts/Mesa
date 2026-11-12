@@ -12,7 +12,6 @@ struct ProfileContentView: View {
     @EnvironmentObject var userSession: UserSession
     @ObservedObject var socialVM: ProfileSocialViewModel
     @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
-    @ObservedObject var favoritesVM: ProfileFavoritesViewModel
     @ObservedObject var externalContentVM: ProfileExternalContentViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
     @ObservedObject var listsVM: ProfileListsViewModel
@@ -21,6 +20,8 @@ struct ProfileContentView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var showEditProfileForSocials = false
     @State private var showImportTooltip = !UserDefaults.standard.bool(forKey: "hasSeenPhotoImportTooltip")
+    /// PROTOTYPE (auto_sort_saved): shows the "Saved (beta)" row; stays false for everyone but the admin on TestFlight.
+    @State private var showSavedBeta = false
     var body: some View {
         ZStack {
             ScrollView {
@@ -91,7 +92,16 @@ struct ProfileContentView: View {
                             }
                         }
 
-                    // Favorites/Videos (tabbed) & Lists — hidden for curated profiles
+                    if showSavedBeta {
+                        Button {
+                            navigationPath.append(ProfileView.SavedLibraryDestination.library)
+                        } label: {
+                            SavedLibraryEntryRow()
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Recently imported/Reviews/My Places (tabbed) & Lists — hidden for curated profiles
                     if listsVM.isLoadingInitialLists && listsVM.filteredPlaceLists.isEmpty
                         && myPlacesVM.isMyPlacesLoading && myPlacesVM.myPlaces.isEmpty {
                         // Same placeholder as other people's profiles while first load is in flight.
@@ -101,7 +111,7 @@ struct ProfileContentView: View {
                     } else {
                     if !profile.isCuratedProfile {
                         ProfileFavoritesExternalPlacesView(
-                            favoritesVM: favoritesVM,
+                            recentlyImportedVM: profile.recentlyImportedViewModel,
                             externalContentVM: externalContentVM,
                             reviewsVM: reviewsVM,
                             myPlacesVM: myPlacesVM
@@ -120,6 +130,10 @@ struct ProfileContentView: View {
             .refreshable {
                 await profile.refreshProfile()
             }
+        }
+        .task(id: userSession.currentUserId) {
+            showSavedBeta = SavedLibraryGate.isEnabled(userId: userSession.currentUserId)
+            showSavedBeta = await SavedLibraryGate.resolve(userId: userSession.currentUserId)
         }
         .sheet(isPresented: $showEditProfileForSocials) {
             if let user = profile.user {

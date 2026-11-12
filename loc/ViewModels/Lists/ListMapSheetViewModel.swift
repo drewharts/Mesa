@@ -170,6 +170,24 @@ final class ListMapSheetViewModel: ObservableObject {
 
     /// Fits the map to all of the list's pins. Runs once per session and never overrides
     /// a place the user has already focused.
+    /// Frames a precomputed region (e.g. from ImportsMapFraming), offset so it sits above the half-height sheet.
+    func fitToRegion(_ region: MKCoordinateRegion) {
+        guard focusedPlaceId == nil else { return }
+        hasFitMap = true
+        let latSpan = region.span.latitudeDelta
+        let sheetFraction = Double(ListSheetDetent.default.screenFraction)
+        let totalLatSpan = min(latSpan / max(1 - sheetFraction, 0.3), 170)
+        let centerLat = region.center.latitude - (totalLatSpan - latSpan) / 2
+        let adjusted = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: min(max(centerLat, -85), 85),
+                longitude: min(max(region.center.longitude, -179.9), 179.9)
+            ),
+            span: MKCoordinateSpan(latitudeDelta: totalLatSpan, longitudeDelta: min(region.span.longitudeDelta, 350))
+        )
+        cameraRequest = CameraRequest(target: .region(adjusted))
+    }
+
     func fitToPlaces(_ places: [LightweightPlace]) {
         guard !hasFitMap, focusedPlaceId == nil else { return }
         let coordinates = places.compactMap { place -> CLLocationCoordinate2D? in

@@ -58,6 +58,9 @@ class ProfileViewModel: ObservableObject {
     /// Child ViewModel for external content places
     let externalContentViewModel: ProfileExternalContentViewModel
 
+    /// Child ViewModel for the "Recently imported" tab's Near me / All scope
+    let recentlyImportedViewModel: RecentlyImportedViewModel
+
     /// Child ViewModel for place lists management
     let listsViewModel: ProfileListsViewModel
 
@@ -96,7 +99,15 @@ class ProfileViewModel: ObservableObject {
 
         self.myPlacesViewModel = ProfileMyPlacesViewModel(userService: userService, userSession: userSession, placeService: placeService)
         self.reviewsViewModel = ProfileReviewsViewModel(userService: userService, userSession: userSession, placeService: placeService, postService: postService)
-        self.externalContentViewModel = ProfileExternalContentViewModel(userService: userService, userSession: userSession)
+        let externalContentViewModel = ProfileExternalContentViewModel(userService: userService, userSession: userSession)
+        self.externalContentViewModel = externalContentViewModel
+        self.recentlyImportedViewModel = RecentlyImportedViewModel(
+            userService: userService,
+            userSession: userSession,
+            allPlacesPublisher: externalContentViewModel.$lightweightExternalPlaces.eraseToAnyPublisher(),
+            isLoadingAllPublisher: externalContentViewModel.$isLoadingExternalPlaces.eraseToAnyPublisher(),
+            locationPublisher: locationManager.$currentLocation.eraseToAnyPublisher()
+        )
         self.listsViewModel = ProfileListsViewModel(userService: userService, placeService: placeService, userSession: userSession, locationManager: locationManager)
         self.notesViewModel = ProfileNotesViewModel(userService: userService, userSession: userSession)
 
@@ -635,6 +646,7 @@ class ProfileViewModel: ObservableObject {
         
         // Clear external places data (delegated to child ViewModel)
         externalContentViewModel.resetAllData()
+        recentlyImportedViewModel.resetAllData()
 
         // Clear reviewed places (delegated to child ViewModel)
         reviewsViewModel.resetAllData()
