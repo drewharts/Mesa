@@ -15,7 +15,8 @@ import Foundation
 
 /// One place the user has, flattened from DetailPlace / imports. Foundation-only so it is easy to test.
 struct SavedPlaceInput: Equatable {
-    enum Source: String, Hashable { case list, imported, myPlace }
+    /// list = list item / my place (via get_all_user_places), imported = external_places, saved = one-tap save (favorites row).
+    enum Source: String, Hashable { case list, imported, myPlace, saved }
 
     var id: String
     var name: String
@@ -559,3 +560,25 @@ enum SavedLibraryBuilder {
         return 2 * r * atan2(sqrt(a), sqrt(1 - a))
     }
 }
+
+// MARK: - One-tap save (prototype)
+
+/// What the bookmark on a place page does. With auto-sort on, an unsaved place is saved in one tap
+/// (it lands in the auto-sorted Saved library); a place that is already saved opens the list picker,
+/// where it can be added to a user-made list, a new list, or unsaved. With auto-sort off: always the picker.
+enum SavedQuickSave {
+    enum Action: Equatable { case saveNow, openListPicker }
+
+    static func action(isSaved: Bool, autoSortEnabled: Bool, isDroppedPin: Bool = false) -> Action {
+        guard autoSortEnabled, !isDroppedPin, !isSaved else { return .openListPicker }
+        return .saveNow
+    }
+
+    /// Where a just-saved place will show up, e.g. "New York City · Restaurants". Nil city -> type only.
+    static func placementLabel(name: String, storedCity: String?, address: String?, categories: [String], corrected: String?) -> String {
+        let type = SavedLibraryBuilder.classify(categories: categories, corrected: corrected, name: name)
+        guard let city = SavedLibraryBuilder.city(storedCity: storedCity, address: address)?.city else { return type.title }
+        return "\(city) · \(type.title)"
+    }
+}
+
