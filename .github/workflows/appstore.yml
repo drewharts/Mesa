@@ -9,6 +9,14 @@ on:
         description: "Submit for App Store review after upload"
         type: boolean
         default: false
+      replace_in_review:
+        description: "Cancel another version's pending review and replace it with this one"
+        type: boolean
+        default: false
+      auto_release:
+        description: "Release automatically after approval"
+        type: boolean
+        default: false
 
 concurrency:
   group: appstore
@@ -117,7 +125,7 @@ jobs:
         run: |
           VERSION=$(xcodebuild -showBuildSettings -project "$PROJECT" -scheme "$SCHEME" -configuration Release 2>/dev/null | awk '/ MARKETING_VERSION =/{print $3; exit}')
           echo "version $VERSION build $BUILD_NUMBER"
-          cd ci && python3 asc_submit.py "$VERSION" "$BUILD_NUMBER" "release_notes_$VERSION.txt" ${{ inputs.submit && '--submit' || '' }}
+          cd ci && python3 asc_submit.py "$VERSION" "$BUILD_NUMBER" "release_notes_$VERSION.txt" ${{ inputs.submit && '--submit' || '' }} ${{ inputs.replace_in_review && '--replace-in-review' || '' }} ${{ inputs.auto_release && '--release-type=AFTER_APPROVAL' || '' }}
 
       - name: Clean up secrets
         if: always()

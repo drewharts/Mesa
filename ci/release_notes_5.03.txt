@@ -1,0 +1,2 @@
+- Security and stability improvements.
+- Adds an update prompt for required updates.
