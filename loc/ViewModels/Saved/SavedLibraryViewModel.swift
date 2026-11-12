@@ -131,25 +131,23 @@ final class SavedLibraryViewModel: ObservableObject {
 
     // MARK: - Data (read-only)
 
-    private struct ImportRow: Decodable {
-        let place_id: String?
-        let added_at: String?
-    }
-
-    /// Reads list / favorite / my-place places plus imports and returns one input per row (dupes are merged later).
+    /// Reads list / favorite / my-place places, imports, and one-tap saves (favorites rows, which carry
+    /// a timestamp) and returns one input per row (dupes are merged later).
     private static func fetchInputs(userId: String) async throws -> [SavedPlaceInput] {
         async let saved = PlaceService.shared.fetchAllUserPlaces(userId: userId)
-        async let imports = fetchImportRows(userId: userId)
+        async let imports = fetchRows(table: "external_places", timeColumn: "added_at", userId: userId)
+        async let quickSaves = fetchRows(table: "favorites", timeColumn: "timestamp", userId: userId)
         let savedPlaces = try await saved
         let importRows = (try? await imports) ?? []
+        let quickSaveRows = (try? await quickSaves) ?? []
 
         var inputs = savedPlaces.map { input(from: $0, source: .list, addedAt: nil) }
 
-        // Imports: reuse loaded places when we have them, batch-fetch the rest.
+        // Reuse loaded places when we have them, batch-fetch the rest.
         var known: [String: DetailPlace] = [:]
         for p in savedPlaces { known[p.id.uuidString.lowercased()] = p }
-        let importIds = importRows.compactMap { $0.place_id?.lowercased() }
-        let missing = Array(Set(importIds.filter { known[$0] == nil }))
+        let rowIds = (importRows + quickSaveRows).map(\.placeId)
+        let missing = Array(Set(rowIds.filter { known[$0] == nil }))
         for chunk in stride(from: 0, to: missing.count, by: 50).map({ Array(missing[$0..<min($0 + 50, missing.count)]) }) {
             // place ids are stored uppercase; ask for both spellings.
             let ids = chunk + chunk.map { $0.uppercased() }
@@ -158,28 +156,42 @@ final class SavedLibraryViewModel: ObservableObject {
             }
         }
         for row in importRows {
-            guard let id = row.place_id?.lowercased(), let place = known[id] else { continue }
-            inputs.append(input(from: place, source: .imported, addedAt: SavedLibraryBuilder.parseTimestamp(row.added_at)))
+            guard let place = known[row.placeId] else { continue }
+            inputs.append(input(from: place, source: .imported, addedAt: row.addedAt))
+        }
+        for row in quickSaveRows {
+            guard let place = known[row.placeId] else { continue }
+            inputs.append(input(from: place, source: .saved, addedAt: row.addedAt))
         }
         return inputs
     }
 
-    /// The user's imports (place id + when added), paged past Supabase's 1,000-row cap.
-    private static func fetchImportRows(userId: String) async throws -> [ImportRow] {
+    private struct TimedRow { let placeId: String; let addedAt: Date? }
+
+    /// The user's rows in `table` (place id + when added), newest first, paged past Supabase's 1,000-row cap.
+    private static func fetchRows(table: String, timeColumn: String, userId: String) async throws -> [TimedRow] {
+        struct Raw: Decodable {
+            let place_id: String?
+            let time: String?
+            enum CodingKeys: String, CodingKey { case place_id, time }
+        }
         let userIds = Array(Set([userId, userId.uppercased(), userId.lowercased()]))
-        var rows: [ImportRow] = []
+        var rows: [TimedRow] = []
         let pageSize = 1000
         var offset = 0
         while offset < 10_000 {
-            let page: [ImportRow] = try await SupabaseManager.shared.client
-                .from("external_places")
-                .select("place_id, added_at")
+            // "time:<column>" aliases the timestamp column so one decoder fits both tables.
+            let page: [Raw] = try await SupabaseManager.shared.client
+                .from(table)
+                .select("place_id, time:\(timeColumn)")
                 .in("user_id", values: userIds)
-                .order("added_at", ascending: false)
+                .order(timeColumn, ascending: false)
                 .range(from: offset, to: offset + pageSize - 1)
                 .execute()
                 .value
-            rows.append(contentsOf: page)
+            rows += page.compactMap { raw in
+                raw.place_id.map { TimedRow(placeId: $0.lowercased(), addedAt: SavedLibraryBuilder.parseTimestamp(raw.time)) }
+            }
             if page.count < pageSize { break }
             offset += pageSize
         }

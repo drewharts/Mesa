@@ -7,12 +7,14 @@
 //  Only reachable for the admin on TestFlight with the PostHog flag on (see SavedLibraryGate).
 //
 
+import Combine
 import CoreLocation
 import SwiftUI
 
 struct SavedLibraryView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var profile: ProfileViewModel
     @StateObject private var viewModel = SavedLibraryViewModel()
     @State private var selectedPlaceId: String?
 
@@ -43,6 +45,10 @@ struct SavedLibraryView: View {
         }
         .task {
             await viewModel.loadIfNeeded(userId: userSession.currentUserId, location: locationManager.currentLocation)
+        }
+        // A one-tap save (or unsave) from a place page re-sorts the library.
+        .onReceive(profile.favoritesViewModel.$userFavorites.removeDuplicates().dropFirst()) { _ in
+            Task { await reload() }
         }
         .navigationDestination(item: $selectedPlaceId) { placeId in
             PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: false)
