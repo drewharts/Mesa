@@ -1,2 +1,2 @@
-- Security and reliability improvements to how Mesa connects to its servers.
-- Mesa can now let you know when an important update is available.
+- Security and stability improvements.
+- Adds an update prompt for required updates.
