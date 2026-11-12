@@ -47,6 +47,19 @@ enum Analytics {
         PostHogSDK.shared.identify(userId.lowercased())
     }
 
+    /// Whether a PostHog feature flag is on for the current user. False when PostHog isn't set up
+    /// or flags haven't loaded, so gated features default to off.
+    static func isFeatureEnabled(_ key: String) -> Bool {
+        guard isEnabled else { return false }
+        return PostHogSDK.shared.isFeatureEnabled(key)
+    }
+
+    /// Refetches feature flags, then calls back on the main queue (immediately when PostHog is off).
+    static func reloadFeatureFlags(_ completion: @escaping () -> Void) {
+        guard isEnabled else { DispatchQueue.main.async(execute: completion); return }
+        PostHogSDK.shared.reloadFeatureFlags { DispatchQueue.main.async(execute: completion) }
+    }
+
     static func reset() {
         guard isEnabled else { return }
         PostHogSDK.shared.reset()
