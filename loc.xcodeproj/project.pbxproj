@@ -647,7 +647,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 5.03;
+				MARKETING_VERSION = 5.04;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -688,7 +688,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 5.03;
+				MARKETING_VERSION = 5.04;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -789,7 +789,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 5.03;
+				MARKETING_VERSION = 5.04;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -826,7 +826,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 5.03;
+				MARKETING_VERSION = 5.04;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

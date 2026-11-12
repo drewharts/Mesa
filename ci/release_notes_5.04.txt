@@ -1,0 +1,2 @@
+- Adding a place to a list now confirms only after it is saved. If the save fails, you see an error and the place is not left half-added.
+- Places added from search now always save to the right list, even when the place already exists in Mesa under another listing.
