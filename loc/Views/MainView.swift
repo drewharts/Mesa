@@ -661,7 +661,7 @@ struct MainView: View {
         profileViewModel.selectedListIdForMap = nil
         profileViewModel.pendingMapFilter = nil
         profileViewModel.externalContentViewModel.disableNearbyFilter()
-        profileViewModel.recentlyImportedViewModel.clearMapScope()
+        profileViewModel.recentlyImportedViewModel.resetScope()
         // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
     }
 

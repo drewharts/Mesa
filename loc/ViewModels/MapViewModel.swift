@@ -197,6 +197,11 @@ class MapViewModel: ObservableObject {
         PresentationService.shared.present(.externalVideos)
     }
 
+    /// Limits external-place pins to the "Near me" radius around a location (nil shows all), live.
+    func setExternalPlacesNearLocation(_ location: CLLocation?) {
+        filteringViewModel.setExternalPlacesNearLocation(location)
+    }
+
     /// Sets the map to show only reviewed places.
     func selectReviews() {
         filteringViewModel.selectReviews()

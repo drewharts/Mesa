@@ -2,9 +2,9 @@
 //  RecentlyImportedViewModel.swift
 //  loc
 //
-//  Single Responsibility: Owns the "Recently imported" profile tab's Near me / All scope and
-//  produces the places that tab shows. "All" mirrors the user's paginated imports from
-//  ProfileExternalContentViewModel; "Near me" fetches the user's own imports inside a bounding
+//  Single Responsibility: Owns the All / Near me scope of the map's imports sheet (opened from the
+//  profile's "Recently imported" tab) and produces the places that sheet and its pins show.
+//  "All" mirrors the user's paginated imports from ProfileExternalContentViewModel; "Near me" fetches the user's own imports inside a bounding
 //  box around their current location and trims them to a 20-mile radius.
 //
 
@@ -12,7 +12,7 @@ import Combine
 import CoreLocation
 import Foundation
 
-/// Drives the profile's "Recently imported" tab and its Near me / All toggle.
+/// Drives the All / Near me toggle in the map's imports sheet.
 @MainActor
 final class RecentlyImportedViewModel: ObservableObject {
     // MARK: - Constants
@@ -20,19 +20,16 @@ final class RecentlyImportedViewModel: ObservableObject {
     /// Radius used by "Near me": 20 miles.
     nonisolated static let nearbyRadiusMeters: CLLocationDistance = 32_187
 
-    /// Max imports fetched for "Near me" (the profile preview shows 6; the rest is headroom).
-    private static let nearbyFetchLimit = 60
+    /// Max imports fetched for "Near me".
+    private static let nearbyFetchLimit = 200
 
     /// How far the user must move before "Near me" is refetched.
     private static let refetchDistanceMeters: CLLocationDistance = 1_600
 
-    /// UserDefaults key that remembers the last scope the user picked.
-    static let scopeDefaultsKey = "profileRecentlyImportedScope"
-
     // MARK: - Published State
 
-    /// The scope the user picked (defaults to All). Persisted so the profile opens the way they left it.
-    @Published private(set) var scope: RecentlyImportedScope
+    /// The scope picked in the map's imports sheet. Starts at All each time the sheet opens.
+    @Published private(set) var scope: RecentlyImportedScope = .all
 
     /// The user's recent imports, newest first (mirrors the profile's existing Videos data).
     @Published private(set) var allPlaces: [LightweightPlace] = []
@@ -52,33 +49,29 @@ final class RecentlyImportedViewModel: ObservableObject {
     /// The last location used for "Near me"; nil until location is authorized and a fix arrives.
     @Published private(set) var currentLocation: CLLocation?
 
-    /// Set while the map is showing this tab's "Near me" results (opened from the profile grid).
+    /// Center the map's pins are limited to while Near me is showing; nil shows all imports.
     @Published private(set) var mapNearMeLocation: CLLocation?
 
     // MARK: - Derived State
 
-    /// Whether the tab is actually showing nearby results (Near me picked and a location is known).
+    /// Whether Near me can be picked (a location is known).
+    var isNearMeAvailable: Bool { currentLocation != nil }
+
+    /// Whether nearby results are showing (Near me picked and a location is known).
     var isShowingNearby: Bool { scope == .nearMe && currentLocation != nil }
 
-    /// Whether Near me is picked but there is no location, so the tab falls back to All.
-    var isLocationUnavailable: Bool { scope == .nearMe && currentLocation == nil }
-
-    /// The places the tab should render for the current scope.
+    /// The places the sheet should list for the current scope.
     var displayedPlaces: [LightweightPlace] { isShowingNearby ? nearbyPlaces : allPlaces }
 
-    /// Whether the tab should show its loading state instead of the grid.
-    var isLoading: Bool {
-        if isShowingNearby {
-            return nearbyPlaces.isEmpty && (isLoadingNearby || !hasLoadedNearby)
-        }
-        return isLoadingAll
+    /// Whether the nearby list is still waiting on its first results.
+    var isLoadingNearbyResults: Bool {
+        isShowingNearby && nearbyPlaces.isEmpty && (isLoadingNearby || !hasLoadedNearby)
     }
 
     // MARK: - Dependencies
 
     private let userService: UserService
     private weak var userSession: UserSession?
-    private let defaults: UserDefaults
     private var nearbyRequestId: Int = 0
     private var cancellables = Set<AnyCancellable>()
 
@@ -90,14 +83,10 @@ final class RecentlyImportedViewModel: ObservableObject {
         userSession: UserSession,
         allPlacesPublisher: AnyPublisher<[LightweightPlace], Never>,
         isLoadingAllPublisher: AnyPublisher<Bool, Never>,
-        locationPublisher: AnyPublisher<CLLocation?, Never>,
-        defaults: UserDefaults = .standard
+        locationPublisher: AnyPublisher<CLLocation?, Never>
     ) {
         self.userService = userService
         self.userSession = userSession
-        self.defaults = defaults
-        self.scope = defaults.string(forKey: Self.scopeDefaultsKey)
-            .flatMap(RecentlyImportedScope.init(rawValue:)) ?? .all
         subscribeToImports(allPlacesPublisher, isLoading: isLoadingAllPublisher)
         subscribeToLocation(locationPublisher)
         subscribeToUser(userSession)
@@ -105,33 +94,36 @@ final class RecentlyImportedViewModel: ObservableObject {
 
     // MARK: - Intents
 
-    /// Switches between Near me and All, remembers the choice, and loads nearby results if needed.
+    /// Switches between All and Near me, updates the map's pin filter, and loads nearby results if needed.
     func selectScope(_ newScope: RecentlyImportedScope) {
         guard newScope != scope else { return }
+        guard newScope == .all || isNearMeAvailable else { return }
         scope = newScope
-        defaults.set(newScope.rawValue, forKey: Self.scopeDefaultsKey)
+        updateMapNearMeLocation()
         if newScope == .nearMe && !hasLoadedNearby {
             reloadNearbyPlaces()
         }
     }
 
-    /// Records whether the map about to open should match "Near me" (only when nearby results are showing).
-    func prepareMapScope() {
-        mapNearMeLocation = isShowingNearby ? currentLocation : nil
-    }
-
-    /// Stops the map matching "Near me"; called when the map's imports sheet closes.
-    func clearMapScope() {
-        mapNearMeLocation = nil
+    /// Resets the sheet to All; called when the map's imports sheet closes.
+    func resetScope() {
+        scope = .all
+        updateMapNearMeLocation()
     }
 
     /// Clears all per-user state; called on logout.
     func resetAllData() {
-        mapNearMeLocation = nil
+        resetScope()
         nearbyRequestId += 1
         nearbyPlaces = []
         isLoadingNearby = false
         hasLoadedNearby = false
+    }
+
+    /// Publishes the map's pin-filter center for the current scope and location.
+    private func updateMapNearMeLocation() {
+        let center = isShowingNearby ? currentLocation : nil
+        if center !== mapNearMeLocation { mapNearMeLocation = center }
     }
 
     // MARK: - Subscriptions
@@ -157,7 +149,7 @@ final class RecentlyImportedViewModel: ObservableObject {
             .removeDuplicates()
             .dropFirst()
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .sink { [weak self] _ in self?.reloadNearbyIfAlreadyLoaded() }
+            .sink { [weak self] _ in self?.reloadNearbyPlaces() }
             .store(in: &cancellables)
     }
 
@@ -176,7 +168,7 @@ final class RecentlyImportedViewModel: ObservableObject {
             .compactMap { $0 }
             .removeDuplicates()
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.reloadNearbyIfAlreadyLoaded() }
+            .sink { [weak self] _ in self?.reloadNearbyPlaces() }
             .store(in: &cancellables)
     }
 
@@ -188,18 +180,12 @@ final class RecentlyImportedViewModel: ObservableObject {
         }
         currentLocation = location
         hasLoadedNearby = false
-        if scope == .nearMe {
-            reloadNearbyPlaces()
-        }
+        updateMapNearMeLocation()
+        // Prefetch so Near me is instant when picked in the sheet.
+        reloadNearbyPlaces()
     }
 
     // MARK: - Loading
-
-    /// Refetches nearby imports when Near me is picked or has already been loaded once.
-    private func reloadNearbyIfAlreadyLoaded() {
-        guard hasLoadedNearby || scope == .nearMe else { return }
-        reloadNearbyPlaces()
-    }
 
     /// Starts a "Near me" fetch for the current location, superseding any fetch in flight.
     private func reloadNearbyPlaces() {
