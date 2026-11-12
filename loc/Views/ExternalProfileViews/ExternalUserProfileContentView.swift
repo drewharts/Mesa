@@ -102,19 +102,19 @@ struct ExternalUserProfileContentView: View {
                         )
                         .padding(.top, 24)
                         .transition(.opacity)
-                    } else if !viewModel.hasLoadedInitialData && viewModel.userLists.isEmpty && viewModel.userFavorites.isEmpty {
+                    } else if !viewModel.hasLoadedInitialData && viewModel.userLists.isEmpty {
                         ExternalProfileLoadingSkeleton()
                             .padding(.top, 16)
                     } else {
                         // Reviews (hidden for curated/brand profiles)
-                        if !viewModel.isCuratedProfile {
+                        if !viewModel.isCuratedProfile && viewModel.showsReviewsSection {
                             ExternalUserProfileFavoritesReviewsView(viewModel: viewModel)
                                 .padding(.top, 16)
                         }
 
                         // Place Lists
                         ExternalUserProfileListsView(viewModel: viewModel, placeLists: viewModel.userLists)
-                            .padding(.top, viewModel.isCuratedProfile ? 16 : 0)
+                            .padding(.top, (viewModel.isCuratedProfile || !viewModel.showsReviewsSection) ? 16 : 0)
                     }
 
                     Spacer(minLength: 50)
