@@ -23,6 +23,12 @@ class SearchViewModel: ObservableObject {
     @Published var showNoPlaceFound: Bool = false
     @Published var isSearching: Bool = false
 
+    /// Places | People toggle. Defaults to Places each time the search page opens.
+    @Published private(set) var mode: SearchMode = .places
+
+    /// True after a People search finished with no matches.
+    @Published var showNoUserFound: Bool = false
+
     /// Keyword-matched results from local database
     @Published var keywordResults: [DetailPlace] = []
     @Published var matchedKeyword: String? = nil
@@ -162,7 +168,7 @@ class SearchViewModel: ObservableObject {
             .removeDuplicates()
             .filter { [weak self] text in
                 guard let self = self else { return false }
-                return self.shouldUseAISearch(text)
+                return SearchPlan.make(mode: self.mode, query: text).searchesAI && self.shouldUseAISearch(text)
             }
             .sink { [weak self] text in
                 self?.currentAISearchTask?.cancel()
@@ -197,6 +203,7 @@ class SearchViewModel: ObservableObject {
         userPhotosSnapshot = [:]  // Clear photo snapshot
         searchError = nil
         showNoPlaceFound = false
+        showNoUserFound = false
         isSearching = false
 
         // Reset keyword search pagination state
@@ -208,18 +215,17 @@ class SearchViewModel: ObservableObject {
         aiSuggestionsViewModel.clear()
     }
     
-    /// Perform search for places and users
+    /// Runs the searches the current mode calls for (Places: Google Places + keywords; People: users).
     private func performSearch(query: String) async {
-        // Check if task was cancelled
         guard !Task.isCancelled else { return }
+        let plan = SearchPlan.make(mode: mode, query: query)
 
-        // Check cache first for instant place results
-        if let cachedResults = searchCache[query] {
+        // Places mode: serve cached place results instantly, still refreshing keyword matches.
+        if plan.searchesPlaces, let cachedResults = searchCache[query] {
             searchResults = cachedResults
             showNoPlaceFound = cachedResults.isEmpty
-            // Still run keyword search even with cached results
             await searchByKeyword(query: query)
-            isSearching = false
+            if !Task.isCancelled { isSearching = false }
             return
         }
 
@@ -229,19 +235,59 @@ class SearchViewModel: ObservableObject {
         matchedKeyword = nil
         searchError = nil
         showNoPlaceFound = false
+        showNoUserFound = false
 
-        // Perform parallel search operations (AI search has separate 500ms debounce pipeline)
         await withTaskGroup(of: Void.self) { group in
-            group.addTask {
-                await self.searchPlaces(query: query)
+            if plan.searchesPlaces {
+                group.addTask { await self.searchPlaces(query: query) }
             }
-            group.addTask {
-                await self.searchUsers(query: query)
+            if plan.searchesUsers {
+                group.addTask { await self.searchUsers(query: query) }
             }
-            group.addTask {
-                await self.searchByKeyword(query: query)
+            if plan.searchesKeywords {
+                group.addTask { await self.searchByKeyword(query: query) }
             }
         }
+        guard !Task.isCancelled else { return }
+        if plan.searchesUsers { showNoUserFound = userResults.isEmpty }
+        isSearching = false
+    }
+
+    /// Switches between Places and People and re-runs the current query for just that type.
+    func selectMode(_ newMode: SearchMode) {
+        guard newMode != mode else { return }
+        mode = newMode
+        currentSearchTask?.cancel()
+        currentAISearchTask?.cancel()
+        aiSuggestionsViewModel.clear()
+        searchResults = []
+        userResults = []
+        keywordResults = []
+        matchedKeyword = nil
+        hasMoreKeywordResults = false
+        searchError = nil
+        showNoPlaceFound = false
+        showNoUserFound = false
+
+        let query = searchText
+        let plan = SearchPlan.make(mode: newMode, query: query)
+        guard plan.searchesPlaces || plan.searchesUsers else {
+            isSearching = false
+            return
+        }
+        isSearching = true
+        currentSearchTask = Task { await self.performSearch(query: query) }
+        if plan.searchesAI {
+            currentAISearchTask = Task { await self.searchAISuggestions(query: query) }
+        }
+    }
+
+    /// Resets the toggle to Places; called when the search page opens.
+    func resetModeToPlaces() {
+        guard mode != .places else { return }
+        mode = .places
+        userResults = []
+        showNoUserFound = false
     }
 
     /// Search for AI-powered suggestions
@@ -347,11 +393,11 @@ class SearchViewModel: ObservableObject {
                 latitude: latitude,
                 longitude: longitude,
                 onResultsUpdated: { [weak self] results in
-                    guard let self = self else {
+                    guard let self = self, self.mode == .places else {
                         continuation.resume()
                         return
                     }
-                    
+
                     self.searchResults = results
                     self.showNoPlaceFound = results.isEmpty
                     self.isSearching = false
@@ -372,48 +418,40 @@ class SearchViewModel: ObservableObject {
         }
     }
     
-    /// Search for users
+    /// Searches users and publishes them, dropping the result if the mode or query changed meanwhile.
     private func searchUsers(query: String) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            userService.searchUsers(query: query) { [weak self] users, error in
-                guard let self = self else {
-                    continuation.resume()
-                    return
-                }
-                
-                if let users = users {
-                    let profiles = users.compactMap { user in
-                        ProfileData(
-                            id: user.id,
-                            firstName: user.firstName,
-                            lastName: user.lastName,
-                            email: user.email,
-                            profilePhotoURL: user.profilePhotoURL,
-                            phoneNumber: "",
-                            fullNameLower: user.fullName.lowercased(),
-                            fullName: user.fullName,
-                            fcmToken: nil,
-                            firebaseUid: nil,
-                            supabaseUid: nil
-                        )
-                    }
-                    
-                    Task { @MainActor in
-                        self.userResults = profiles
-                        // Prefetch photos using shared cache
-                        await self.prefetchProfilePhotos(for: profiles)
-                        // Create snapshot AFTER photos load to prevent reactive updates
-                        self.createPhotoSnapshot()
-                    }
-                } else if let error = error {
+        let profiles: [ProfileData]? = await withCheckedContinuation { continuation in
+            userService.searchUsers(query: query) { users, error in
+                if let error = error {
                     print("⚠️ [SearchViewModel] User search error: \(error.localizedDescription)")
                 }
-                
-                continuation.resume()
+                let profiles = users?.map { user in
+                    ProfileData(
+                        id: user.id,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        email: user.email,
+                        profilePhotoURL: user.profilePhotoURL,
+                        phoneNumber: "",
+                        fullNameLower: user.fullName.lowercased(),
+                        fullName: user.fullName,
+                        fcmToken: nil,
+                        firebaseUid: nil,
+                        supabaseUid: nil
+                    )
+                }
+                continuation.resume(returning: profiles)
             }
         }
+        guard !Task.isCancelled, mode == .people, let profiles else { return }
+        userResults = profiles
+        Task { @MainActor in
+            // Prefetch photos using shared cache, then snapshot them to avoid reactive updates
+            await self.prefetchProfilePhotos(for: profiles)
+            self.createPhotoSnapshot()
+        }
     }
-    
+
     /// Prefetch profile photos for search results
     private func prefetchProfilePhotos(for users: [ProfileData]) async {
         await withTaskGroup(of: Void.self) { group in
