@@ -8,7 +8,17 @@ const APNS_TEAM_ID = Deno.env.get('APNS_TEAM_ID')
 const APNS_BUNDLE_ID = Deno.env.get('APNS_BUNDLE_ID') || 'drewharts.locc'
 const APNS_KEY = Deno.env.get('APNS_KEY') // Your .p8 key content
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+// Prefer the new secret key (sb_secret_..., injected as the SUPABASE_SECRET_KEYS
+// JSON map, key "default"); fall back to the legacy service_role key so this
+// keeps working before the secret key exists and until legacy keys are retired.
+function serverKey(): string {
+  try {
+    const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')
+    if (keys && typeof keys.default === 'string' && keys.default) return keys.default
+  } catch (_) { /* fall through */ }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+}
+const SUPABASE_SERVICE_ROLE_KEY = serverKey()
 
 // Generate APNs JWT token
 async function generateAPNsJWT(): Promise<string> {
