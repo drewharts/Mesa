@@ -67,7 +67,9 @@ struct ExternalPlacesPopupView: View {
             onRemove: { place in
                 profile.externalContentViewModel.deleteExternalPlace(place)
             },
-            fitsMapToPlaces: true
+            fitsMapToPlaces: true,
+            framingRegion: recentlyImportedVM.mapFramingRegion,
+            framingKey: recentlyImportedVM.scope.rawValue
         )
         .onAppear {
             externalContentVM.currentMapRegion = appCoordinator.currentMapRegion

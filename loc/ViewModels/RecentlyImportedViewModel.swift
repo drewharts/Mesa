@@ -11,6 +11,7 @@
 import Combine
 import CoreLocation
 import Foundation
+import MapKit
 
 /// Drives the All / Near me toggle in the map's imports sheet.
 @MainActor
@@ -66,6 +67,23 @@ final class RecentlyImportedViewModel: ObservableObject {
     /// Whether the nearby list is still waiting on its first results.
     var isLoadingNearbyResults: Bool {
         isShowingNearby && nearbyPlaces.isEmpty && (isLoadingNearby || !hasLoadedNearby)
+    }
+
+    /// Opening map region for the sheet: Near me frames nearby imports and the user; All frames
+    /// nearby imports if any, else the densest cluster of recent imports (never wider than a metro).
+    var mapFramingRegion: MKCoordinateRegion? {
+        let nearby = nearbyPlaces.compactMap(Self.coordinate)
+        let user = currentLocation?.coordinate
+        if isShowingNearby {
+            return ImportsMapFraming.region(recent: [], nearby: nearby, user: user)
+        }
+        return ImportsMapFraming.region(recent: allPlaces.compactMap(Self.coordinate), nearby: nearby, user: user)
+    }
+
+    /// Returns a place's coordinate when it has one.
+    nonisolated private static func coordinate(_ place: LightweightPlace) -> CLLocationCoordinate2D? {
+        guard let lat = place.latitude, let lon = place.longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
 
     // MARK: - Dependencies
