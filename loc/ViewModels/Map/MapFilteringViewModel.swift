@@ -76,6 +76,13 @@ class MapFilteringViewModel: ObservableObject {
         onFilterChanged?()
     }
 
+    /// Updates the "Near me" pin filter while external places are showing and reloads the pins.
+    func setExternalPlacesNearLocation(_ location: CLLocation?) {
+        guard showingExternalPlacesOnMap, location !== externalPlacesNearLocation else { return }
+        externalPlacesNearLocation = location
+        onFilterChanged?()
+    }
+
     /// Sets the map to show only reviewed places.
     func selectReviews() {
         showingReviewsOnMap = true

@@ -35,14 +35,12 @@ struct ProfileFavoritesExternalPlacesView: View {
     private var sectionData: ProfileFavoritesReviewsSectionData {
         ProfileFavoritesReviewsSectionData(
             favorites: [],
-            externalPlaces: recentlyImportedVM.displayedPlaces,
+            externalPlaces: externalContentVM.lightweightExternalPlaces,
             reviewedPlaces: reviewsVM.lightweightReviewedPlaces,
             myPlaces: myPlacesVM.lightweightMyPlaces,
-            isLoadingExternalPlaces: recentlyImportedVM.isLoading,
+            isLoadingExternalPlaces: externalContentVM.isLoadingExternalPlaces,
             isLoadingReviews: reviewsVM.isLoadingReviewedPlaces,
-            isLoadingMyPlaces: myPlacesVM.isMyPlacesLoading,
-            recentlyImportedScope: recentlyImportedVM.scope,
-            isRecentlyImportedLocationUnavailable: recentlyImportedVM.isLocationUnavailable
+            isLoadingMyPlaces: myPlacesVM.isMyPlacesLoading
         )
     }
 
@@ -56,8 +54,7 @@ struct ProfileFavoritesExternalPlacesView: View {
             onExternalPlacesTap: handleExternalContentTap,
             onReviewsTap: handleReviewsTap,
             onMyPlacesTap: handleMyPlacesTap,
-            onExternalPlacesHelpTap: { activePopupSheet = .help },
-            onRecentlyImportedScopeChange: { recentlyImportedVM.selectScope($0) }
+            onExternalPlacesHelpTap: { activePopupSheet = .help }
         )
         .sheet(item: $activePopupSheet, onDismiss: handlePopupDismiss) { sheet in
             popupContent(for: sheet)
@@ -104,7 +101,6 @@ struct ProfileFavoritesExternalPlacesView: View {
 
     /// Handles tap on external content section - shows popup over profile.
     private func handleExternalContentTap() {
-        recentlyImportedVM.prepareMapScope()
         openOnMap(.externalPlaces)
     }
 

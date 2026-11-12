@@ -13,31 +13,29 @@ struct ExternalPlacesPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var appCoordinator: AppCoordinator
     @ObservedObject var externalContentVM: ProfileExternalContentViewModel
-    /// Supplies the profile's "Near me" results when the map was opened from the grid with Near me on.
+    /// Owns the sheet's All / Near me toggle and the nearby results.
     @ObservedObject var recentlyImportedVM: RecentlyImportedViewModel
     var showNearbyFilter: Bool = true
     var onViewOnMap: (() -> Void)? = nil
 
-    /// Whether this sheet mirrors the profile's "Near me" toggle instead of the full import list.
-    private var isNearMe: Bool { recentlyImportedVM.mapNearMeLocation != nil }
+    /// Whether the sheet is showing Near me results instead of the full import list.
+    private var isNearMe: Bool { recentlyImportedVM.isShowingNearby }
 
     var body: some View {
         PlaceListPopupView(
             title: isNearMe ? "Imported near me" : "Saved Videos",
             count: isNearMe ? recentlyImportedVM.nearbyPlaces.count : externalContentVM.totalExternalPlacesCount,
             isLoading: isNearMe
-                ? recentlyImportedVM.isLoadingNearby && recentlyImportedVM.nearbyPlaces.isEmpty
+                ? recentlyImportedVM.isLoadingNearbyResults
                 : externalContentVM.isLoadingExternalPlaces,
             isLoadingMore: isNearMe ? false : externalContentVM.isLoadingMoreExternalPlaces,
             places: isNearMe ? recentlyImportedVM.nearbyPlaces : externalContentVM.lightweightExternalPlaces,
             hasMore: isNearMe ? false : externalContentVM.hasMoreExternalPlaces,
             emptyIcon: "video",
-            emptyTitle: isNearMe ? "Nothing imported nearby"
-                : (externalContentVM.isNearbyFilterEnabled ? "No Nearby Videos" : "No Videos Yet"),
-            emptyMessage: isNearMe ? "Places you import within 20 miles show up here"
-                : (externalContentVM.isNearbyFilterEnabled
-                    ? "No video places found in the current map area"
-                    : "Places you add from shared videos will appear here"),
+            emptyTitle: isNearMe ? "Nothing imported nearby" : "No Videos Yet",
+            emptyMessage: isNearMe
+                ? "Places you import within 20 miles show up here"
+                : "Places you add from shared videos will appear here",
             loadMore: {
                 guard !isNearMe else { return }
                 await externalContentVM.loadMoreExternalPlaces()
@@ -58,14 +56,18 @@ struct ExternalPlacesPopupView: View {
                 }
             },
             headerAccessory: {
-                if showNearbyFilter && !isNearMe {
-                    nearbyFilterToggle
+                if showNearbyFilter {
+                    RecentlyImportedScopeToggle(
+                        selectedScope: recentlyImportedVM.scope,
+                        isNearMeAvailable: recentlyImportedVM.isNearMeAvailable,
+                        onSelect: { recentlyImportedVM.selectScope($0) }
+                    )
                 }
             },
             onRemove: { place in
                 profile.externalContentViewModel.deleteExternalPlace(place)
             },
-            fitsMapToPlaces: isNearMe || !externalContentVM.isNearbyFilterEnabled
+            fitsMapToPlaces: true
         )
         .onAppear {
             externalContentVM.currentMapRegion = appCoordinator.currentMapRegion
@@ -88,29 +90,6 @@ struct ExternalPlacesPopupView: View {
         .onChange(of: appCoordinator.currentMapRegion?.span.longitudeDelta) { _, _ in
             guard let region = appCoordinator.currentMapRegion else { return }
             externalContentVM.reloadForRegionChange(newRegion: region)
-        }
-    }
-
-    // MARK: - Nearby Filter Toggle
-
-    private var nearbyFilterToggle: some View {
-        HStack(spacing: 8) {
-            NearbyFilterButton(
-                title: "Recent",
-                isSelected: !externalContentVM.isNearbyFilterEnabled
-            ) {
-                guard externalContentVM.isNearbyFilterEnabled else { return }
-                externalContentVM.currentMapRegion = appCoordinator.currentMapRegion
-                externalContentVM.toggleNearbyFilter()
-            }
-            NearbyFilterButton(
-                title: "Nearby",
-                isSelected: externalContentVM.isNearbyFilterEnabled
-            ) {
-                guard !externalContentVM.isNearbyFilterEnabled else { return }
-                externalContentVM.currentMapRegion = appCoordinator.currentMapRegion
-                externalContentVM.toggleNearbyFilter()
-            }
         }
     }
 }

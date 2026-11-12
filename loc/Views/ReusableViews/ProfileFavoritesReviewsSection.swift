@@ -47,10 +47,6 @@ struct ProfileFavoritesReviewsSectionData {
     let isLoadingReviews: Bool
     let isLoadingMyPlaces: Bool
     var isLoadingFavorites: Bool = false
-    /// Scope picked on the Recently imported tab; nil hides the Near me / All toggle.
-    var recentlyImportedScope: RecentlyImportedScope? = nil
-    /// True when Near me is picked but location is unavailable, so All is shown with a note.
-    var isRecentlyImportedLocationUnavailable: Bool = false
 }
 
 /// Unified tab section for Recently imported (external places), Reviews, and My Places.
@@ -65,7 +61,6 @@ struct ProfileFavoritesReviewsSection: View {
     let onReviewsTap: () -> Void
     let onMyPlacesTap: (() -> Void)?
     let onExternalPlacesHelpTap: (() -> Void)?
-    var onRecentlyImportedScopeChange: ((RecentlyImportedScope) -> Void)? = nil
 
     /// Tab the user tapped; nil until they tap one, so the first tab is the default.
     @State private var pickedTabId: String? = nil
@@ -107,14 +102,6 @@ struct ProfileFavoritesReviewsSection: View {
                 selectedTabId: selectedTabBinding,
                 onHelpTap: config.showExternalPlacesTab ? onExternalPlacesHelpTap : nil
             )
-            if selectedTabId == ProfileTab.externalPlaces.id, let scope = data.recentlyImportedScope {
-                RecentlyImportedScopeToggle(
-                    selectedScope: scope,
-                    isLocationUnavailable: data.isRecentlyImportedLocationUnavailable,
-                    onSelect: { onRecentlyImportedScopeChange?($0) }
-                )
-                .padding(.horizontal, 16)
-            }
             contentGrid
             Divider()
                 .padding(.horizontal, 20)
@@ -210,14 +197,7 @@ struct ProfileFavoritesReviewsSection: View {
     }
 
     private var emptyExternalPlacesState: some View {
-        if data.recentlyImportedScope == .nearMe && !data.isRecentlyImportedLocationUnavailable {
-            return ProfileEmptyState(
-                icon: "location",
-                title: "Nothing imported nearby",
-                message: "Places you import within 20 miles show up here"
-            )
-        }
-        return ProfileEmptyState(
+        ProfileEmptyState(
             icon: "video",
             title: "Nothing imported yet",
             message: config.isMyProfile
