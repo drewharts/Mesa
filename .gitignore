@@ -51,3 +51,8 @@ firebase-functions/node_modules/
 
 # Logs
 *.log
+
+# Never commit Supabase service-role / secret keys to the app.
+# AdminConfig.swift used to hard-code one; it was unused and has been removed.
+loc/Services/AdminConfig.swift
+*.secret.xcconfig
