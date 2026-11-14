@@ -38,10 +38,14 @@ struct PlaceChangeHandler: ViewModifier {
     /// Returns true when the same place is being updated with fresh data (not a new selection).
     private func isSamePlaceRefresh(old: DetailPlace?, new: DetailPlace?) -> Bool {
         guard let old = old, let new = new else { return false }
-        if let oldGoogleId = old.googlePlaceId, let newGoogleId = new.googlePlaceId {
-            return oldGoogleId == newGoogleId
-        }
-        return old.id == new.id
+        // Same row, or the same real Google place under a new id. Two different rows that both lack
+        // a Google id ("" == "") used to count as the same place, which kept the old place's content.
+        return PlaceSelectionIdentity.isSamePlace(
+            oldId: old.id.uuidString,
+            oldGooglePlaceId: old.googlePlaceId,
+            newId: new.id.uuidString,
+            newGooglePlaceId: new.googlePlaceId
+        )
     }
 
     /// Handles a genuinely new place selection by resetting all dependent state.

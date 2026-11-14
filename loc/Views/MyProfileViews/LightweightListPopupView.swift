@@ -42,6 +42,8 @@ struct LightweightListPopupView: View {
     @State private var showEditListSheet: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
     @State private var hasInitiallyAppeared = false
+    /// Set once the list's places are loaded; earlier pending pin taps wait for consumePendingHighlight().
+    @State private var hasLoadedPlaces = false
 
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = []) {
@@ -119,6 +121,10 @@ struct LightweightListPopupView: View {
             // When a map pin is tapped while the list sheet is open, highlight and scroll to its row.
             // Uses onReceive (Combine) instead of onChange for reliable delivery even when
             // a navigation destination is pushed on the stack.
+            // The publisher replays a value left from before this sheet opened. Until the places
+            // load, every id looks "not in this list" and would open that older place, so leave it
+            // for consumePendingHighlight() after the load.
+            guard hasLoadedPlaces else { return }
             presentationService.pendingPlaceNavigation = nil
             handleMapPinTap(placeId)
         }
@@ -144,6 +150,7 @@ struct LightweightListPopupView: View {
             Task {
                 await listsVM.loadPlacesForListIfNeeded(listId: currentList.list_id, fallbackCount: currentList.place_count)
                 await loadFullListAndFitMap()
+                hasLoadedPlaces = true
                 consumePendingHighlight()
             }
 
@@ -402,6 +409,8 @@ struct LightweightListPopupView: View {
     private func consumePendingHighlight() {
         guard let placeId = presentationService.pendingPlaceNavigation else { return }
         presentationService.pendingPlaceNavigation = nil
+        // Only highlight places in this list; a leftover id from elsewhere must not open a page.
+        guard place(withId: placeId) != nil else { return }
         handleMapPinTap(placeId)
     }
 
