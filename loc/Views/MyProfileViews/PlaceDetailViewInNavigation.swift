@@ -14,12 +14,20 @@ struct PlaceDetailViewInNavigation: View {
     let shouldAnimateMap: Bool
 
     @StateObject private var viewModel: PlaceDetailNavigationViewModel
+    @ObservedObject private var ownership = PlaceDetailOwnership.shared
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+
+    /// Identifies this page in the ownership stack.
+    @State private var ownerToken = UUID()
+    /// The place this page shows. The shared selection is put back to it if something else overwrites it.
+    @State private var ownedPlace: DetailPlace?
+    /// How many times this page has put its place back (capped by PlaceDetailOwnerStack.maxReasserts).
+    @State private var reassertCount = 0
 
     init(placeId: String, minSheetHeight: CGFloat, shouldAnimateMap: Bool = false) {
         self.minSheetHeight = minSheetHeight
@@ -41,7 +49,10 @@ struct PlaceDetailViewInNavigation: View {
                 }
                 .padding()
             } else {
-                PlaceDetailViewContent(minSheetHeight: minSheetHeight)
+                PlaceDetailViewContent(minSheetHeight: minSheetHeight, onWillChangePlace: { newPlace in
+                    // The page itself moves to another place (e.g. video re-association): own that one.
+                    adopt(newPlace)
+                })
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(profile)
                     .environmentObject(locationManager)
@@ -58,10 +69,57 @@ struct PlaceDetailViewInNavigation: View {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 if let place = viewModel.loadedPlace {
+                    adopt(place)
                     selectedPlaceVM.selectPlace(place, shouldAnimateMap: shouldAnimateMap)
                     selectedPlaceVM.isDetailSheetPresented = false
                 }
             }
+        }
+        .onAppear {
+            // Back on screen (e.g. popped back to this page): reclaim the selection for this place.
+            guard let ownedPlace else { return }
+            ownership.claim(token: ownerToken, placeId: ownedPlace.id.uuidString)
+            reconcileSelection()
+        }
+        .onDisappear {
+            ownership.release(token: ownerToken)
+        }
+        .onChange(of: selectedPlaceVM.selectedPlace?.id) { _, _ in
+            reconcileSelection()
+        }
+        .onChange(of: ownership.stack.top) { _, _ in
+            reconcileSelection()
+        }
+    }
+
+    /// Makes the given place this page's place and marks the page as the visible owner.
+    private func adopt(_ place: DetailPlace) {
+        ownedPlace = place
+        ownership.claim(token: ownerToken, placeId: place.id.uuidString)
+    }
+
+    /// Puts this page's place back when a stale or unrelated write replaced the shared selection.
+    private func reconcileSelection() {
+        guard let ownedPlace else { return }
+        let selected = selectedPlaceVM.selectedPlace
+        let decision = PlaceDetailOwnerStack.decide(
+            isTopOwner: ownership.isTop(ownerToken),
+            ownedPlaceId: ownedPlace.id.uuidString,
+            ownedGooglePlaceId: ownedPlace.googlePlaceId,
+            selectedPlaceId: selected?.id.uuidString,
+            selectedGooglePlaceId: selected?.googlePlaceId,
+            isGlobalDetailSheetPresented: selectedPlaceVM.isDetailSheetPresented,
+            reassertsSoFar: reassertCount
+        )
+        switch decision {
+        case .keep:
+            break
+        case .adopt:
+            if let selected { adopt(selected) }
+        case .reassert:
+            reassertCount += 1
+            selectedPlaceVM.selectPlace(ownedPlace, shouldAnimateMap: false)
+            selectedPlaceVM.isDetailSheetPresented = false
         }
     }
 }
@@ -71,6 +129,8 @@ struct PlaceDetailViewInNavigation: View {
 /// Data-Driven: Drives ViewModel updates via .onChange() instead of ViewModel observing other ViewModels
 struct PlaceDetailViewContent: View {
     let minSheetHeight: CGFloat
+    /// Called before the page moves itself to another place, so an owning wrapper can follow it.
+    var onWillChangePlace: ((DetailPlace) -> Void)? = nil
 
     @State private var selectedImageIndex: Int?
     @State private var showPhotoGallery = false
@@ -110,6 +170,7 @@ struct PlaceDetailViewContent: View {
                         onAddReview: { showCreatePost = true },
                         onPlaceChanged: { newPlace in
                             // Navigate to the new place after video association change
+                            onWillChangePlace?(newPlace)
                             selectedPlaceVM.selectPlaceAndFetchDetails(newPlace, shouldAnimateMap: true)
                         }
                     )

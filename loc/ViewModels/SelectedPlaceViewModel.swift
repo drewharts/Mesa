@@ -50,6 +50,9 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// In-flight enrichment for the current selection; cancelled when a new place is selected.
     private var enrichmentTask: Task<Void, Never>?
+
+    /// In-flight fresh-details fetch for the current selection; cancelled when a new place is selected.
+    private var freshDetailsTask: Task<Void, Never>?
     private var serviceCancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
@@ -130,6 +133,8 @@ class SelectedPlaceViewModel: ObservableObject {
         selectionGeneration += 1
         enrichmentTask?.cancel()
         enrichmentTask = nil
+        freshDetailsTask?.cancel()
+        freshDetailsTask = nil
     }
 
     /// Whether the detail sheet is presented (bridged to PresentationService).
@@ -219,9 +224,12 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Navigates to a place by ID.
     func navigateToPlace(placeId: String, onDismiss: (() -> Void)? = nil) {
+        let generation = selectionGeneration
         Task {
             guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
             await MainActor.run {
+                // Something else was selected while this loaded: don't override it.
+                guard generation == self.selectionGeneration else { return }
                 self.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
                 self.isDetailSheetPresented = true
                 onDismiss?()
@@ -411,14 +419,17 @@ class SelectedPlaceViewModel: ObservableObject {
     /// If the resolved place is a city (locality), redirects to the city detail sheet.
     private func fetchFreshDetailsInBackground(for place: DetailPlace) {
         guard place.isCustom != true else { return }
-        Task {
+        let generation = selectionGeneration
+        freshDetailsTask = Task {
             do {
                 let enriched = try await placeRepository.resolvePlace(
                     googlePlaceId: place.googlePlaceId,
                     fallbackId: place.id.uuidString,
                     existingPlace: place
                 )
-                guard self.selectedPlace?.id == place.id else { return }
+                // A newer selection happened while this was loading: drop the stale result.
+                guard !Task.isCancelled, generation == selectionGeneration,
+                      self.selectedPlace?.id == place.id else { return }
 
                 // Redirect to city sheet if the place is a city-level result
                 if Self.isCityPlace(enriched), let coordinate = enriched.coordinate {
@@ -443,7 +454,8 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             } catch {
                 print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
-                guard self.selectedPlace?.id == place.id else { return }
+                guard !Task.isCancelled, generation == selectionGeneration,
+                      self.selectedPlace?.id == place.id else { return }
                 selectionState.markFetchComplete()
 
                 if place.hasPlaceholderID && (place.googlePlaceId ?? "").isEmpty {
