@@ -31,7 +31,7 @@ struct ListPlaceRowView: View {
             ListPlaceThumbnail(place: place, size: Self.thumbnailSize)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(place.name)
+                Text(LightweightPlace.displayName(place.name))
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
