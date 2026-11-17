@@ -51,6 +51,9 @@ class PlaceSelectionStateViewModel: ObservableObject {
     func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
         // Set selectedPlace FIRST so coordinate is available when onChange observer fires
         selectedPlace = place
+        // No fresh fetch is pending for this selection; a flag left over from an earlier, abandoned
+        // fetch would otherwise skip this place's enrichment.
+        isFetchingFreshDetails = false
         // Only set animation flag to true, never reset to false (avoids race conditions with concurrent callers)
         if shouldAnimateMap {
             let hasValidCoordinates = place.coordinate?.isValidForNavigation == true

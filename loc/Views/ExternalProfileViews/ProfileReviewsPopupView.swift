@@ -162,11 +162,9 @@ struct ProfileReviewsPopupView: View {
                     place: place,
                     preferExternalThumbnail: false,
                     onNavigate: { placeId in
+                        // The place page loads and selects its own place; a separate fetch-and-select
+                        // here could land after a later tap and reopen the older place.
                         navigationPath.append(placeId)
-                        Task {
-                            guard let place = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
-                            selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-                        }
                     }
                 )
                 .onAppear {
