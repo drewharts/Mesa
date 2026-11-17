@@ -1,6 +1,6 @@
 # Auto-sorted Saved: plan for shipping to everyone
 
-Status: prototype behind admin + TestFlight + PostHog flag `auto_sort_saved` (PR #265).
+Status: shipping in 5.04 on by default for everyone. PostHog flag `auto_sort_saved` is only a kill switch (set false to disable). The gating notes below describe the earlier prototype.
 
 ## What the prototype does
 - On a place page, the bookmark saves an unsaved place in one tap. The place sorts itself into Saved by city, then type, then cuisine. A small banner reads "Saved to New York City · Restaurants" and has an **Add to list** button.

@@ -43,7 +43,7 @@ struct PlaceDetailTabsView: View {
     @State private var showingNoteSheet = false
     @State private var showPlacePhotoSelector = false
     @State private var travelSelectorState: TravelTimeSelectorState?
-    /// PROTOTYPE (auto_sort_saved): "New York City · Restaurants" after a one-tap save; nil hides the banner.
+    /// "New York City · Restaurants" after a one-tap save; nil hides the banner.
     @State private var quickSaveBanner: String?
     @State private var quickSaveBannerTask: Task<Void, Never>?
     
@@ -191,12 +191,12 @@ struct PlaceDetailTabsView: View {
         .padding(.bottom, 3)
     }
     
-    // MARK: - One-tap save (PROTOTYPE, auto_sort_saved)
+    // MARK: - One-tap save (auto_sort_saved)
 
     /// With auto-sort on, the bookmark saves an unsaved place in one tap (it sorts itself into Saved);
     /// otherwise, or when already saved, it opens the usual list picker.
     private func handleBookmarkTap() {
-        let autoSort = SavedLibraryGate.isEnabled(userId: userSession.currentUserId)
+        let autoSort = SavedLibraryGate.isEnabled
         switch SavedQuickSave.action(isSaved: viewModel.isPlaceInList, autoSortEnabled: autoSort, isDroppedPin: viewModel.isDroppedPin) {
         case .openListPicker:
             onAddToList()

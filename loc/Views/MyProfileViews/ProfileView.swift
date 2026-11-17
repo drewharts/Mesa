@@ -77,7 +77,7 @@ struct ProfileView: View {
                         }
                     }
                 }
-                // PROTOTYPE (auto_sort_saved): admin + TestFlight + PostHog flag only.
+                // Auto-sorted Saved library (on for everyone; PostHog auto_sort_saved is a kill switch).
                 .navigationDestination(for: SavedLibraryDestination.self) { _ in
                     SavedLibraryView()
                         .environmentObject(profile)
@@ -129,7 +129,7 @@ struct ProfileView: View {
         case following
     }
 
-    /// PROTOTYPE: the auto-sorted "Saved (beta)" library.
+    /// The auto-sorted "Saved" library.
     enum SavedLibraryDestination: Hashable {
         case library
     }

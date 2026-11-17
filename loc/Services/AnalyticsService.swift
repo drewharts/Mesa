@@ -54,6 +54,14 @@ enum Analytics {
         return PostHogSDK.shared.isFeatureEnabled(key)
     }
 
+    /// Whether a PostHog feature flag has been explicitly switched off for the current user.
+    /// False when PostHog isn't set up, flags haven't loaded, or the flag doesn't exist, so
+    /// default-on features stay on unless someone deliberately turns the flag off (kill switch).
+    static func isFeatureExplicitlyDisabled(_ key: String) -> Bool {
+        guard isEnabled else { return false }
+        return (PostHogSDK.shared.getFeatureFlag(key) as? Bool) == false
+    }
+
     /// Refetches feature flags, then calls back on the main queue (immediately when PostHog is off).
     static func reloadFeatureFlags(_ completion: @escaping () -> Void) {
         guard isEnabled else { DispatchQueue.main.async(execute: completion); return }

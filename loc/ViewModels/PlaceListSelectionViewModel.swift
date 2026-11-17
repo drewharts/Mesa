@@ -651,8 +651,8 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
 
     /// Toggles the favorite status for a place via ProfileViewModel.
-    /// PROTOTYPE (auto_sort_saved): the favorites row is presented as the auto-sorted "Saved" library.
-    var isAutoSortSaved: Bool { SavedLibraryGate.isEnabled(userId: userSession.currentUserId) }
+    /// the favorites row is presented as the auto-sorted "Saved" library.
+    var isAutoSortSaved: Bool { SavedLibraryGate.isEnabled }
 
     func toggleFavorite(place: DetailPlace) {
         let label = isAutoSortSaved ? "Saved" : "Favorites"

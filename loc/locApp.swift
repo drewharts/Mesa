@@ -12,6 +12,7 @@ struct locApp: App {
     @StateObject private var locationManager: LocationManager
     @StateObject private var userSession: UserSession
     @StateObject private var appCoordinator = AppCoordinator()
+    @StateObject private var updateGate = AppUpdateGate.shared
     
     // Other dependencies (not environment objects)
     private let serviceContainer = ServiceContainer.shared
@@ -227,6 +228,15 @@ struct locApp: App {
                     Button("OK") { }
                 } message: {
                     Text(appCoordinator.alertMessage)
+                }
+                .overlay {
+                    if updateGate.updateRequired {
+                        UpdateRequiredView()
+                    }
+                }
+                .task { await updateGate.check() }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    Task { await updateGate.check() }
                 }
         }
     }

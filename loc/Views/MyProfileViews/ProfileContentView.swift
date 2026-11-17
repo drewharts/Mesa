@@ -20,8 +20,8 @@ struct ProfileContentView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var showEditProfileForSocials = false
     @State private var showImportTooltip = !UserDefaults.standard.bool(forKey: "hasSeenPhotoImportTooltip")
-    /// PROTOTYPE (auto_sort_saved): shows the "Saved (beta)" row; stays false for everyone but the admin on TestFlight.
-    @State private var showSavedBeta = false
+    /// Shows the "Saved" row unless the auto_sort_saved kill switch is set.
+    @State private var showSaved = SavedLibraryGate.isEnabled
     var body: some View {
         ZStack {
             ScrollView {
@@ -92,7 +92,7 @@ struct ProfileContentView: View {
                             }
                         }
 
-                    if showSavedBeta {
+                    if showSaved {
                         Button {
                             navigationPath.append(ProfileView.SavedLibraryDestination.library)
                         } label: {
@@ -132,8 +132,8 @@ struct ProfileContentView: View {
             }
         }
         .task(id: userSession.currentUserId) {
-            showSavedBeta = SavedLibraryGate.isEnabled(userId: userSession.currentUserId)
-            showSavedBeta = await SavedLibraryGate.resolve(userId: userSession.currentUserId)
+            showSaved = SavedLibraryGate.isEnabled
+            showSaved = await SavedLibraryGate.resolve()
         }
         .sheet(isPresented: $showEditProfileForSocials) {
             if let user = profile.user {

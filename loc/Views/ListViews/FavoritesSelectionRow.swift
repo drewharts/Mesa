@@ -12,7 +12,7 @@ import SwiftUI
 struct FavoritesSelectionRow: View {
     let isFavorited: Bool
     let onToggle: () -> Void
-    /// PROTOTYPE (auto_sort_saved): `.autoSortSaved` shows the same row as "Saved".
+    /// `.autoSortSaved` shows the same row as "Saved".
     var style: Style = .favorites
 
     enum Style { case favorites, autoSortSaved }
