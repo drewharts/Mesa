@@ -2,7 +2,7 @@
 //  SavedLibraryBuilder.swift
 //  loc
 //
-//  PROTOTYPE (auto_sort_saved). Pure, on-device sorting of the places a user already has
+//  Pure, on-device sorting of the places a user already has
 //  (list items, favorites, my places, imports) into a "Saved" library:
 //  city -> type (Restaurants, Bars, Coffee & Sweets, Shops, Sights, Stays, Other) -> cuisine,
 //  plus smart groups (Near you, Saved this week, Dinner in <city>).
@@ -561,7 +561,7 @@ enum SavedLibraryBuilder {
     }
 }
 
-// MARK: - One-tap save (prototype)
+// MARK: - One-tap save
 
 /// What the bookmark on a place page does. With auto-sort on, an unsaved place is saved in one tap
 /// (it lands in the auto-sorted Saved library); a place that is already saved opens the list picker,

@@ -2,7 +2,7 @@
 //  SavedLibraryViewModel.swift
 //  loc
 //
-//  PROTOTYPE (auto_sort_saved). Loads the places the user already has (lists, favorites,
+//  Loads the places the user already has (lists, favorites,
 //  my places, imports) with read-only queries, then sorts them on device with SavedLibraryBuilder.
 //  Writes nothing.
 //

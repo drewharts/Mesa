@@ -2,9 +2,9 @@
 //  SavedLibraryView.swift
 //  loc
 //
-//  PROTOTYPE (auto_sort_saved). "Saved (beta)": every place the user has, sorted on device by
+//  auto_sort_saved. "Saved": every place the user has, sorted on device by
 //  city -> type -> cuisine, with Near you / Saved this week / Dinner in <city> groups.
-//  Only reachable for the admin on TestFlight with the PostHog flag on (see SavedLibraryGate).
+//  On for everyone unless the PostHog kill switch is set (see SavedLibraryGate).
 //
 
 import Combine
@@ -31,18 +31,6 @@ struct SavedLibraryView: View {
         }
         .navigationTitle("Saved")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 6) {
-                    Text("Saved").font(.headline)
-                    Text("BETA")
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Color.mesaAccent.opacity(0.15), in: Capsule())
-                        .foregroundColor(.mesaAccent)
-                }
-            }
-        }
         .task {
             await viewModel.loadIfNeeded(userId: userSession.currentUserId, location: locationManager.currentLocation)
         }
@@ -53,7 +41,7 @@ struct SavedLibraryView: View {
         .navigationDestination(item: $selectedPlaceId) { placeId in
             PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: false)
         }
-        .analyticsScreen("Saved Beta")
+        .analyticsScreen("Saved")
     }
 
     // MARK: - Content
@@ -240,7 +228,7 @@ struct SavedLibraryView: View {
     }
 }
 
-/// Entry row on the user's own profile. Hidden unless SavedLibraryGate passes.
+/// Entry row on the user's own profile. Hidden only when the SavedLibraryGate kill switch is set.
 struct SavedLibraryEntryRow: View {
     var body: some View {
         HStack(spacing: 12) {
@@ -248,16 +236,9 @@ struct SavedLibraryEntryRow: View {
                 .font(.system(size: 20))
                 .foregroundColor(.mesaAccent)
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text("Saved")
-                        .font(.subheadline).fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    Text("BETA")
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Color.mesaAccent.opacity(0.15), in: Capsule())
-                        .foregroundColor(.mesaAccent)
-                }
+                Text("Saved")
+                    .font(.subheadline).fontWeight(.semibold)
+                    .foregroundColor(.primary)
                 Text("All your places, sorted by city and type")
                     .font(.caption)
                     .foregroundColor(.secondary)

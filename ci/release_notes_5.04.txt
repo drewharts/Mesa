@@ -1,0 +1,3 @@
+- Saved places now sort themselves automatically by city and type. You can still make your own lists.
+- Redesigned profile.
+- Fixed list places opening the wrong place.
