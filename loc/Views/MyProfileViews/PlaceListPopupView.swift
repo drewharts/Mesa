@@ -23,6 +23,7 @@
 
 import SwiftUI
 import Combine
+import MapKit
 
 struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     // MARK: - Configuration
@@ -44,6 +45,13 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     let onRemove: ((LightweightPlace) -> Void)?
     /// Whether opening the sheet fits the map to the places' pins (off for region-driven filters like "Nearby").
     let fitsMapToPlaces: Bool
+    /// Optional precomputed opening region; when set it replaces the bounding-box fit.
+    let framingRegion: MKCoordinateRegion?
+    /// Identifies the framing (e.g. the scope); a new key refits the map once.
+    let framingKey: String?
+
+    /// The framing key that has already been applied to the map.
+    @State private var appliedFramingKey: String?
 
     @Environment(\.presentationMode) var presentationMode
 
@@ -67,8 +75,12 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
         @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView,
         @ViewBuilder headerAccessory: @escaping () -> HeaderAccessory,
         onRemove: ((LightweightPlace) -> Void)? = nil,
-        fitsMapToPlaces: Bool = true
+        fitsMapToPlaces: Bool = true,
+        framingRegion: MKCoordinateRegion? = nil,
+        framingKey: String? = nil
     ) {
+        self.framingRegion = framingRegion
+        self.framingKey = framingKey
         self.onRemove = onRemove
         self.fitsMapToPlaces = fitsMapToPlaces
         self.title = title
@@ -123,6 +135,7 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
             fitMapIfNeeded()
         }
         .onChange(of: places.count) { _, _ in fitMapIfNeeded() }
+        .onChange(of: framingKey) { _, _ in fitMapIfNeeded() }
         .onDisappear { sheetVM.endSession() }
     }
 
@@ -243,8 +256,17 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
         return !(lat == 0 && lon == 0)
     }
 
+    /// Fits the map once: to the precomputed framing region when provided, else to the places' bounding box.
     private func fitMapIfNeeded() {
-        guard fitsMapToPlaces, !places.isEmpty else { return }
+        guard fitsMapToPlaces else { return }
+        if let framingKey {
+            guard let framingRegion, appliedFramingKey != framingKey else { return }
+            appliedFramingKey = framingKey
+            sheetVM.fitToRegion(framingRegion)
+            if !places.isEmpty { placeMeta.prefetchCities(for: places) }
+            return
+        }
+        guard !places.isEmpty else { return }
         sheetVM.fitToPlaces(places)
         placeMeta.prefetchCities(for: places)
     }

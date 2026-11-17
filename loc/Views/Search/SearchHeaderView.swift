@@ -2,7 +2,7 @@
 //  SearchHeaderView.swift
 //  loc
 //
-//  DUMB Component: Search text field with cancel button
+//  DUMB Component: Search text field with cancel button and a compact Places | People toggle
 //
 
 import SwiftUI
@@ -15,16 +15,24 @@ struct SearchHeaderView: View {
     @Binding var searchText: String
     @FocusState.Binding var isFocused: Bool
 
+    // MARK: - Data
+
+    let mode: SearchMode
+
     // MARK: - Callbacks
 
+    let onModeChange: (SearchMode) -> Void
     let onCancel: () -> Void
 
     // MARK: - Body
 
     var body: some View {
-        HStack(spacing: 12) {
-            searchField
-            cancelButton
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                searchField
+                cancelButton
+            }
+            modePicker
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
@@ -32,13 +40,28 @@ struct SearchHeaderView: View {
 
     // MARK: - Subviews
 
+    private var modeBinding: Binding<SearchMode> {
+        Binding(get: { mode }, set: { onModeChange($0) })
+    }
+
+    private var modePicker: some View {
+        Picker("Search for", selection: modeBinding) {
+            ForEach(SearchMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .frame(maxWidth: 200)
+    }
+
     private var searchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.gray)
                 .font(.system(size: 16, weight: .medium))
 
-            TextField("Search places, users...", text: $searchText)
+            TextField(mode.placeholder, text: $searchText)
                 .font(.body)
                 .foregroundColor(.primary)
                 .focused($isFocused)

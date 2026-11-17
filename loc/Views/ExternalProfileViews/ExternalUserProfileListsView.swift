@@ -107,7 +107,7 @@ struct ExternalUserProfileListsView: View {
     }
 
     private var emptyState: some View {
-        Text("No lists available")
+        Text("No lists yet")
             .font(.subheadline)
             .foregroundColor(.gray)
             .padding(.leading, 20)

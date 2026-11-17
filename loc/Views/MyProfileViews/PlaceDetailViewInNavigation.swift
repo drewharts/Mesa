@@ -53,6 +53,9 @@ struct PlaceDetailViewInNavigation: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadPlace()
+            // The user tapped another place while this one loaded (this view was replaced and its
+            // task cancelled): don't select the old place over the new one.
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 if let place = viewModel.loadedPlace {
                     selectedPlaceVM.selectPlace(place, shouldAnimateMap: shouldAnimateMap)

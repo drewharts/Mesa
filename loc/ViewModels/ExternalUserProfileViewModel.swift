@@ -62,13 +62,18 @@ class ExternalUserProfileViewModel: ObservableObject {
 
     /// True when the user has nothing to show (no lists, favorites, reviews or places).
     /// Only meaningful after the initial load, so we never flash the empty state while loading.
+    /// Whether the profile has nothing visible to show (no lists and no reviews). Favorites and
+    /// imports are not shown on other people's profiles, so they don't count.
     var isEmptyProfile: Bool {
         hasLoadedInitialData
             && listSearchText.isEmpty
             && userLists.isEmpty
-            && userFavorites.isEmpty
             && lightweightReviewedPlaces.isEmpty
-            && totalPlacesCount == 0
+    }
+
+    /// Whether the Reviews section should show (hidden once loaded with no reviews, instead of an empty block).
+    var showsReviewsSection: Bool {
+        isLoadingReviewedPlaces || !lightweightReviewedPlaces.isEmpty || !hasLoadedInitialData
     }
 
     // MARK: - Followers/Following for Nested Navigation

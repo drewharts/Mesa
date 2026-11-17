@@ -198,9 +198,12 @@ struct MapView: View {
     private func handleCommunityMarkerTap(_ marker: CommunityPlaceMarker) {
         // Cancel any in-flight tap discovery (SpatialTapGesture fires simultaneously)
         mapViewModel.tapDiscoveryViewModel.resetState()
+        let selectionAtTap = selectedPlaceVM.selectedPlace?.id
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: marker) {
                 await MainActor.run {
+                    // Something else was selected while this loaded: don't override it.
+                    guard selectedPlaceVM.selectedPlace?.id == selectionAtTap else { return }
                     // Preserve the annotation so it survives zoom-out density culling
                     mapViewModel.setPreservedAnnotation(for: place)
                     // Use selectPlace since data is already complete from backend
@@ -226,27 +229,37 @@ struct MapView: View {
 
         let place = mapViewModel.resolveAnnotationForNavigation(annotation)
         mapViewModel.setPreservedAnnotation(for: place)
+        let routedToPopup = isPlacePopupShowing
         navigateToPlace(place)
 
-        if !mapViewModel.hasFullDetails(for: annotation) {
+        // Backfill full details only for the direct detail sheet, and only if this place is still
+        // the selection. In a popup the sheet owns selection (its detail view loads the place), and
+        // a late backfill would overwrite whatever the user tapped next.
+        if !routedToPopup && !mapViewModel.hasFullDetails(for: annotation) {
             Task {
-                if let fullPlace = await mapViewModel.loadPlaceDetails(for: annotation) {
+                if let fullPlace = await mapViewModel.loadPlaceDetails(for: annotation),
+                   selectedPlaceVM.selectedPlace?.id == place.id {
                     selectedPlaceVM.selectPlace(fullPlace, shouldAnimateMap: false)
                 }
             }
         }
     }
 
+    /// Whether a map popup sheet (list, imports, reviews, …) is showing and owns place selection.
+    private var isPlacePopupShowing: Bool {
+        mapViewModel.showingListPopup ||
+        mapViewModel.showingExternalPlacesPopup ||
+        mapViewModel.showingReviewsPopup ||
+        mapViewModel.showingFavoritesPopup ||
+        mapViewModel.showingExternalListPopup ||
+        mapViewModel.showingExternalReviewsPopup ||
+        mapViewModel.showingExternalFavoritesPopup ||
+        mapViewModel.showingKeywordPopup
+    }
+
     /// Routes place navigation through popup sheet or direct detail sheet.
     private func navigateToPlace(_ place: DetailPlace) {
-        if mapViewModel.showingListPopup ||
-           mapViewModel.showingExternalPlacesPopup ||
-           mapViewModel.showingReviewsPopup ||
-           mapViewModel.showingFavoritesPopup ||
-           mapViewModel.showingExternalListPopup ||
-           mapViewModel.showingExternalReviewsPopup ||
-           mapViewModel.showingExternalFavoritesPopup ||
-           mapViewModel.showingKeywordPopup {
+        if isPlacePopupShowing {
             mapViewModel.pendingPlaceNavigation = place.id.uuidString
         } else {
             selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)

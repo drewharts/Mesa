@@ -52,6 +52,7 @@ struct SearchContentView: View {
         !searchViewModel.aiSuggestionsViewModel.suggestions.isEmpty ||
         searchViewModel.aiSuggestionsViewModel.isLoading ||
         searchViewModel.showNoPlaceFound ||
+        searchViewModel.showNoUserFound ||
         searchViewModel.isSearching
     }
 
@@ -96,7 +97,9 @@ struct SearchContentView: View {
 
     private var searchResultsSection: some View {
         VStack(spacing: 0) {
-            coordinateRow
+            if searchViewModel.mode == .places {
+                coordinateRow
+            }
 
             SearchResultsView(
                 placeResults: searchViewModel.searchResults,
@@ -129,7 +132,8 @@ struct SearchContentView: View {
                 onSelectAIPlace: { place in
                     searchViewModel.saveAIPlaceSelection(place)
                     onSelectPlace(place)
-                }
+                },
+                showNoUserFound: searchViewModel.showNoUserFound
             )
         }
     }
@@ -183,7 +187,7 @@ struct SearchContentView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.gray.opacity(0.5))
 
-            Text("Search for places and users")
+            Text(searchViewModel.mode == .places ? "Search for places" : "Search for people")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
