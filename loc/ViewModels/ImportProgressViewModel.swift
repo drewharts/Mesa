@@ -23,6 +23,13 @@ class ImportProgressViewModel: ObservableObject {
     @Published private(set) var isFinished: Bool = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var savedPlaces: [DetailPlace] = []
+    /// "Saved to {City · Type}" / "Saved N places" once the import landed in the Saved library.
+    @Published private(set) var autoSaveMessage: String?
+    /// True after the user taps "Add to list" on the auto-save banner (reveals the list picker).
+    @Published var isListPickerRequested: Bool = false
+    /// Ids of places this import added to Saved, so each is saved once and can be undone if wrong.
+    private var autoSavedIds = Set<String>()
+    private weak var autoSaveFavorites: ProfileFavoritesViewModel?
     /// Whether the user can leave the app and still be told when the import is done.
     @Published private(set) var notificationsEnabled: Bool = false
 
@@ -169,6 +176,38 @@ class ImportProgressViewModel: ObservableObject {
         Analytics.track(.importFinished, ["success": false])
     }
 
+    // MARK: - Auto-save to Saved
+
+    /// Whether the import was saved automatically, so the list picker waits for "Add to list".
+    var isAutoSaved: Bool { !autoSavedIds.isEmpty }
+
+    /// Whether the inline list picker should be shown: always when nothing was auto-saved (gate off).
+    var showsListPicker: Bool { !isAutoSaved || isListPickerRequested }
+
+    /// Saves the found places to Saved (favorites row, same write as one-tap save) unless the kill switch is set.
+    func autoSaveIfEnabled(favorites: ProfileFavoritesViewModel) {
+        guard SavedLibraryGate.isEnabled else { return }
+        autoSaveFavorites = favorites
+        let fresh = ImportAutoSave.placesToSave(from: savedPlaces, alreadySaved: autoSavedIds)
+        for place in fresh {
+            favorites.addFavoritePlace(place: place)
+            autoSavedIds.insert(place.id.uuidString)
+        }
+        refreshAutoSaveMessage()
+    }
+
+    /// Recomputes the banner from the places that are currently auto-saved.
+    private func refreshAutoSaveMessage() {
+        let current = savedPlaces.filter { autoSavedIds.contains($0.id.uuidString) }
+        autoSaveMessage = ImportAutoSave.bannerMessage(for: current)
+    }
+
+    /// Takes a wrongly detected place back out of Saved if this import was the one that saved it.
+    private func undoAutoSave(of wrong: DetailPlace) {
+        guard autoSavedIds.remove(wrong.id.uuidString) != nil else { return }
+        autoSaveFavorites?.removeFavoritePlace(place: wrong)
+    }
+
     // MARK: - Actions
 
     /// Adds a place the user picked by hand (already linked to this video via external_places).
@@ -213,6 +252,8 @@ class ImportProgressViewModel: ObservableObject {
         }
         places = applyCorrections(to: places)
         savedPlaces = dedup(places.filter { $0.status == .saved }.compactMap { $0.place })
+        undoAutoSave(of: wrong)
+        if let favorites = autoSaveFavorites { autoSaveIfEnabled(favorites: favorites) } else { refreshAutoSaveMessage() }
         await unlinkFromVideo(wrong)
         Analytics.track(.importPlaceCorrected, ["action": "replace"])
     }
@@ -226,6 +267,8 @@ class ImportProgressViewModel: ObservableObject {
             errorMessage = "No places left. Search for the right one below."
         }
         statusText = "\(savedPlaces.count) place\(savedPlaces.count == 1 ? "" : "s") found"
+        undoAutoSave(of: wrong)
+        refreshAutoSaveMessage()
         await unlinkFromVideo(wrong)
         Analytics.track(.importPlaceCorrected, ["action": "remove"])
     }

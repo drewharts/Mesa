@@ -11,9 +11,16 @@ struct ExternalPlaceSelectionView: View {
     @State private var isBulkAdd = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
     @State private var tripSelectionViewModel: PlaceTripSelectionViewModel?
+    @StateObject private var saveBanner = ExternalPlaceSaveBannerViewModel()
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profile.externalContentViewModel }
+
+    /// Title of the bulk button: saves everything when auto-sort is on, otherwise opens the list picker.
+    private var saveAllTitle: String {
+        let count = externalContentVM.importedPlaces.count
+        return SavedLibraryGate.isEnabled ? "Save all \(count)" : "Add all \(count) to a list"
+    }
 
     var body: some View {
         NavigationView {
@@ -68,6 +75,8 @@ struct ExternalPlaceSelectionView: View {
                                 place: place,
                                 onBookmarkTapped: {
                                     profile.listsViewModel.ensureListsLoaded()
+                                    // Saves straight to Saved (banner offers "Add to list"); picker only if auto-save is off.
+                                    guard !saveBanner.autoSave([place], favorites: profile.favoritesViewModel) else { return }
                                     isBulkAdd = false
                                     selectedPlaceForList = place
                                     showingListSelection = true
@@ -94,14 +103,26 @@ struct ExternalPlaceSelectionView: View {
                 VStack(spacing: 12) {
                     Divider()
 
+                    if let message = saveBanner.message {
+                        SavedBannerView(message: message) {
+                            // Open the usual picker for exactly the places that were just saved.
+                            isBulkAdd = saveBanner.savedPlaces.count > 1
+                            selectedPlaceForList = saveBanner.savedPlaces.first
+                            saveBanner.dismiss()
+                            showingListSelection = true
+                        }
+                        .padding(.horizontal, 20)
+                    }
+
                     if externalContentVM.importedPlaces.count > 1 {
                         Button {
                             profile.listsViewModel.ensureListsLoaded()
+                            guard !saveBanner.autoSave(externalContentVM.importedPlaces, favorites: profile.favoritesViewModel) else { return }
                             isBulkAdd = true
                             selectedPlaceForList = externalContentVM.importedPlaces.first
                             showingListSelection = true
                         } label: {
-                            Label("Add all \(externalContentVM.importedPlaces.count) to a list", systemImage: "text.badge.plus")
+                            Label(saveAllTitle, systemImage: "text.badge.plus")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
@@ -163,7 +184,7 @@ struct ExternalPlaceSelectionView: View {
                 tripSelectionViewModel = PlaceTripSelectionViewModel()
             }
             if newValue {
-                listSelectionViewModel?.bulkPlaces = isBulkAdd ? externalContentVM.importedPlaces : []
+                listSelectionViewModel?.bulkPlaces = isBulkAdd ? (saveBanner.savedPlaces.count > 1 ? saveBanner.savedPlaces : externalContentVM.importedPlaces) : []
             }
         }
     }

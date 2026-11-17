@@ -34,7 +34,9 @@ struct ProfileViewListsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             searchBarTapTarget
+            foldedBanner
             listContent
+            foldedToggle
         }
         .fullScreenCover(isPresented: $showFullScreenLists) {
             FullScreenListsView(listsVM: listsVM)
@@ -124,6 +126,36 @@ struct ProfileViewListsView: View {
             )
         }
         .padding(.horizontal, 20)
+    }
+
+    // MARK: - Folded Lists
+
+    /// One-time "Folded N lists into your cities" banner with Undo.
+    @ViewBuilder
+    private var foldedBanner: some View {
+        let folded = listsVM.foldedListsViewModel
+        if folded.bannerCount != nil {
+            FoldedListsBannerView(
+                title: folded.bannerTitle,
+                onUndo: { folded.undoBanner() },
+                onDismiss: { folded.dismissBanner() }
+            )
+            .padding(.horizontal, 20)
+        }
+    }
+
+    /// "Show folded lists" toggle, only when something is folded.
+    @ViewBuilder
+    private var foldedToggle: some View {
+        let folded = listsVM.foldedListsViewModel
+        if folded.foldedCount > 0 {
+            FoldedListsToggleRow(
+                title: folded.toggleTitle,
+                isShowing: folded.showFolded,
+                onToggle: { folded.toggleShowFolded() },
+                onRestoreAll: { folded.restoreAll() }
+            )
+        }
     }
 
     // MARK: - List Content

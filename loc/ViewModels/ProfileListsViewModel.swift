@@ -36,6 +36,11 @@ class ProfileListsViewModel: ObservableObject {
     /// Pagination of places within individual lists.
     let placePaginationViewModel: ListsPlacePaginationViewModel
 
+    /// Lists folded into their cities (hidden from the grid, banner, Undo).
+    let foldedListsViewModel = FoldedListsViewModel()
+
+    private weak var userSession: UserSession?
+
     // MARK: - Combine Subscriptions
 
     /// Stores subscriptions to child ViewModels for change propagation.
@@ -250,6 +255,7 @@ class ProfileListsViewModel: ObservableObject {
         self.distanceSortingViewModel = distanceSortingVM
         self.legacyLoadingViewModel = legacyLoadingVM
         self.placePaginationViewModel = placePaginationVM
+        self.userSession = userSession
 
         // Wire up cross-ViewModel references
         mutationsVM.setDistanceSortingViewModel(distanceSortingVM)
@@ -305,6 +311,44 @@ class ProfileListsViewModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
+        setupFoldedListsObservers()
+    }
+
+    /// Hides folded lists in the grid and looks for new ones whenever the full list metadata loads.
+    private func setupFoldedListsObservers() {
+        foldedListsViewModel.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest(foldedListsViewModel.$foldedIds, foldedListsViewModel.$showFolded)
+            .map { folded, showing in showing ? Set<String>() : folded }
+            .removeDuplicates()
+            .sink { [weak self] hidden in
+                self?.searchViewModel.hiddenListIds = hidden
+                self?.loadMoreListsIfAllHidden()
+            }
+            .store(in: &cancellables)
+
+        dataViewModel.$allListsCache
+            .filter { !$0.isEmpty }
+            .debounce(for: .seconds(1), scheduler: RunLoop.main)
+            .sink { [weak self] lists in
+                guard let userId = self?.userSession?.currentUserId else { return }
+                Task { @MainActor [weak self] in await self?.foldedListsViewModel.detectIfNeeded(userId: userId, lists: lists) }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Keeps paging while folding has hidden every list loaded so far, so remaining lists are not stranded.
+    private func loadMoreListsIfAllHidden() {
+        guard !searchViewModel.hiddenListIds.isEmpty else { return }
+        Task { @MainActor [weak self] in
+            var pages = 0
+            while let self, self.filteredPlaceLists.isEmpty, self.hasMorePlaceLists, pages < 5 {
+                await self.loadMoreLists()
+                pages += 1
+            }
+        }
     }
 
     // MARK: - Callback Propagation
@@ -595,6 +639,7 @@ class ProfileListsViewModel: ObservableObject {
         dataViewModel.resetAllData()
         loadingViewModel.resetLoadingStates()
         searchViewModel.resetSearchState()
+        foldedListsViewModel.reset()
         distanceSortingViewModel.resetSortingState()
         legacyLoadingViewModel.resetLegacyLoadingState()
         placePaginationViewModel.resetPaginationState()
