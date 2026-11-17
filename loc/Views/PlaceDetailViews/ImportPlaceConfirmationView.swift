@@ -56,7 +56,7 @@ struct ImportPlaceConfirmationView: View {
                 .foregroundColor(.green)
 
             VStack(spacing: 6) {
-                Text(viewModel.place.name)
+                Text(viewModel.place.displayName)
                     .font(.title3)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
