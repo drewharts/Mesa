@@ -17,6 +17,9 @@ struct DetailPlace: Codable, Identifiable, Equatable {
 
     var id: UUID = UUID()
     var name: String
+
+    /// Name safe to show: hides junk "undefined"/"null"/blank names, falling back to the address.
+    var displayName: String { LightweightPlace.displayName(name, address: address) }
     var address: String?
     var city: String?
     var mapboxId: String?
