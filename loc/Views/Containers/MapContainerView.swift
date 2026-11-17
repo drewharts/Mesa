@@ -157,6 +157,9 @@ struct MapContainerView: View {
             .onChange(of: profileViewModel.showExternalPlacesOnMap) { _, newValue in
                 handleExternalPlacesOnMap(newValue)
             }
+            .onReceive(profileViewModel.recentlyImportedViewModel.$mapNearMeLocation.removeDuplicates { $0 === $1 }) { location in
+                handleExternalPlacesNearLocationChange(location)
+            }
             .onChange(of: profileViewModel.showReviewsOnMap) { _, newValue in
                 handleReviewsOnMap(newValue)
             }
@@ -273,10 +276,20 @@ struct MapContainerView: View {
         }
     }
 
+    /// Re-filters external-place pins when the imports sheet switches between All and Near me.
+    private func handleExternalPlacesNearLocationChange(_ location: CLLocation?) {
+        guard mapViewModel.showingExternalPlacesOnMap else { return }
+        mapViewModel.setExternalPlacesNearLocation(location)
+        guard let userId = userSession.currentUserId, let region = appCoordinator.currentMapRegion else { return }
+        Task {
+            await mapViewModel.onMapCameraSettled(region, userId: userId)
+        }
+    }
+
     /// Handles showing external places on map
     private func handleExternalPlacesOnMap(_ newValue: Bool) {
         if newValue {
-            mapViewModel.selectExternalPlaces()
+            mapViewModel.selectExternalPlaces(near: profileViewModel.recentlyImportedViewModel.mapNearMeLocation)
             profileViewModel.showExternalPlacesOnMap = false
             if let userId = userSession.currentUserId {
                 let currentRegion = appCoordinator.currentMapRegion

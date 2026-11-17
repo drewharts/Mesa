@@ -77,6 +77,16 @@ struct ProfileView: View {
                         }
                     }
                 }
+                // Auto-sorted Saved library (on for everyone; PostHog auto_sort_saved is a kill switch).
+                .navigationDestination(for: SavedLibraryDestination.self) { _ in
+                    SavedLibraryView()
+                        .environmentObject(profile)
+                        .environmentObject(userSession)
+                        .environmentObject(selectedPlaceVM)
+                        .environmentObject(placeVM)
+                        .environmentObject(userProfileNavigationViewModel)
+                        .environmentObject(locationManager)
+                }
         }
             .modifier(SheetsModifier(
                 photoImportVM: photoImportVM,
@@ -118,6 +128,11 @@ struct ProfileView: View {
         case followers
         case following
     }
+
+    /// The auto-sorted "Saved" library.
+    enum SavedLibraryDestination: Hashable {
+        case library
+    }
     
     private var mainContent: some View {
         ZStack {
@@ -125,7 +140,6 @@ struct ProfileView: View {
             ProfileContentView(
                 socialVM: profile.socialViewModel,
                 myPlacesVM: profile.myPlacesViewModel,
-                favoritesVM: profile.favoritesViewModel,
                 externalContentVM: profile.externalContentViewModel,
                 reviewsVM: profile.reviewsViewModel,
                 listsVM: profile.listsViewModel,

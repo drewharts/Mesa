@@ -495,6 +495,23 @@ class ProfileListsViewModel: ObservableObject {
         await loadingViewModel.loadListsByPlaceCoordinates(placeLatitude: placeLatitude, placeLongitude: placeLongitude)
     }
 
+    /// Returns the cached list matching an id, ignoring UUID casing.
+    func cachedList(withId listId: String) -> LightweightPlaceList? {
+        lightweightPlaceLists.first { $0.list_id.caseInsensitiveCompare(listId) == .orderedSame }
+    }
+
+    /// Builds a loader that fetches a list missing from the cache (e.g. a shared or just-used list) and caches it.
+    func makeListSheetLoader(listId: String) -> ListSheetLoadViewModel {
+        ListSheetLoadViewModel(
+            listId: listId,
+            fetchList: { try await ServiceContainer.shared.userService.fetchPlaceListById(listId: $0) },
+            onLoaded: { [weak self] list in
+                guard let self, self.cachedList(withId: list.list_id) == nil else { return }
+                self.lightweightPlaceLists.insert(list, at: 0)
+            }
+        )
+    }
+
     /// Loads places for multiple lists in parallel.
     func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         await loadingViewModel.loadPlacesForLists(lists)

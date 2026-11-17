@@ -43,6 +43,16 @@ class SelectedPlaceViewModel: ObservableObject {
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
 
     private var cancellables = Set<AnyCancellable>()
+
+    /// Bumped on every new selection; async loads apply their result only if it still matches,
+    /// so a slow load for a previously tapped place can't overwrite the current one.
+    private var selectionGeneration = 0
+
+    /// In-flight enrichment for the current selection; cancelled when a new place is selected.
+    private var enrichmentTask: Task<Void, Never>?
+
+    /// In-flight fresh-details fetch for the current selection; cancelled when a new place is selected.
+    private var freshDetailsTask: Task<Void, Never>?
     private var serviceCancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
@@ -112,7 +122,19 @@ class SelectedPlaceViewModel: ObservableObject {
     /// The currently selected place.
     var selectedPlace: DetailPlace? {
         get { selectionState.selectedPlace }
-        set { selectionState.selectedPlace = newValue }
+        set {
+            if newValue?.id != selectionState.selectedPlace?.id { invalidatePendingLoads() }
+            selectionState.selectedPlace = newValue
+        }
+    }
+
+    /// Cancels in-flight loads and invalidates any that can't be cancelled.
+    private func invalidatePendingLoads() {
+        selectionGeneration += 1
+        enrichmentTask?.cancel()
+        enrichmentTask = nil
+        freshDetailsTask?.cancel()
+        freshDetailsTask = nil
     }
 
     /// Whether the detail sheet is presented (bridged to PresentationService).
@@ -202,9 +224,12 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Navigates to a place by ID.
     func navigateToPlace(placeId: String, onDismiss: (() -> Void)? = nil) {
+        let generation = selectionGeneration
         Task {
             guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
             await MainActor.run {
+                // Something else was selected while this loaded: don't override it.
+                guard generation == self.selectionGeneration else { return }
                 self.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
                 self.isDetailSheetPresented = true
                 onDismiss?()
@@ -313,6 +338,7 @@ class SelectedPlaceViewModel: ObservableObject {
     func clearAllUserData() {
         print("🗑️ [SelectedPlaceViewModel] Clearing all user data for security")
 
+        invalidatePendingLoads()
         selectionState.clearAllState()
         postsCacheService.clearAllData()
         metadata.clearAllData()
@@ -324,6 +350,7 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Handles when a place is selected.
     private func handlePlaceSelected(_ place: DetailPlace) {
+        invalidatePendingLoads()
         let currentCoordinate = locationManager.currentLocation?.coordinate
 
         if PlaceDataAssembler.needsEnrichment(place) && !selectionState.isFetchingFreshDetails {
@@ -368,16 +395,20 @@ class SelectedPlaceViewModel: ObservableObject {
             continueWithPlaceSetup(place: place, currentLocation: currentLocation)
             return
         }
-        Task {
+        let generation = selectionGeneration
+        enrichmentTask = Task {
             do {
                 let enriched = try await placeRepository.resolvePlace(
                     googlePlaceId: place.googlePlaceId,
                     fallbackId: place.id.uuidString,
                     existingPlace: place
                 )
+                // A newer selection happened while this was loading: drop the stale result.
+                guard !Task.isCancelled, generation == selectionGeneration else { return }
                 selectionState.updatePlaceDetails(enriched)
                 continueWithPlaceSetup(place: enriched, currentLocation: currentLocation)
             } catch {
+                guard !Task.isCancelled, generation == selectionGeneration else { return }
                 print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
                 continueWithPlaceSetup(place: place, currentLocation: currentLocation)
             }
@@ -388,14 +419,17 @@ class SelectedPlaceViewModel: ObservableObject {
     /// If the resolved place is a city (locality), redirects to the city detail sheet.
     private func fetchFreshDetailsInBackground(for place: DetailPlace) {
         guard place.isCustom != true else { return }
-        Task {
+        let generation = selectionGeneration
+        freshDetailsTask = Task {
             do {
                 let enriched = try await placeRepository.resolvePlace(
                     googlePlaceId: place.googlePlaceId,
                     fallbackId: place.id.uuidString,
                     existingPlace: place
                 )
-                guard self.selectedPlace?.id == place.id else { return }
+                // A newer selection happened while this was loading: drop the stale result.
+                guard !Task.isCancelled, generation == selectionGeneration,
+                      self.selectedPlace?.id == place.id else { return }
 
                 // Redirect to city sheet if the place is a city-level result
                 if Self.isCityPlace(enriched), let coordinate = enriched.coordinate {
@@ -420,7 +454,8 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             } catch {
                 print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
-                guard self.selectedPlace?.id == place.id else { return }
+                guard !Task.isCancelled, generation == selectionGeneration,
+                      self.selectedPlace?.id == place.id else { return }
                 selectionState.markFetchComplete()
 
                 if place.hasPlaceholderID && (place.googlePlaceId ?? "").isEmpty {

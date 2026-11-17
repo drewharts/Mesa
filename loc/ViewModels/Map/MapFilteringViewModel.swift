@@ -6,11 +6,16 @@
 //
 
 import Foundation
+import CoreLocation
 
 @MainActor
 class MapFilteringViewModel: ObservableObject {
     @Published var selectedListId: String? = nil
-    @Published var showingExternalPlacesOnMap: Bool = false
+    @Published var showingExternalPlacesOnMap: Bool = false {
+        didSet { if !showingExternalPlacesOnMap { externalPlacesNearLocation = nil } }
+    }
+    /// When set, the external-places filter only shows imports within the "Near me" radius of this location.
+    @Published var externalPlacesNearLocation: CLLocation? = nil
     @Published var showingReviewsOnMap: Bool = false
     @Published var showingFavoritesOnMap: Bool = false
     @Published var showingMyPlacesOnMap: Bool = false
@@ -58,15 +63,23 @@ class MapFilteringViewModel: ObservableObject {
 
     // MARK: - Content Type Filtering
 
-    /// Sets the map to show only external places.
-    func selectExternalPlaces() {
+    /// Sets the map to show only external places, optionally limited to the "Near me" radius around a location.
+    func selectExternalPlaces(near location: CLLocation? = nil) {
         showingExternalPlacesOnMap = true
+        externalPlacesNearLocation = location
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
         showingMyPlacesOnMap = false
         selectedListId = nil
         showingKeywordResultsPopup = false
         keywordTypesFilter = nil
+        onFilterChanged?()
+    }
+
+    /// Updates the "Near me" pin filter while external places are showing and reloads the pins.
+    func setExternalPlacesNearLocation(_ location: CLLocation?) {
+        guard showingExternalPlacesOnMap, location !== externalPlacesNearLocation else { return }
+        externalPlacesNearLocation = location
         onFilterChanged?()
     }
 

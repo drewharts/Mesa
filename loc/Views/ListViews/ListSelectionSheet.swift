@@ -257,7 +257,8 @@ struct ListsInSelectionSheet: View {
                         isFavorited: viewModel.isFavorited,
                         onToggle: {
                             viewModel.toggleFavorite(place: place)
-                        }
+                        },
+                        style: viewModel.isAutoSortSaved ? .autoSortSaved : .favorites
                     )
 
                     Divider()

@@ -83,14 +83,11 @@ struct ExternalUserLightweightListPopupView: View {
         openPlaceDetail(place)
     }
 
-    /// Opens the place page inside the sheet and selects the place on the map.
+    /// Opens the place page inside the sheet; the page loads and selects its own place.
+    /// (A separate fetch-and-select here could land after a later tap and reopen the older place.)
     private func openPlaceDetail(_ place: LightweightPlace) {
         sheetVM.ensureAtLeastHalf()
         navigationPath.append(place.place_id)
-        Task {
-            guard let fetched = try? await PlaceService.shared.fetchPlace(withId: place.place_id) else { return }
-            selectedPlaceVM.selectPlaceAndFetchDetails(fetched, shouldAnimateMap: true)
-        }
     }
 
     /// Pin tap: scroll to and highlight the row; a second tap on the same pin opens its details.

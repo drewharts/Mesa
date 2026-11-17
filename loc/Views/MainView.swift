@@ -400,7 +400,8 @@ struct MainView: View {
     /// User's list popup sheet content.
     private func listSheet(listId: String) -> some View {
         Group {
-            if let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
+            if let cached = profileViewModel.listsViewModel.cachedList(withId: listId),
+               let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == cached.id }) {
                 LightweightListPopupView(
                     lists: profileViewModel.listsViewModel.lightweightPlaceLists,
                     initialListIndex: listIndex,
@@ -409,7 +410,7 @@ struct MainView: View {
                 )
                 .id(listId)
             } else {
-                loadingListView
+                ListSheetLoadView(viewModel: profileViewModel.listsViewModel.makeListSheetLoader(listId: listId))
             }
         }
         .applyMapPopupEnvironment(from: self)
@@ -419,7 +420,10 @@ struct MainView: View {
 
     /// External places popup sheet content.
     private var externalPlacesSheet: some View {
-        ExternalPlacesPopupView(externalContentVM: profileViewModel.externalContentViewModel)
+        ExternalPlacesPopupView(
+            externalContentVM: profileViewModel.externalContentViewModel,
+            recentlyImportedVM: profileViewModel.recentlyImportedViewModel
+        )
             .applyMapPopupEnvironment(from: self)
             .applyListMapSheetPresentation()
             .onDisappear { handleMapPopupDisappear() }
@@ -658,6 +662,7 @@ struct MainView: View {
         profileViewModel.selectedListIdForMap = nil
         profileViewModel.pendingMapFilter = nil
         profileViewModel.externalContentViewModel.disableNearbyFilter()
+        profileViewModel.recentlyImportedViewModel.resetScope()
         // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
     }
 

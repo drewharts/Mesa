@@ -34,6 +34,8 @@ struct SearchResultsView: View {
     let isAILoading: Bool
     let aiError: String?
     let onSelectAIPlace: (DetailPlace) -> Void
+    /// True when a People search returned nothing.
+    var showNoUserFound: Bool = false
 
     @State private var isUsersCollapsed: Bool = false
     @State private var isKeywordCollapsed: Bool = true
@@ -45,6 +47,8 @@ struct SearchResultsView: View {
                 VStack(spacing: 0) {
                     if isSearching {
                         loadingView
+                    } else if showNoUserFound {
+                        noUserFoundView
                     } else {
                         UserResultsView(
                             userResults: userResults,
@@ -81,6 +85,15 @@ struct SearchResultsView: View {
             .scrollDismissesKeyboard(.interactively)
             .frame(maxHeight: geometry.size.height)
         }
+    }
+
+    private var noUserFoundView: some View {
+        Text("No people found for \u{201C}\(searchText)\u{201D}")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 40)
+            .padding(.horizontal, 20)
     }
 
     private var loadingView: some View {
