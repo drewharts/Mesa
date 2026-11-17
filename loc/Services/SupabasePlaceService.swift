@@ -477,12 +477,20 @@ class SupabasePlaceService: ObservableObject {
             return []
         }
         
-        let placeRecords: [PlaceRecord] = try await supabase.client
-            .from("places")
-            .select()
-            .in("id", values: Array(allPlaceIds))
-            .execute()
-            .value
+        // Chunk the id filter: hundreds of ids in one GET exceed the API's URL
+        // limit (a ~950-place account produced a 32 KB URL and HTTP 400).
+        let ids = Array(allPlaceIds)
+        var placeRecords: [PlaceRecord] = []
+        for start in stride(from: 0, to: ids.count, by: 150) {
+            let chunk = Array(ids[start..<min(start + 150, ids.count)])
+            let page: [PlaceRecord] = try await supabase.client
+                .from("places")
+                .select()
+                .in("id", values: chunk)
+                .execute()
+                .value
+            placeRecords.append(contentsOf: page)
+        }
         
         let places = placeRecords.map { convertToDetailPlace($0) }
         

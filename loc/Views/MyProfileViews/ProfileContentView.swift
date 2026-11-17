@@ -20,6 +20,8 @@ struct ProfileContentView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var showEditProfileForSocials = false
     @State private var showImportTooltip = !UserDefaults.standard.bool(forKey: "hasSeenPhotoImportTooltip")
+    /// PROTOTYPE (auto_sort_saved): shows the "Saved (beta)" row; stays false for everyone but the admin on TestFlight.
+    @State private var showSavedBeta = false
     var body: some View {
         ZStack {
             ScrollView {
@@ -90,6 +92,15 @@ struct ProfileContentView: View {
                             }
                         }
 
+                    if showSavedBeta {
+                        Button {
+                            navigationPath.append(ProfileView.SavedLibraryDestination.library)
+                        } label: {
+                            SavedLibraryEntryRow()
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     // Recently imported/Reviews/My Places (tabbed) & Lists — hidden for curated profiles
                     if listsVM.isLoadingInitialLists && listsVM.filteredPlaceLists.isEmpty
                         && myPlacesVM.isMyPlacesLoading && myPlacesVM.myPlaces.isEmpty {
@@ -119,6 +130,10 @@ struct ProfileContentView: View {
             .refreshable {
                 await profile.refreshProfile()
             }
+        }
+        .task(id: userSession.currentUserId) {
+            showSavedBeta = SavedLibraryGate.isEnabled(userId: userSession.currentUserId)
+            showSavedBeta = await SavedLibraryGate.resolve(userId: userSession.currentUserId)
         }
         .sheet(isPresented: $showEditProfileForSocials) {
             if let user = profile.user {
