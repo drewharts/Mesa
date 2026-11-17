@@ -22,6 +22,9 @@ class ListsSearchViewModel: ObservableObject {
     /// List search text.
     @Published var listSearchText: String = ""
 
+    /// Lowercased ids of lists folded into their cities; hidden from the grid unless the user is searching.
+    @Published var hiddenListIds: Set<String> = []
+
     // MARK: - Dependencies
 
     private let userService: UserService
@@ -49,10 +52,15 @@ class ListsSearchViewModel: ObservableObject {
     /// Returns filtered lists based on current filter state.
     var filteredPlaceLists: [LightweightPlaceList] {
         guard let dataVM = dataViewModel else { return [] }
-        if showOnlySharedLists {
-            return dataVM.lightweightPlaceLists.filter { $0.isCollaborative }
-        }
-        return dataVM.lightweightPlaceLists
+        let lists = visibleLists(dataVM.lightweightPlaceLists)
+        return showOnlySharedLists ? lists.filter { $0.isCollaborative } : lists
+    }
+
+    /// Drops folded lists, except while searching so a search can still find them.
+    private func visibleLists(_ lists: [LightweightPlaceList]) -> [LightweightPlaceList] {
+        let isSearching = !listSearchText.trimmingCharacters(in: .whitespaces).isEmpty
+        guard !hiddenListIds.isEmpty, !isSearching else { return lists }
+        return lists.filter { !hiddenListIds.contains($0.list_id.lowercased()) }
     }
 
     /// Count of collaborative lists.
