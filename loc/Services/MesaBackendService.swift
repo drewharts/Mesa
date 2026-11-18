@@ -322,6 +322,20 @@ class MesaBackendService {
         return try parsePlaceDetailsResponse(data: data)
     }
 
+    /// Fetches the reservation link (Resy/OpenTable/Tock/...) for a place; throws on 404 or other errors.
+    func fetchReservation(placeId: String) async throws -> ReservationLink {
+        guard let encoded = placeId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "\(baseURL)/places/\(encoded)/reservation") else {
+            throw MesaBackendError.invalidURL
+        }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse else { throw MesaBackendError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else {
+            throw MesaBackendError.serverError(statusCode: http.statusCode)
+        }
+        return try JSONDecoder().decode(ReservationLink.self, from: data)
+    }
+
     /// Fetches AI-powered place suggestions using async/await.
     func fetchAISuggestions(query: String, latitude: Double, longitude: Double, limit: Int = 5) async throws -> [DetailPlace] {
         guard !query.isEmpty else { return [] }

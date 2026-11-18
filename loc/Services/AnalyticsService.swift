@@ -154,6 +154,7 @@ enum Analytics {
         case discoverySaved = "discovery_saved"
         case discoveryPlaceOpened = "discovery_place_opened"
         case discoveryEmpty = "discovery_empty"
+        case reservationTapped = "reservation_tapped"
     }
 }
 
