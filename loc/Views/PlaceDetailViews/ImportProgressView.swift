@@ -185,7 +185,7 @@ struct ImportProgressView: View {
                         .frame(width: 24)
                     placeThumbnail(item.place)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.place?.name ?? item.name)
+                        Text(item.place?.displayName ?? LightweightPlace.displayName(item.name))
                             .font(.body)
                             .foregroundColor(.primary)
                             .lineLimit(1)
@@ -225,7 +225,7 @@ struct ImportProgressView: View {
                         .padding(.vertical, 5)
                         .background(Capsule().fill(Color(.secondarySystemBackground)))
                 }
-                .accessibilityLabel("Wrong place? Fix \(place.name)")
+                .accessibilityLabel("Wrong place? Fix \(place.displayName)")
             }
 
             if let place = item.place, showsSelectionToggles, item.status == .saved {
@@ -388,7 +388,7 @@ struct ImportProgressView: View {
                 guard !PlaceIdGuard.isPlaceholder(place.id.uuidString) else { return }
                 detailPlaceViewModel.places[place.id.uuidString] = place
                 viewModel.appendManualPlace(place)
-                showAddAllConfirmation("Added \(place.name)")
+                showAddAllConfirmation("Added \(place.displayName)")
             }
             .environmentObject(profile)
         }
@@ -399,7 +399,7 @@ struct ImportProgressView: View {
                 detailPlaceViewModel.places[place.id.uuidString] = place
                 excludedPlaceIds.remove(wrong.id.uuidString)
                 Task { await viewModel.replacePlace(wrong, with: place) }
-                showAddAllConfirmation("Changed to \(place.name)")
+                showAddAllConfirmation("Changed to \(place.displayName)")
             }
             .environmentObject(profile)
         }
