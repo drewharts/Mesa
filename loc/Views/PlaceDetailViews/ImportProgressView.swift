@@ -62,14 +62,14 @@ struct ImportProgressView: View {
         .onChange(of: viewModel.savedPlaces.count) { _, _ in
             // A place added by hand after an empty result still gets the one-tap save.
             if viewModel.isFinished && !viewModel.savedPlaces.isEmpty {
-                viewModel.autoSaveIfEnabled(favorites: profile.favoritesViewModel)
+                Task { await viewModel.autoSave(profile: profile, userSession: userSession) }
                 prepareListChoices()
             }
         }
         .onChange(of: viewModel.isFinished) { _, finished in
             if finished && !viewModel.savedPlaces.isEmpty {
                 refreshProfileAfterImport()
-                viewModel.autoSaveIfEnabled(favorites: profile.favoritesViewModel)
+                Task { await viewModel.autoSave(profile: profile, userSession: userSession) }
                 prepareListChoices()
             }
         }

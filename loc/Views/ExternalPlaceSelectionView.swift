@@ -11,16 +11,13 @@ struct ExternalPlaceSelectionView: View {
     @State private var isBulkAdd = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
     @State private var tripSelectionViewModel: PlaceTripSelectionViewModel?
-    @StateObject private var saveBanner = ExternalPlaceSaveBannerViewModel()
+    @StateObject private var saveBanner = CitySaveBannerViewModel()
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profile.externalContentViewModel }
 
-    /// Title of the bulk button: saves everything when auto-sort is on, otherwise opens the list picker.
-    private var saveAllTitle: String {
-        let count = externalContentVM.importedPlaces.count
-        return SavedLibraryGate.isEnabled ? "Save all \(count)" : "Add all \(count) to a list"
-    }
+    /// Title of the bulk button, which saves every detected place into its city list.
+    private var saveAllTitle: String { "Save all \(externalContentVM.importedPlaces.count)" }
 
     var body: some View {
         NavigationView {
@@ -75,11 +72,14 @@ struct ExternalPlaceSelectionView: View {
                                 place: place,
                                 onBookmarkTapped: {
                                     profile.listsViewModel.ensureListsLoaded()
-                                    // Saves straight to Saved (banner offers "Add to list"); picker only if auto-save is off.
-                                    guard !saveBanner.autoSave([place], favorites: profile.favoritesViewModel) else { return }
-                                    isBulkAdd = false
-                                    selectedPlaceForList = place
-                                    showingListSelection = true
+                                    // Saves straight to the city list (banner offers "Change"); picker only if nothing could be saved.
+                                    Task { @MainActor in
+                                        await saveBanner.save([place], profile: profile, userSession: userSession)
+                                        guard saveBanner.message == nil else { return }
+                                        isBulkAdd = false
+                                        selectedPlaceForList = place
+                                        showingListSelection = true
+                                    }
                                 },
                                 onPlaceTapped: {
                                     // First dismiss this sheet, then navigate to place detail
@@ -104,7 +104,7 @@ struct ExternalPlaceSelectionView: View {
                     Divider()
 
                     if let message = saveBanner.message {
-                        SavedBannerView(message: message) {
+                        SavedBannerView(message: message, isError: saveBanner.isError) {
                             // Open the usual picker for exactly the places that were just saved.
                             isBulkAdd = saveBanner.savedPlaces.count > 1
                             selectedPlaceForList = saveBanner.savedPlaces.first
@@ -117,10 +117,13 @@ struct ExternalPlaceSelectionView: View {
                     if externalContentVM.importedPlaces.count > 1 {
                         Button {
                             profile.listsViewModel.ensureListsLoaded()
-                            guard !saveBanner.autoSave(externalContentVM.importedPlaces, favorites: profile.favoritesViewModel) else { return }
-                            isBulkAdd = true
-                            selectedPlaceForList = externalContentVM.importedPlaces.first
-                            showingListSelection = true
+                            Task { @MainActor in
+                                await saveBanner.save(externalContentVM.importedPlaces, profile: profile, userSession: userSession)
+                                guard saveBanner.message == nil else { return }
+                                isBulkAdd = true
+                                selectedPlaceForList = externalContentVM.importedPlaces.first
+                                showingListSelection = true
+                            }
                         } label: {
                             Label(saveAllTitle, systemImage: "text.badge.plus")
                                 .font(.headline)

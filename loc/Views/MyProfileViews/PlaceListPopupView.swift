@@ -212,7 +212,8 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
                 },
                 onSelect: { handleTileTap($0) },
                 onOpenDetail: { openPlaceDetail($0) },
-                onRemove: removeHandler
+                onRemove: removeHandler,
+                showsTypeFilter: true
             )
         }
     }

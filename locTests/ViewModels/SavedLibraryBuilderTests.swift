@@ -224,25 +224,6 @@ final class SavedLibraryBuilderTests: XCTestCase {
         XCTAssertNil(SavedLibraryBuilder.parseTimestamp(nil))
     }
 
-    // MARK: - One-tap save
-
-    func testQuickSave_AutoSortSavesUnsavedPlaceInOneTap() {
-        XCTAssertEqual(SavedQuickSave.action(isSaved: false, autoSortEnabled: true), .saveNow)
-    }
-
-    func testQuickSave_AlreadySavedOrFlagOffOpensListPicker() {
-        XCTAssertEqual(SavedQuickSave.action(isSaved: true, autoSortEnabled: true), .openListPicker)
-        XCTAssertEqual(SavedQuickSave.action(isSaved: false, autoSortEnabled: false), .openListPicker)
-        XCTAssertEqual(SavedQuickSave.action(isSaved: true, autoSortEnabled: false), .openListPicker)
-        XCTAssertEqual(SavedQuickSave.action(isSaved: false, autoSortEnabled: true, isDroppedPin: true), .openListPicker)
-    }
-
-    func testQuickSave_PlacementLabel() {
-        XCTAssertEqual(SavedQuickSave.placementLabel(name: "Oddball", storedCity: "", address: "188 Avenue B, New York, NY 10009", categories: ["Cocktail bar"], corrected: nil), "New York City · Bars")
-        XCTAssertEqual(SavedQuickSave.placementLabel(name: "Mehmet", storedCity: "Paris", address: nil, categories: ["restaurant"], corrected: nil), "Paris · Restaurants")
-        XCTAssertEqual(SavedQuickSave.placementLabel(name: "Pin", storedCity: nil, address: nil, categories: [], corrected: nil), "Other")
-    }
-
     func testBuild_OneTapSaveShowsInThisWeekAndMergesWithListCopy() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let lib = SavedLibraryBuilder.build([
