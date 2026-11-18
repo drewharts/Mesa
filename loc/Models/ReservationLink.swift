@@ -34,8 +34,23 @@ struct ReservationLink: Codable, Equatable {
         case "opentable": return "OpenTable"
         case "tock": return "Tock"
         case "sevenrooms": return "SevenRooms"
+        case "yelp": return "Yelp"
         default: return nil
         }
+    }
+
+    /// Returns the asset catalog name of the provider's logo, or nil when unrecognized.
+    static func providerLogoAssetName(_ provider: String?) -> String? {
+        providerDisplayName(provider).map { "ReserveLogo\($0)" }
+    }
+
+    /// Returns the asset name of this link's provider logo, or nil for unknown providers.
+    var logoAssetName: String? { Self.providerLogoAssetName(provider) }
+
+    /// Returns the visible button text, e.g. "Reserve · Resy", or "Reserve" for unknown providers.
+    var buttonLabelText: String {
+        guard let name = Self.providerDisplayName(provider) else { return "Reserve" }
+        return "Reserve · \(name)"
     }
 
     /// Returns true when a place of these categories is likely to take reservations.

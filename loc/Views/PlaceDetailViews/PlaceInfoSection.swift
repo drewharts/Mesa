@@ -116,7 +116,7 @@ struct PlaceInfoSection: View {
                                 onReserveTapped?()
                                 openURL(url)
                             } label: {
-                                actionButtonLabel(icon: "calendar", text: reservation.buttonTitle)
+                                ReserveActionLabel(link: reservation)
                             }
                             .buttonStyle(.plain)
                         }

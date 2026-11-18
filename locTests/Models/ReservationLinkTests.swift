@@ -38,6 +38,25 @@ final class ReservationLinkTests: XCTestCase {
         XCTAssertNil(ReservationLink.providerDisplayName(nil))
     }
 
+    func testProviderLogoAssetNames() {
+        XCTAssertEqual(ReservationLink.providerLogoAssetName("resy"), "ReserveLogoResy")
+        XCTAssertEqual(ReservationLink.providerLogoAssetName("OpenTable"), "ReserveLogoOpenTable")
+        XCTAssertEqual(ReservationLink.providerLogoAssetName("tock"), "ReserveLogoTock")
+        XCTAssertEqual(ReservationLink.providerLogoAssetName("Seven Rooms"), "ReserveLogoSevenRooms")
+        XCTAssertEqual(ReservationLink.providerLogoAssetName("yelp"), "ReserveLogoYelp")
+        XCTAssertNil(ReservationLink.providerLogoAssetName("somethingelse"))
+        XCTAssertNil(ReservationLink.providerLogoAssetName(nil))
+    }
+
+    func testButtonLabelTextAndLogo() throws {
+        let resy = try decode(#"{"provider":"resy","url":"https://resy.com/x"}"#)
+        XCTAssertEqual(resy.buttonLabelText, "Reserve · Resy")
+        XCTAssertEqual(resy.logoAssetName, "ReserveLogoResy")
+        let unknown = try decode(#"{"provider":"foo","url":"https://x.com"}"#)
+        XCTAssertEqual(unknown.buttonLabelText, "Reserve")
+        XCTAssertNil(unknown.logoAssetName)
+    }
+
     func testNonHttpURLRejected() throws {
         XCTAssertNil(try decode(#"{"provider":"resy","url":"javascript:alert(1)"}"#).destinationURL)
     }
