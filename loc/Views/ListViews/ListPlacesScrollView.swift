@@ -24,7 +24,7 @@ struct ListPlacesScrollView: View {
     let onOpenDetail: (LightweightPlace) -> Void
     /// Optional destructive action (own lists only).
     let onRemove: ((String) -> Void)?
-    /// Shows the type chips (All, Restaurants, Bars, ...) above the places. Off for the map's "Places here" sheet.
+    /// Shows the tag chips (All, Sushi, Coffee, ...) above the places. Off for the map's "Places here" sheet.
     var showsTypeFilter: Bool = false
 
     @StateObject private var filterVM = ListTypeFilterViewModel()
@@ -51,7 +51,7 @@ struct ListPlacesScrollView: View {
         showsTypeFilter ? filterVM.visiblePlaces(from: places) : places
     }
 
-    /// The chip row, or nothing when filtering is off or the list has only one type.
+    /// The chip row, or nothing when filtering is off or the list has too few tags.
     @ViewBuilder
     private var typeFilterRow: some View {
         let chips = showsTypeFilter ? filterVM.chips(for: places) : []
