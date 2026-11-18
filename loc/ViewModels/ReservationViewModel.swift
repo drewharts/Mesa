@@ -35,6 +35,6 @@ final class ReservationViewModel: ObservableObject {
 
     /// Records the tap in analytics.
     func trackTap() {
-        AnalyticsService.track(.reservationTapped, ["provider": link?.provider ?? "unknown"])
+        Analytics.track(.reservationTapped, ["provider": link?.provider ?? "unknown"])
     }
 }
