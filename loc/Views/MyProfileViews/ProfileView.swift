@@ -77,16 +77,6 @@ struct ProfileView: View {
                         }
                     }
                 }
-                // Auto-sorted Saved library (on for everyone; PostHog auto_sort_saved is a kill switch).
-                .navigationDestination(for: SavedLibraryDestination.self) { _ in
-                    SavedLibraryView()
-                        .environmentObject(profile)
-                        .environmentObject(userSession)
-                        .environmentObject(selectedPlaceVM)
-                        .environmentObject(placeVM)
-                        .environmentObject(userProfileNavigationViewModel)
-                        .environmentObject(locationManager)
-                }
         }
             .modifier(SheetsModifier(
                 photoImportVM: photoImportVM,

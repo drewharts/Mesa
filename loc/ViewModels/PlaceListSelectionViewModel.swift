@@ -651,17 +651,13 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
 
     /// Toggles the favorite status for a place via ProfileViewModel.
-    /// the favorites row is presented as the auto-sorted "Saved" library.
-    var isAutoSortSaved: Bool { SavedLibraryGate.isEnabled }
-
     func toggleFavorite(place: DetailPlace) {
-        let label = isAutoSortSaved ? "Saved" : "Favorites"
         if isFavorited {
             profile.favoritesViewModel.removeFavoritePlace(place: place)
-            showConfirmation("Removed from \(label)", type: .removed)
+            showConfirmation("Removed from Favorites", type: .removed)
         } else {
             profile.favoritesViewModel.addFavoritePlace(place: place)
-            showConfirmation(isAutoSortSaved ? "Saved" : "Added to Favorites", type: .added)
+            showConfirmation("Added to Favorites", type: .added)
         }
         isFavorited.toggle()
     }

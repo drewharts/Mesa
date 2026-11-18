@@ -24,7 +24,10 @@ struct ListPlacesScrollView: View {
     let onOpenDetail: (LightweightPlace) -> Void
     /// Optional destructive action (own lists only).
     let onRemove: ((String) -> Void)?
+    /// Shows the type chips (All, Restaurants, Bars, ...) above the places. Off for the map's "Places here" sheet.
+    var showsTypeFilter: Bool = false
 
+    @StateObject private var filterVM = ListTypeFilterViewModel()
     @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
 
     static let rowTileSize: CGFloat = 150
@@ -40,7 +43,22 @@ struct ListPlacesScrollView: View {
     /// casing) gave LazyVGrid duplicate identities, which left a blank cell and broke the 2-column flow.
     private var uniquePlaces: [LightweightPlace] {
         var seen = Set<String>()
-        return places.filter { seen.insert($0.place_id.lowercased()).inserted }
+        return shownPlaces.filter { seen.insert($0.place_id.lowercased()).inserted }
+    }
+
+    /// The places after the selected type chip is applied.
+    private var shownPlaces: [LightweightPlace] {
+        showsTypeFilter ? filterVM.visiblePlaces(from: places) : places
+    }
+
+    /// The chip row, or nothing when filtering is off or the list has only one type.
+    @ViewBuilder
+    private var typeFilterRow: some View {
+        let chips = showsTypeFilter ? filterVM.chips(for: places) : []
+        if !chips.isEmpty {
+            ListTypeFilterRow(chips: chips, isSelected: { filterVM.isSelected($0) }, onSelect: { filterVM.select($0) })
+                .padding(.vertical, 4)
+        }
     }
 
     private func isSelected(_ place: LightweightPlace) -> Bool {
@@ -53,6 +71,12 @@ struct ListPlacesScrollView: View {
             Group {
                 if places.isEmpty && !isLoadingInitial {
                     Text("No places in this list")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                } else if shownPlaces.isEmpty && !isLoadingInitial {
+                    Text("No places match this filter")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
@@ -77,7 +101,10 @@ struct ListPlacesScrollView: View {
                     .transition(.opacity)
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 8) { typeFilterRow }
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
+            // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
+            .onChange(of: filterVM.selection) { _, _ in onLoadMore() }
             .onAppear {
                 for p in places { if let la = p.latitude, let lo = p.longitude {
                     PlaceTimeZoneCache.shared.registerCoordinate(placeId: p.place_id, latitude: la, longitude: lo)

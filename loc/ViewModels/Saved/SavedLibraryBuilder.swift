@@ -32,8 +32,6 @@ struct SavedPlaceInput: Equatable {
     /// When the user added it; only imports carry this (place_list_items has no created_at).
     var addedAt: Date?
     var sources: Set<Source> = []
-    /// Lowercased ids of other rows that were merged into this one by `dedupe`.
-    var mergedIds: Set<String> = []
 }
 
 // MARK: - Output
@@ -84,8 +82,6 @@ struct SavedLibraryPlace: Identifiable, Equatable {
     var addedAt: Date?
     var distanceMeters: Double?
     var sources: Set<SavedPlaceInput.Source>
-    /// Lowercased ids of every row (own and merged duplicates) this place stands for.
-    var aliasIds: Set<String> = []
 }
 
 struct SavedCityGroup: Identifiable, Equatable {
@@ -105,17 +101,7 @@ struct SavedCityGroup: Identifiable, Equatable {
 }
 
 struct SavedSmartGroup: Identifiable, Equatable {
-    enum Kind: Hashable {
-        case nearYou, thisWeek, dinner
-
-        var systemImage: String {
-            switch self {
-            case .nearYou: return "location"
-            case .thisWeek: return "clock"
-            case .dinner: return "fork.knife"
-            }
-        }
-    }
+    enum Kind: Hashable { case nearYou, thisWeek, dinner }
     var kind: Kind
     var title: String
     var places: [SavedLibraryPlace]
@@ -162,8 +148,7 @@ enum SavedLibraryBuilder {
                 type: type,
                 cuisine: type == .restaurants ? cuisine(categories: input.categories, corrected: input.userCorrectedCategory, name: input.name) : nil,
                 isDinnerSpot: input.isDinnerSpot && type == .restaurants,
-                addedAt: input.addedAt, distanceMeters: distance, sources: input.sources,
-                aliasIds: input.mergedIds.union([input.id.lowercased()])
+                addedAt: input.addedAt, distanceMeters: distance, sources: input.sources
             )
         }
 
@@ -239,8 +224,6 @@ enum SavedLibraryBuilder {
     private static func merge(_ a: SavedPlaceInput, _ b: SavedPlaceInput) -> SavedPlaceInput {
         var m = a
         m.sources.formUnion(b.sources)
-        m.mergedIds.formUnion(b.mergedIds)
-        m.mergedIds.insert(b.id.lowercased())
         if m.address?.isEmpty ?? true { m.address = b.address }
         if m.storedCity?.isEmpty ?? true { m.storedCity = b.storedCity }
         if m.latitude == nil { m.latitude = b.latitude; m.longitude = b.longitude }
@@ -577,25 +560,3 @@ enum SavedLibraryBuilder {
         return 2 * r * atan2(sqrt(a), sqrt(1 - a))
     }
 }
-
-// MARK: - One-tap save
-
-/// What the bookmark on a place page does. With auto-sort on, an unsaved place is saved in one tap
-/// (it lands in the auto-sorted Saved library); a place that is already saved opens the list picker,
-/// where it can be added to a user-made list, a new list, or unsaved. With auto-sort off: always the picker.
-enum SavedQuickSave {
-    enum Action: Equatable { case saveNow, openListPicker }
-
-    static func action(isSaved: Bool, autoSortEnabled: Bool, isDroppedPin: Bool = false) -> Action {
-        guard autoSortEnabled, !isDroppedPin, !isSaved else { return .openListPicker }
-        return .saveNow
-    }
-
-    /// Where a just-saved place will show up, e.g. "New York City · Restaurants". Nil city -> type only.
-    static func placementLabel(name: String, storedCity: String?, address: String?, categories: [String], corrected: String?) -> String {
-        let type = SavedLibraryBuilder.classify(categories: categories, corrected: corrected, name: name)
-        guard let city = SavedLibraryBuilder.city(storedCity: storedCity, address: address)?.city else { return type.title }
-        return "\(city) · \(type.title)"
-    }
-}
-

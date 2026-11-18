@@ -2,7 +2,7 @@
 //  ImportAutoSaveTests.swift
 //  locTests
 //
-//  Tests for the pure rules that save imported places straight into Saved.
+//  Tests for the pure rules that save imported places straight into their city list.
 //
 
 import XCTest
@@ -28,21 +28,5 @@ final class ImportAutoSaveTests: XCTestCase {
         let placeholder = try makePlace(id: PlaceIdGuard.placeholderId, name: "Loading")
         let result = ImportAutoSave.placesToSave(from: [fresh, done, placeholder], alreadySaved: [done.id.uuidString])
         XCTAssertEqual(result.map(\.name), ["Fresh"])
-    }
-
-    // MARK: - bannerMessage
-
-    func testBannerMessage_EmptyIsNil() {
-        XCTAssertNil(ImportAutoSave.bannerMessage(for: []))
-    }
-
-    func testBannerMessage_SinglePlaceShowsPlacement() throws {
-        let place = try makePlace(extra: ["city": "Paris", "categories": ["restaurant"]])
-        XCTAssertEqual(ImportAutoSave.bannerMessage(for: [place]), "Saved to Paris · Restaurants")
-    }
-
-    func testBannerMessage_MultiplePlacesShowsCount() throws {
-        let places = try (1...3).map { try makePlace(name: "P\($0)") }
-        XCTAssertEqual(ImportAutoSave.bannerMessage(for: places), "Saved 3 places")
     }
 }

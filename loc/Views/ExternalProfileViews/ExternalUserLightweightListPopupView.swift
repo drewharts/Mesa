@@ -207,7 +207,8 @@ struct ExternalUserLightweightListPopupView: View {
             onLoadMore: {},
             onSelect: { handleRowTap($0) },
             onOpenDetail: { openPlaceDetail($0) },
-            onRemove: nil
+            onRemove: nil,
+            showsTypeFilter: true
         )
     }
 }

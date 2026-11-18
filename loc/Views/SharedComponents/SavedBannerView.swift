@@ -2,7 +2,7 @@
 //  SavedBannerView.swift
 //  loc
 //
-//  Low-key "Saved to …" confirmation with the one secondary action: add it to a list too.
+//  Low-key "Added to {City}" confirmation with the one secondary action: change or add another list.
 //  Shared by the place page one-tap save and the import flows.
 //
 
@@ -10,20 +10,23 @@ import SwiftUI
 
 struct SavedBannerView: View {
     let message: String
-    let onAddToList: () -> Void
+    var isError: Bool = false
+    let onChange: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.mesaAccent)
+            Image(systemName: isError ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                .foregroundColor(isError ? .red : .mesaAccent)
             Text(message)
                 .font(.footnote)
                 .foregroundColor(.secondary)
                 .lineLimit(1)
             Spacer(minLength: 8)
-            Button("Add to list", action: onAddToList)
-                .font(.footnote.weight(.semibold))
-                .foregroundColor(.mesaAccent)
+            if !isError {
+                Button("Change", action: onChange)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(.mesaAccent)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

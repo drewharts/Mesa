@@ -391,7 +391,8 @@ struct LightweightListPopupView: View {
             onOpenDetail: { openPlaceDetail($0) },
             onRemove: { placeId in
                 profile.listsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
-            }
+            },
+            showsTypeFilter: true
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

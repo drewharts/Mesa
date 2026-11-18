@@ -34,16 +34,6 @@ struct FullScreenListsView: View {
                 filterAndActionsRow
                     .padding(.top, 10)
 
-                if listsVM.foldedListsViewModel.foldedCount > 0 {
-                    FoldedListsToggleRow(
-                        title: listsVM.foldedListsViewModel.toggleTitle,
-                        isShowing: listsVM.foldedListsViewModel.showFolded,
-                        onToggle: { listsVM.foldedListsViewModel.toggleShowFolded() },
-                        onRestoreAll: { listsVM.foldedListsViewModel.restoreAll() }
-                    )
-                    .padding(.top, 8)
-                }
-
                 Divider()
                     .padding(.top, 8)
 

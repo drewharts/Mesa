@@ -23,13 +23,19 @@ class ImportProgressViewModel: ObservableObject {
     @Published private(set) var isFinished: Bool = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var savedPlaces: [DetailPlace] = []
-    /// "Saved to {City · Type}" / "Saved N places" once the import landed in the Saved library.
+    /// "Added to {City}" / "Added N places to {City}" once the import landed in city lists.
     @Published private(set) var autoSaveMessage: String?
-    /// True after the user taps "Add to list" on the auto-save banner (reveals the list picker).
+    /// True after the user taps "Change" on the auto-save banner (reveals the list picker).
     @Published var isListPickerRequested: Bool = false
-    /// Ids of places this import added to Saved, so each is saved once and can be undone if wrong.
+    /// Place id -> city list id for rows this import added, so each is saved once and can be undone if wrong.
+    private var autoSavedLists: [String: String] = [:]
+    /// Place ids already handled (saved now or already in the list), so a re-run doesn't repeat them.
     private var autoSavedIds = Set<String>()
-    private weak var autoSaveFavorites: ProfileFavoritesViewModel?
+    /// True while a city-list save is running, so the list picker doesn't flash up before the banner.
+    @Published private(set) var isAutoSaving = false
+    private var autoSaveRerunRequested = false
+    private var autoSaveProfile: ProfileViewModel?
+    private var autoSaveSession: UserSession?
     /// Whether the user can leave the app and still be told when the import is done.
     @Published private(set) var notificationsEnabled: Bool = false
 
@@ -176,36 +182,45 @@ class ImportProgressViewModel: ObservableObject {
         Analytics.track(.importFinished, ["success": false])
     }
 
-    // MARK: - Auto-save to Saved
+    // MARK: - Auto-save to city lists
 
-    /// Whether the import was saved automatically, so the list picker waits for "Add to list".
+    /// Whether the import was saved automatically, so the list picker waits for "Change".
     var isAutoSaved: Bool { !autoSavedIds.isEmpty }
 
-    /// Whether the inline list picker should be shown: always when nothing was auto-saved (gate off).
-    var showsListPicker: Bool { !isAutoSaved || isListPickerRequested }
+    /// Whether the inline list picker should be shown: only after nothing was auto-saved or "Change" was tapped.
+    var showsListPicker: Bool { (!isAutoSaved && !isAutoSaving) || isListPickerRequested }
 
-    /// Saves the found places to Saved (favorites row, same write as one-tap save) unless the kill switch is set.
-    func autoSaveIfEnabled(favorites: ProfileFavoritesViewModel) {
-        guard SavedLibraryGate.isEnabled else { return }
-        autoSaveFavorites = favorites
+    /// Saves the found places into their city lists (creating a list per new city) and records where they went.
+    /// A call made while a save is running is folded into one follow-up pass.
+    func autoSave(profile: ProfileViewModel, userSession: UserSession) async {
+        autoSaveProfile = profile
+        autoSaveSession = userSession
+        guard !isAutoSaving else { autoSaveRerunRequested = true; return }
+        isAutoSaving = true
+        repeat {
+            autoSaveRerunRequested = false
+            await saveUnhandledPlaces(profile: profile, userSession: userSession)
+        } while autoSaveRerunRequested
+        isAutoSaving = false
+    }
+
+    /// One pass: saves every found place not yet handled, then records the ids, undo targets and banner text.
+    private func saveUnhandledPlaces(profile: ProfileViewModel, userSession: UserSession) async {
         let fresh = ImportAutoSave.placesToSave(from: savedPlaces, alreadySaved: autoSavedIds)
-        for place in fresh {
-            favorites.addFavoritePlace(place: place)
-            autoSavedIds.insert(place.id.uuidString)
-        }
-        refreshAutoSaveMessage()
+        guard !fresh.isEmpty else { return }
+        let summary = await CitySaveViewModel(profile: profile, userSession: userSession).save(fresh)
+        autoSavedLists.merge(summary.newlyAdded) { _, new in new }
+        // Failed places stay out of the handled set so a later run retries them.
+        autoSavedIds.formUnion(summary.handledIds)
+        autoSaveMessage = summary.message
     }
 
-    /// Recomputes the banner from the places that are currently auto-saved.
-    private func refreshAutoSaveMessage() {
-        let current = savedPlaces.filter { autoSavedIds.contains($0.id.uuidString) }
-        autoSaveMessage = ImportAutoSave.bannerMessage(for: current)
-    }
-
-    /// Takes a wrongly detected place back out of Saved if this import was the one that saved it.
+    /// Takes a wrongly detected place back out of the city list if this import was the one that added it.
     private func undoAutoSave(of wrong: DetailPlace) {
-        guard autoSavedIds.remove(wrong.id.uuidString) != nil else { return }
-        autoSaveFavorites?.removeFavoritePlace(place: wrong)
+        let id = wrong.id.uuidString
+        autoSavedIds.remove(id)
+        guard let listId = autoSavedLists.removeValue(forKey: id) else { return }
+        autoSaveProfile?.listsViewModel.removePlaceFromLightweightList(listId: listId, place: wrong)
     }
 
     // MARK: - Actions
@@ -253,7 +268,7 @@ class ImportProgressViewModel: ObservableObject {
         places = applyCorrections(to: places)
         savedPlaces = dedup(places.filter { $0.status == .saved }.compactMap { $0.place })
         undoAutoSave(of: wrong)
-        if let favorites = autoSaveFavorites { autoSaveIfEnabled(favorites: favorites) } else { refreshAutoSaveMessage() }
+        if let profile = autoSaveProfile, let session = autoSaveSession { await autoSave(profile: profile, userSession: session) }
         await unlinkFromVideo(wrong)
         Analytics.track(.importPlaceCorrected, ["action": "replace"])
     }
@@ -268,7 +283,7 @@ class ImportProgressViewModel: ObservableObject {
         }
         statusText = "\(savedPlaces.count) place\(savedPlaces.count == 1 ? "" : "s") found"
         undoAutoSave(of: wrong)
-        refreshAutoSaveMessage()
+        if autoSavedIds.isEmpty { autoSaveMessage = nil }
         await unlinkFromVideo(wrong)
         Analytics.track(.importPlaceCorrected, ["action": "remove"])
     }
