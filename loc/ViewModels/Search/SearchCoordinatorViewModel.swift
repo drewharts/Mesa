@@ -54,12 +54,26 @@ class SearchCoordinatorViewModel {
         selectedPlaceVM?.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
     }
 
-    /// Presents the place detail sheet immediately with minimal animation.
-    func presentPlaceDetail() {
-        PresentationService.shared.presentImmediately(.placeDetail)
-        selectedPlaceVM?.selectionState.isDetailSheetPresented = true
+    /// Whether a place detail sheet is waiting for the search sheet to finish dismissing.
+    private var hasPendingPlaceDetail = false
+
+    /// Selects a search result: dismisses the keyboard, starts the map flight, and queues the
+    /// detail sheet to present only after the search sheet has fully dismissed.
+    func selectPlaceFromSearch(_ detailPlace: DetailPlace) {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        prepareMapForPlace(detailPlace)
+        hasPendingPlaceDetail = true
     }
-    
+
+    /// Presents the queued place detail sheet (call from the search sheet's onDismiss).
+    /// Skips it if the selection was cleared meanwhile (e.g. redirected to a city sheet).
+    func presentPendingPlaceDetailIfNeeded() {
+        guard hasPendingPlaceDetail else { return }
+        hasPendingPlaceDetail = false
+        guard selectedPlaceVM?.selectedPlace != nil else { return }
+        selectedPlaceVM?.isDetailSheetPresented = true
+    }
+
     /// Handle user selection from search
     /// Single Responsibility: Coordinate user profile navigation
     func handleUserSelection(_ profileData: ProfileData) {
