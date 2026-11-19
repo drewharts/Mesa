@@ -268,14 +268,13 @@ struct GoogleMapView: UIViewRepresentable {
 
         private func syncDirectMarkers(_ newItems: [MapAnnotationItem], on mapView: GMSMapView) {
             let newById = Dictionary(uniqueKeysWithValues: newItems.map { ($0.stableId, $0) })
-            let currentIds = Set(directMarkersById.keys)
-            let newIds = Set(newById.keys)
+            let diff = MapIdDiff(old: Set(directMarkersById.keys), new: Set(newById.keys))
 
-            for id in currentIds.subtracting(newIds) {
+            for id in diff.removed {
                 directMarkersById[id]?.map = nil
                 directMarkersById.removeValue(forKey: id)
             }
-            for id in newIds.subtracting(currentIds) {
+            for id in diff.added {
                 guard let item = newById[id] else { continue }
                 let marker = GMSMarker(position: item.coordinate)
                 marker.userData = item
@@ -283,18 +282,26 @@ struct GoogleMapView: UIViewRepresentable {
                 directMarkersById[id] = marker
                 configureDirectMarker(marker, for: item)
             }
-            for id in currentIds.intersection(newIds) {
+            for id in diff.kept {
                 guard let marker = directMarkersById[id], let item = newById[id] else { continue }
-                marker.position = item.coordinate
+                // Writing an unchanged position/icon still makes GMSMapView re-layout and re-upload
+                // the texture, which shows up as flicker when SwiftUI updates mid-zoom.
+                if marker.position.latitude != item.coordinate.latitude
+                    || marker.position.longitude != item.coordinate.longitude {
+                    marker.position = item.coordinate
+                }
                 configureDirectMarker(marker, for: item)
             }
         }
 
+        /// Applies icon, anchor and z-order to a direct marker, skipping writes that wouldn't change anything.
         private func configureDirectMarker(_ marker: GMSMarker, for item: MapAnnotationItem) {
             let isSelected = parent.isAnnotationSelected(item)
-            marker.icon = parent.annotationImageProvider(item, isSelected)
+            let image = parent.annotationImageProvider(item, isSelected)
+            if marker.icon !== image { marker.icon = image }
             marker.groundAnchor = CGPoint(x: 0.5, y: 0.5)
-            marker.zIndex = isSelected ? 2 : 0
+            let zIndex: Int32 = isSelected ? 2 : 0
+            if marker.zIndex != zIndex { marker.zIndex = zIndex }
         }
 
         // MARK: Camera
@@ -428,6 +435,7 @@ struct GoogleMapView: UIViewRepresentable {
 
         func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
             isCameraMoving = true
+            settleTask?.cancel()   // a new gesture supersedes any pending settle report
             if gesture {
                 isApplyingProgrammaticCameraChange = false
             }
@@ -462,7 +470,23 @@ struct GoogleMapView: UIViewRepresentable {
             isApplyingProgrammaticCameraChange = false
             requestRecluster()
             if hasAppliedInitialCamera {
-                parent.onCameraSettled?(region)
+                scheduleSettleReport(region)
+            }
+        }
+
+        private var settleTask: Task<Void, Never>?
+        private var settleGate = MapCameraSettleGate()
+        private static let settleDebounce: Duration = .milliseconds(250)
+
+        /// Reports a camera settle after a short quiet period, and only if the viewport really changed,
+        /// so back-to-back pinches don't each trigger state writes and viewport fetches.
+        private func scheduleSettleReport(_ region: MKCoordinateRegion) {
+            settleTask?.cancel()
+            settleTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.settleDebounce)
+                guard !Task.isCancelled, let self, !self.isCameraMoving else { return }
+                guard self.settleGate.shouldReport(region) else { return }
+                self.parent.onCameraSettled?(region)
             }
         }
 
