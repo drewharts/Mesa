@@ -20,6 +20,20 @@ final class ListTypeFilterTests: XCTestCase {
         ListTypeFilter.tags(of: place("x", name, type: type))
     }
 
+    /// A place with a full raw categories array (and optionally a user-corrected category).
+    private func place(_ id: String, _ name: String, categories: [String], corrected: String? = nil) -> LightweightPlace {
+        LightweightPlace(place_id: id, name: name, latest_review_photo: nil, categories: categories, user_corrected_category: corrected)
+    }
+
+    private func tags(_ name: String, categories: [String], corrected: String? = nil) -> [String] {
+        ListTypeFilter.tags(of: place("x", name, categories: categories, corrected: corrected))
+    }
+
+    /// `count` places sharing one categories array.
+    private func group(_ prefix: String, categories: [String], count: Int) -> [LightweightPlace] {
+        (0..<count).map { place("\(prefix)\($0)", "\(prefix) \($0)", categories: categories) }
+    }
+
     /// `count` places with the same category, ids prefixed so several groups can be combined.
     private func group(_ prefix: String, _ type: String, count: Int) -> [LightweightPlace] {
         (0..<count).map { place("\(prefix)\($0)", "\(prefix) \($0)", type: type) }
@@ -69,6 +83,96 @@ final class ListTypeFilterTests: XCTestCase {
     func testTags_AccentsAndPunctuationNormalize() {
         XCTAssertEqual(tags("Café Select", "Café"), ["Coffee"])
         XCTAssertEqual(tags("Taco-Mex", "restaurant"), ["Mexican"])
+    }
+
+
+    // MARK: - Full categories array
+
+    func testTags_GenericFirstCategoriesAreIgnored() {
+        XCTAssertEqual(tags("Somewhere", categories: ["establishment", "food", "point_of_interest", "restaurant"]), [])
+        XCTAssertEqual(tags("Somewhere", categories: ["establishment", "food", "point_of_interest", "sushi_restaurant"]), ["Sushi", "Japanese"])
+        XCTAssertEqual(tags("Somewhere", categories: ["food", "store", "meal_takeaway", "meal_delivery", "lounge", "event venue"]), [])
+    }
+
+    func testTags_BothCategoryFormatsAndCases() {
+        XCTAssertEqual(tags("A", categories: ["Italian restaurant"]), ["Italian"])
+        XCTAssertEqual(tags("A", categories: ["italian_restaurant"]), ["Italian"])
+        XCTAssertEqual(tags("A", categories: ["Pizza restaurant"]), ["Pizza"])
+        XCTAssertEqual(tags("A", categories: ["Mexican restaurant"]), ["Mexican"])
+        XCTAssertEqual(tags("A", categories: ["cafe", "food"]), ["Coffee"])
+        XCTAssertEqual(tags("A", categories: ["Coffee shop"]), ["Coffee"])
+        XCTAssertEqual(tags("A", categories: ["bakery", "food"]), ["Bakery"])
+    }
+
+    func testTags_BarWithWineBarGetsBoth() {
+        XCTAssertEqual(tags("A", categories: ["Bar", "Wine bar"]), ["Wine Bar", "Bar"])
+        XCTAssertEqual(tags("A", categories: ["Restaurant", "Wine bar"]), ["Wine Bar"])
+        XCTAssertEqual(tags("A", categories: ["bar", "establishment"]), ["Bar"])
+        XCTAssertEqual(tags("A", categories: ["Pub"]), ["Bar"])
+        XCTAssertEqual(tags("A", categories: ["Cocktail bar"]), ["Cocktails"])
+    }
+
+    func testTags_KoreanBarbecueIsKoreanBBQAndKorean() {
+        XCTAssertEqual(tags("A", categories: ["Korean barbecue restaurant"]), ["Korean BBQ", "Korean"])
+        XCTAssertEqual(tags("A", categories: ["korean_restaurant"]), ["Korean"])
+        XCTAssertEqual(tags("A", categories: ["barbecue_restaurant"]), ["BBQ"])
+    }
+
+    func testTags_UsefulCategoryIsNotFirst() {
+        XCTAssertEqual(tags("A", categories: ["Chinese restaurant", "Ramen restaurant", "Noodle shop"]), ["Ramen", "Japanese", "Chinese"])
+    }
+
+    func testTags_UserCorrectedCategoryWins() {
+        XCTAssertEqual(tags("A", categories: ["Italian restaurant"], corrected: "Mexican restaurant"), ["Mexican"])
+        // A correction that maps to nothing does not erase the original categories.
+        XCTAssertEqual(tags("A", categories: ["Italian restaurant"], corrected: "restaurant"), ["Italian"])
+    }
+
+    func testTags_NameKeywordsFallBackWhenCategoriesAreGeneric() {
+        let generic = ["establishment", "food", "point_of_interest", "restaurant"]
+        XCTAssertEqual(tags("Joe's Pizza", categories: generic), ["Pizza"])
+        XCTAssertEqual(tags("Blue Bottle Coffee", categories: generic), ["Coffee"])
+        XCTAssertEqual(tags("Levain Bakery", categories: generic), ["Bakery"])
+        XCTAssertEqual(tags("Terroir Wine", categories: generic), ["Wine Bar"])
+    }
+
+    func testTags_MissingCategoriesFallBackToPlaceType() {
+        XCTAssertEqual(tags("A", "Italian restaurant"), ["Italian"])
+    }
+
+    func testChips_RealisticNewYorkList() {
+        let generic = ["establishment", "food", "point_of_interest", "restaurant"]
+        let places = group("gen", categories: generic, count: 54)
+            + group("bar", categories: ["bar", "establishment"], count: 19)
+            + group("sushi", categories: ["Sushi restaurant"], count: 16)
+            + group("jp", categories: ["Japanese restaurant"], count: 13)
+            + group("Bar", categories: ["Bar", "Wine bar"], count: 10)
+            + group("rest", categories: ["Restaurant", "Wine bar"], count: 10)
+            + group("it", categories: ["Italian restaurant"], count: 9)
+            + group("cs", categories: ["Coffee shop"], count: 8)
+            + group("mx", categories: ["Mexican restaurant"], count: 7)
+            + group("pz", categories: ["Pizza restaurant"], count: 6)
+            + group("kr", categories: ["Korean restaurant"], count: 5)
+            + group("kb", categories: ["Korean barbecue restaurant"], count: 4)
+            + group("cf", categories: ["cafe", "food", "establishment"], count: 5)
+            + group("bk", categories: ["bakery", "food"], count: 4)
+        let chips = titles(places)
+        XCTAssertEqual(chips.first, "All")
+        for expected in ["Sushi", "Japanese", "Bar", "Wine Bar", "Italian", "Coffee", "Mexican", "Pizza", "Korean"] {
+            XCTAssertTrue(chips.contains(expected), "missing chip \(expected) in \(chips)")
+        }
+        XCTAssertLessThanOrEqual(chips.count, 1 + ListTypeFilter.maxTagChips)
+        // Japanese = sushi (implied) 16 + 13; Coffee = 8 + 5, so Japanese outranks Coffee.
+        XCTAssertLessThan(chips.firstIndex(of: "Japanese")!, chips.firstIndex(of: "Coffee")!)
+    }
+
+    func testDecode_MissingOrNullCategoriesDecode() throws {
+        let json = #"[{"place_id":"1","name":"A"},{"place_id":"2","name":"B","categories":null,"user_corrected_category":null},{"place_id":"3","name":"C","categories":["bar","Wine bar"],"user_corrected_category":"Wine bar"}]"#
+        let places = try JSONDecoder().decode([LightweightPlace].self, from: Data(json.utf8))
+        XCTAssertNil(places[0].categories)
+        XCTAssertNil(places[1].categories)
+        XCTAssertEqual(places[2].categories, ["bar", "Wine bar"])
+        XCTAssertEqual(places[2].user_corrected_category, "Wine bar")
     }
 
     // MARK: - Chip row

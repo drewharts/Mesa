@@ -56,6 +56,8 @@ final class ListTypeFilterViewModel: ObservableObject {
         for place in places {
             hasher.combine(place.place_id)
             hasher.combine(place.place_type)
+            hasher.combine(place.categories)
+            hasher.combine(place.user_corrected_category)
             hasher.combine(place.name)
         }
         return hasher.finalize()
