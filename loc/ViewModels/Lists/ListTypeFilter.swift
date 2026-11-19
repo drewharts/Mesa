@@ -31,6 +31,11 @@ struct ListTagIndex {
         return places.filter { tagsByPlaceId[$0.place_id]?.contains(tag) ?? false }
     }
 
+    /// Ids (lowercased) of every place carrying the tag.
+    func placeIds(tagged tag: String) -> Set<String> {
+        Set(tagsByPlaceId.filter { $0.value.contains(tag) }.keys.map { $0.lowercased() })
+    }
+
     /// Whether any place carries the tag.
     func contains(tag: String) -> Bool {
         tagsByPlaceId.values.contains { $0.contains(tag) }
@@ -52,13 +57,16 @@ enum ListTypeFilter {
         let category: [String]
         let exact: [String]
         let name: [String]
+        /// Name-word prefixes (a word merely starting with the phrase, e.g. "SUSHIRO" for "sushi"). Keep rare.
+        let namePrefix: [String]
         let implies: [String]
 
-        init(_ tag: String, category: [String], exact: [String] = [], name: [String] = [], implies: [String] = []) {
+        init(_ tag: String, category: [String], exact: [String] = [], name: [String] = [], namePrefix: [String] = [], implies: [String] = []) {
             self.tag = tag
             self.category = category.map(ListTypeFilter.padded)
             self.exact = exact.map(ListTypeFilter.padded)
             self.name = name.map(ListTypeFilter.padded)
+            self.namePrefix = namePrefix.map { ListTypeFilter.padded($0).trimmingCharacters(in: .whitespaces) }
             self.implies = implies
         }
     }
@@ -71,7 +79,7 @@ enum ListTypeFilter {
 
     /// Rules in display-priority order. A phrase matches whole words only.
     private static let rules: [Rule] = [
-        Rule("Sushi", category: ["sushi"], name: ["sushi"], implies: ["Japanese"]),
+        Rule("Sushi", category: ["sushi"], name: ["sushi"], namePrefix: ["sushi"], implies: ["Japanese"]),
         Rule("Omakase", category: ["omakase"], name: ["omakase"], implies: ["Japanese"]),
         Rule("Ramen", category: ["ramen"], name: ["ramen"], implies: ["Japanese"]),
         Rule("Japanese", category: ["japanese", "izakaya", "yakitori", "tempura", "udon"], name: ["japanese", "izakaya", "yakitori"]),
@@ -152,7 +160,7 @@ enum ListTypeFilter {
         rules.filter { rule in
             categories.contains { text in
                 rule.category.contains { text.contains($0) } || rule.exact.contains(text)
-            } || rule.name.contains { name.contains($0) }
+            } || rule.name.contains { name.contains($0) } || rule.namePrefix.contains { name.contains(" " + $0) }
         }
     }
 

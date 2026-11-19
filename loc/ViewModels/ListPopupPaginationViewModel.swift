@@ -83,11 +83,14 @@ class ListPopupPaginationViewModel: ObservableObject {
         }
     }
 
-    /// Largest number of places fetched in one request when loading a whole list for the map.
-    private static let maxFullLoadCount = 300
+    /// Largest number of places loaded when fetching a whole list.
+    private static let maxFullLoadCount = 1000
 
-    /// Loads every place of a list in a single request so each pin on the map has a matching row.
-    /// Keeps optimistic local inserts, and leaves infinite-scroll pagination as a fallback for huge lists.
+    /// Places fetched per request when loading a whole list (smaller requests stay fast and reliable).
+    private static let fullLoadChunkSize = 100
+
+    /// Loads every place of a list in chunked requests so each pin on the map has a matching row and tag
+    /// chips can show all their matches. Keeps optimistic local inserts; keeps what loaded if a chunk fails.
     func loadAllPlaces(for listId: String, expectedCount: Int) async {
         guard let listsVM = listsVM else { return }
         initializeStateIfNeeded(for: listId)
@@ -99,32 +102,44 @@ class ListPopupPaginationViewModel: ObservableObject {
         guard !alreadyComplete, paginationStates[listId]?.isLoadingMore != true else { return }
 
         updateState(for: listId) { state in state.isLoadingMore = true }
-        // Fetch enough to outgrow a stale expectedCount (e.g. metadata said 1 but 6 places exist).
-        let pageSize = min(max(max(expectedCount, loadedCount) + 10, 20), Self.maxFullLoadCount)
-
-        do {
-            let fetched = try await listsVM.loadMorePlacesForList(listId: listId, page: 1, pageSize: pageSize)
-            let fetchedIds = Set(fetched.map { $0.place_id.lowercased() })
-            let localOnly = (listsVM.lightweightPlaceListPlaces[ListPlaceCount.normalizedId(listId)]
-                ?? listsVM.lightweightPlaceListPlaces[listId]
-                ?? []).filter { !fetchedIds.contains($0.place_id.lowercased()) }
-            listsVM.setPlacesForList(listId: listId, places: fetched + localOnly)
-            let knownComplete = fetched.count < pageSize
-            listsVM.dataViewModel.syncLoadedPlaceCount(
-                listId: listId,
-                loaded: fetched.count + localOnly.count,
-                knownComplete: knownComplete
-            )
-
-            updateState(for: listId) { state in
-                state.currentPage = max(1, fetched.count / 6)
-                state.hasMorePlaces = !knownComplete
-                state.isLoadingMore = false
-            }
-        } catch {
+        let (fetched, knownComplete) = await fetchAllPages(listId: listId, listsVM: listsVM)
+        guard !fetched.isEmpty || knownComplete else {
             updateState(for: listId) { state in state.isLoadingMore = false }
-            print("❌ [ListPopupPaginationViewModel] Error loading all places: \(error.localizedDescription)")
+            return
         }
+        let fetchedIds = Set(fetched.map { $0.place_id.lowercased() })
+        let localOnly = (listsVM.lightweightPlaceListPlaces[ListPlaceCount.normalizedId(listId)]
+            ?? listsVM.lightweightPlaceListPlaces[listId]
+            ?? []).filter { !fetchedIds.contains($0.place_id.lowercased()) }
+        listsVM.setPlacesForList(listId: listId, places: fetched + localOnly)
+        listsVM.dataViewModel.syncLoadedPlaceCount(
+            listId: listId,
+            loaded: fetched.count + localOnly.count,
+            knownComplete: knownComplete
+        )
+        updateState(for: listId) { state in
+            state.currentPage = max(1, fetched.count / 6)
+            state.hasMorePlaces = !knownComplete
+            state.isLoadingMore = false
+        }
+    }
+
+    /// Fetches a list's places chunk by chunk; returns what loaded and whether the end of the list was reached.
+    private func fetchAllPages(listId: String, listsVM: ProfileListsViewModel) async -> (places: [LightweightPlace], complete: Bool) {
+        var all: [LightweightPlace] = []
+        var page = 1
+        while all.count < Self.maxFullLoadCount {
+            do {
+                let chunk = try await listsVM.loadMorePlacesForList(listId: listId, page: page, pageSize: Self.fullLoadChunkSize)
+                all += chunk
+                if chunk.count < Self.fullLoadChunkSize { return (all, true) }
+                page += 1
+            } catch {
+                print("❌ [ListPopupPaginationViewModel] Error loading all places: \(error.localizedDescription)")
+                return (all, false)
+            }
+        }
+        return (all, false)
     }
 
     /// Resets pagination state for a specific list.

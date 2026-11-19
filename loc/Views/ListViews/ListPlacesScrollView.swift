@@ -26,6 +26,10 @@ struct ListPlacesScrollView: View {
     let onRemove: ((String) -> Void)?
     /// Shows the tag chips (All, Sushi, Coffee, ...) above the places. Off for the map's "Places here" sheet.
     var showsTypeFilter: Bool = false
+    /// The list being shown; with `showsTypeFilter` it lets the chips cover every place in the list.
+    var listId: String? = nil
+    /// Loads every remaining place of the list so a selected chip shows all of its matches.
+    var onLoadAll: (() async -> Void)? = nil
 
     @StateObject private var filterVM = ListTypeFilterViewModel()
     @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
@@ -64,7 +68,7 @@ struct ListPlacesScrollView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
-                } else if display.tiles.isEmpty && !isLoadingInitial {
+                } else if display.tiles.isEmpty && !isLoadingInitial && !filterVM.isLoadingMatches {
                     Text("No places match this filter")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -93,7 +97,14 @@ struct ListPlacesScrollView: View {
             .safeAreaInset(edge: .top, spacing: 8) { typeFilterRow(chips: display.chips) }
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
-            .onChange(of: filterVM.selection) { _, _ in onLoadMore() }
+            .onChange(of: filterVM.selection) { _, _ in
+                onLoadMore()
+                Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
+            }
+            .task(id: places.count) {
+                guard showsTypeFilter, let listId else { return }
+                await filterVM.refreshTagSource(listId: listId, loaded: places)
+            }
             .onAppear {
                 for p in places { if let la = p.latitude, let lo = p.longitude {
                     PlaceTimeZoneCache.shared.registerCoordinate(placeId: p.place_id, latitude: la, longitude: lo)
@@ -162,7 +173,7 @@ struct ListPlacesScrollView: View {
                     }
                 }
             }
-            if isLoadingMore {
+            if isLoadingMore || filterVM.isLoadingMatches {
                 ListPlaceTileSkeleton(width: tileWidth)
                 ListPlaceTileSkeleton(width: tileWidth)
             }

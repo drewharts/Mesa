@@ -392,7 +392,9 @@ struct LightweightListPopupView: View {
             onRemove: { placeId in
                 profile.listsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
             },
-            showsTypeFilter: true
+            showsTypeFilter: true,
+            listId: listId,
+            onLoadAll: { await paginationVM.loadAllPlaces(for: listId, expectedCount: displayedPlaceCount) }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

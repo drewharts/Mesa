@@ -308,3 +308,92 @@ final class ListTypeFilterTests: XCTestCase {
         XCTAssertEqual(ids, ["p7", "p8", "p9"])
     }
 }
+
+// MARK: - Whole-list chips and filter loading
+
+@MainActor
+final class ListTypeFilterWholeListTests: XCTestCase {
+
+    private func place(_ id: String, _ name: String, categories: [String] = [], corrected: String? = nil) -> LightweightPlace {
+        LightweightPlace(place_id: id, name: name, latest_review_photo: nil, categories: categories, user_corrected_category: corrected)
+    }
+
+    /// 40 tag-source rows: 23 sushi, 13 wine bars, 4 Korean.
+    private var source: [LightweightPlace] {
+        (0..<23).map { place("s\($0)", "Spot \($0)", categories: ["sushi_restaurant"]) }
+            + (0..<13).map { place("w\($0)", "Cellar \($0)", categories: ["wine_bar"]) }
+            + (0..<4).map { place("k\($0)", "Hall \($0)", categories: ["korean_restaurant"]) }
+    }
+
+    private func makeVM(source: [LightweightPlace]?) -> ListTypeFilterViewModel {
+        ListTypeFilterViewModel(tagSourceLoader: { _ in source }, cache: ListTagSourceCache())
+    }
+
+    func testChips_ComeFromWholeSourceNotLoadedPages() async {
+        let vm = makeVM(source: source)
+        let firstPage = Array(source.prefix(6))
+        await vm.refreshTagSource(listId: "L", loaded: firstPage)
+        let titles = vm.display(for: firstPage, filtersByType: true).chips.map(\.title)
+        XCTAssertEqual(titles.first, "All")
+        XCTAssertTrue(titles.contains("Sushi"))
+        XCTAssertTrue(titles.contains("Wine Bar"))
+        XCTAssertTrue(titles.contains("Korean"))
+    }
+
+    func testUnloadedMatchIds_ListsMatchesBeyondLoadedPages() async {
+        let vm = makeVM(source: source)
+        let loaded = Array(source.prefix(6))
+        await vm.refreshTagSource(listId: "L", loaded: loaded)
+        vm.select(ListTypeChip(tag: "Wine Bar", title: "Wine Bar"))
+        XCTAssertEqual(vm.unloadedMatchIds(loaded: loaded).count, 13)
+    }
+
+    func testLoadMatches_CallsLoadAllWhenMatchesMissingAndClearsSpinner() async {
+        let vm = makeVM(source: source)
+        var loaded = Array(source.prefix(6))
+        await vm.refreshTagSource(listId: "L", loaded: loaded)
+        vm.select(ListTypeChip(tag: "Wine Bar", title: "Wine Bar"))
+        var calls = 0
+        await vm.loadMatchesIfNeeded(loaded: { loaded }, loadAll: { calls += 1; loaded = self.source })
+        XCTAssertEqual(calls, 1)
+        XCTAssertFalse(vm.isLoadingMatches)
+        XCTAssertEqual(vm.visiblePlaces(from: loaded).count, 13)
+    }
+
+    func testLoadMatches_SkipsLoadAllWhenAllMatchesLoadedOrAllSelected() async {
+        let vm = makeVM(source: source)
+        let all = source
+        await vm.refreshTagSource(listId: "L", loaded: all)
+        var calls = 0
+        await vm.loadMatchesIfNeeded(loaded: { all }, loadAll: { calls += 1 })
+        vm.select(ListTypeChip(tag: "Korean", title: "Korean"))
+        await vm.loadMatchesIfNeeded(loaded: { all }, loadAll: { calls += 1 })
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testRefresh_FailureKeepsLoadedBasedChips() async {
+        let vm = makeVM(source: nil)
+        await vm.refreshTagSource(listId: "L", loaded: source)
+        XCTAssertNil(vm.fullIndex)
+        XCTAssertFalse(vm.display(for: source, filtersByType: true).chips.isEmpty)
+    }
+
+    func testRefresh_UsesCacheThenSkipsRefetchUntilPlaceAdded() async {
+        var fetches = 0
+        let cache = ListTagSourceCache()
+        let src = source
+        let vm = ListTypeFilterViewModel(tagSourceLoader: { _ in fetches += 1; return src }, cache: cache)
+        await vm.refreshTagSource(listId: "L", loaded: src)
+        await vm.refreshTagSource(listId: "L", loaded: src)
+        XCTAssertEqual(fetches, 1)
+        await vm.refreshTagSource(listId: "L", loaded: src + [place("new", "Fresh Sushi")])
+        XCTAssertEqual(fetches, 2)
+        XCTAssertNotNil(cache.index(for: "l"))
+    }
+
+    func testNameRule_SushiPrefixWordMatchesButOtherWordsDoNot() {
+        XCTAssertTrue(ListTypeFilter.tags(of: place("1", "SUSHIRO")).contains("Sushi"))
+        XCTAssertTrue(ListTypeFilter.tags(of: place("2", "Sushiya Ginza")).contains("Sushi"))
+        XCTAssertFalse(ListTypeFilter.tags(of: place("3", "Nonsushi Deli")).contains("Sushi"))
+    }
+}
