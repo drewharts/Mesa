@@ -267,4 +267,44 @@ final class ListTypeFilterTests: XCTestCase {
         XCTAssertFalse(vm.chips(for: mixed).isEmpty)
         XCTAssertTrue(vm.chips(for: [mixed[2]]).isEmpty)
     }
+
+    // MARK: - Display (memoized tiles)
+
+    func testUniquePlaces_DropsDuplicateIdsIgnoringCase() {
+        let places = [place("ABC", "A", type: nil), place("abc", "A again", type: nil), place("def", "B", type: nil)]
+        XCTAssertEqual(ListTypeFilter.uniquePlaces(places).map(\.name), ["A", "B"])
+    }
+
+    @MainActor
+    func testDisplay_UnfilteredKeepsAllUniqueTilesAndNoChips() {
+        let vm = ListTypeFilterViewModel()
+        let display = vm.display(for: mixed + [mixed[0]], filtersByType: false)
+        XCTAssertEqual(display.tiles.count, mixed.count)
+        XCTAssertTrue(display.chips.isEmpty)
+    }
+
+    @MainActor
+    func testDisplay_AppliesSelectionAndRefreshesAfterChange() {
+        let vm = ListTypeFilterViewModel()
+        XCTAssertEqual(vm.display(for: mixed, filtersByType: true).tiles.count, mixed.count)
+        vm.select(ListTypeChip(tag: "Cocktails", title: "Cocktails"))
+        XCTAssertEqual(vm.display(for: mixed, filtersByType: true).tiles.count, vm.visiblePlaces(from: mixed).count)
+    }
+
+    @MainActor
+    func testDisplay_ReflectsChangedPlaceFieldsWithSameIds() {
+        let vm = ListTypeFilterViewModel()
+        _ = vm.display(for: mixed, filtersByType: true)
+        var renamed = mixed
+        renamed[0] = place(mixed[0].place_id, "Renamed", type: mixed[0].place_type)
+        XCTAssertEqual(vm.display(for: renamed, filtersByType: true).tiles.first?.name, "Renamed")
+    }
+
+    @MainActor
+    func testDisplay_LoadMoreTriggersAreTheLastThreeTiles() {
+        let vm = ListTypeFilterViewModel()
+        let places = group("p", "restaurant", count: 10)
+        let ids = vm.display(for: places, filtersByType: false).loadMoreTriggerIds
+        XCTAssertEqual(ids, ["p7", "p8", "p9"])
+    }
 }

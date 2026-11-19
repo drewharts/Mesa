@@ -39,22 +39,9 @@ struct ListPlacesScrollView: View {
 
     private var isCollapsed: Bool { sheetVM.detent == .peek }
 
-    /// One tile per place. Duplicate ids (same place reached twice, sometimes with different id
-    /// casing) gave LazyVGrid duplicate identities, which left a blank cell and broke the 2-column flow.
-    private var uniquePlaces: [LightweightPlace] {
-        var seen = Set<String>()
-        return shownPlaces.filter { seen.insert($0.place_id.lowercased()).inserted }
-    }
-
-    /// The places after the selected type chip is applied.
-    private var shownPlaces: [LightweightPlace] {
-        showsTypeFilter ? filterVM.visiblePlaces(from: places) : places
-    }
-
     /// The chip row, or nothing when filtering is off or the list has too few tags.
     @ViewBuilder
-    private var typeFilterRow: some View {
-        let chips = showsTypeFilter ? filterVM.chips(for: places) : []
+    private func typeFilterRow(chips: [ListTypeChip]) -> some View {
         if !chips.isEmpty {
             ListTypeFilterRow(chips: chips, isSelected: { filterVM.isSelected($0) }, onSelect: { filterVM.select($0) })
                 .padding(.vertical, 4)
@@ -67,7 +54,9 @@ struct ListPlacesScrollView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
+        // Chips, de-duplicated tiles and load-more ids are memoized in the view model: computed once per render.
+        let display = filterVM.display(for: places, filtersByType: showsTypeFilter)
+        return ScrollViewReader { proxy in
             Group {
                 if places.isEmpty && !isLoadingInitial {
                     Text("No places in this list")
@@ -75,7 +64,7 @@ struct ListPlacesScrollView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
-                } else if shownPlaces.isEmpty && !isLoadingInitial {
+                } else if display.tiles.isEmpty && !isLoadingInitial {
                     Text("No places match this filter")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -84,7 +73,7 @@ struct ListPlacesScrollView: View {
                 } else if isCollapsed {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: 12) {
-                            content(tileWidth: Self.rowTileSize)
+                            content(display, tileWidth: Self.rowTileSize)
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
@@ -93,7 +82,7 @@ struct ListPlacesScrollView: View {
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 16) {
-                            content(tileWidth: nil)
+                            content(display, tileWidth: nil)
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 32)
@@ -101,7 +90,7 @@ struct ListPlacesScrollView: View {
                     .transition(.opacity)
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 8) { typeFilterRow }
+            .safeAreaInset(edge: .top, spacing: 8) { typeFilterRow(chips: display.chips) }
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
             .onChange(of: filterVM.selection) { _, _ in onLoadMore() }
@@ -136,13 +125,13 @@ struct ListPlacesScrollView: View {
     }
 
     @ViewBuilder
-    private func content(tileWidth: CGFloat?) -> some View {
+    private func content(_ display: ListTypeFilterViewModel.Display, tileWidth: CGFloat?) -> some View {
         if places.isEmpty {
             ForEach(0..<6, id: \.self) { _ in
                 ListPlaceTileSkeleton(width: tileWidth)
             }
         } else {
-            ForEach(Array(uniquePlaces.enumerated()), id: \.element.id) { index, place in
+            ForEach(display.tiles) { place in
                 ListPlaceTileView(
                     place: place,
                     locationText: locationText(place.place_id),
@@ -168,7 +157,7 @@ struct ListPlacesScrollView: View {
                 }
                 .onAppear {
                     onRowAppear(place)
-                    if index >= uniquePlaces.count - 3 {
+                    if display.loadMoreTriggerIds.contains(place.place_id.lowercased()) {
                         onLoadMore()
                     }
                 }
@@ -220,7 +209,13 @@ struct ListPlaceTileView: View {
                         .stroke(isSelected ? Color.mesaAccent : Color.gray.opacity(0.15),
                                 lineWidth: isSelected ? 3 : 1)
                 )
-                .shadow(color: Color.black.opacity(isSelected ? 0.16 : 0.07), radius: isSelected ? 8 : 5, x: 0, y: 3)
+                // Shadow is cast by a plain rounded rect behind the photo (cheap, known shape) instead of by the
+                // clipped photo/overlay stack, which forced an offscreen render pass per tile while scrolling.
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: Color.black.opacity(isSelected ? 0.16 : 0.07), radius: isSelected ? 8 : 5, x: 0, y: 3)
+                )
                 .scaleEffect(isSelected ? 1.0 : 0.985)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -237,7 +232,7 @@ struct ListPlaceTileView: View {
                         Text(state.isOpen ? "Open" : "Closed")
                             .fontWeight(.semibold)
                             .foregroundColor(state.isOpen ? .green : .secondary)
-                        if let change = hoursStore.changeText(for: place.place_id) {
+                        if let change = PlaceHours.changeText(for: state, timeZone: hoursStore.timeZone(for: place.place_id)) {
                             Text("· \(change)").foregroundColor(.secondary)
                         }
                     }

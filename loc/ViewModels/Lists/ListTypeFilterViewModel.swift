@@ -17,6 +17,37 @@ final class ListTypeFilterViewModel: ObservableObject {
     private var cachedSignature: Int?
     private var cachedIndex = ListTagIndex.empty
 
+    /// Everything the list needs to render one frame, computed together so the view asks once per render.
+    struct Display {
+        let chips: [ListTypeChip]
+        let tiles: [LightweightPlace]
+        /// Ids (lowercased) of the last few tiles; appearing one of them asks for the next page.
+        let loadMoreTriggerIds: Set<String>
+    }
+
+    /// Number of trailing tiles whose appearance triggers loading the next page.
+    private static let loadMoreLookahead = 3
+
+    private var cachedDisplay: (places: [LightweightPlace], selection: String?, filtersByType: Bool, display: Display)?
+
+    /// The chips and de-duplicated, filtered tiles for the places. Memoized on the exact places and selection
+    /// (full equality, since tiles render most fields), so re-renders during scrolling (hours, neighborhoods,
+    /// focus) do not re-filter hundreds of places.
+    func display(for places: [LightweightPlace], filtersByType: Bool) -> Display {
+        if let hit = cachedDisplay, hit.filtersByType == filtersByType, hit.selection == selection, hit.places == places {
+            return hit.display
+        }
+        let shown = filtersByType ? visiblePlaces(from: places) : places
+        let tiles = ListTypeFilter.uniquePlaces(shown)
+        let display = Display(
+            chips: filtersByType ? chips(for: places) : [],
+            tiles: tiles,
+            loadMoreTriggerIds: Set(tiles.suffix(Self.loadMoreLookahead).map { $0.place_id.lowercased() })
+        )
+        cachedDisplay = (places, selection, filtersByType, display)
+        return display
+    }
+
     /// Chips for the places currently loaded.
     func chips(for places: [LightweightPlace]) -> [ListTypeChip] {
         index(for: places).chips

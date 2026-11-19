@@ -20,6 +20,8 @@ struct CachedAsyncImage<Placeholder: View>: View {
         self.targetSize = targetSize
         self.placeholder = placeholder
         self.onFailure = onFailure
+        // A memory-cache hit renders on the first frame: lazily re-created rows (scrolling back) never flash the placeholder.
+        _loadedImage = State(initialValue: url.flatMap { ImageCacheService.shared.memoryImage(for: $0, targetSize: targetSize) })
     }
 
     var body: some View {
@@ -38,8 +40,12 @@ struct CachedAsyncImage<Placeholder: View>: View {
 
     /// Loads image via ImageCacheService (cache -> deduplicated fetch -> downsample -> cache), reporting non-cancelled failures.
     private func loadImage() async {
+        guard let imageURL = url else { loadedImage = nil; return }
+        if let cached = ImageCacheService.shared.memoryImage(for: imageURL, targetSize: targetSize) {
+            loadedImage = cached
+            return
+        }
         loadedImage = nil
-        guard let imageURL = url else { return }
         loadedImage = await ImageCacheService.shared.fetchImage(for: imageURL, targetSize: targetSize)
         if loadedImage == nil && !Task.isCancelled {
             onFailure?()

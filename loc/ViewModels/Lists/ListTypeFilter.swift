@@ -188,6 +188,13 @@ enum ListTypeFilter {
         index(for: places).chips
     }
 
+    /// One entry per place: duplicate ids (same place reached twice, sometimes with different id casing)
+    /// would give a lazy grid duplicate identities, so only the first occurrence is kept.
+    static func uniquePlaces(_ places: [LightweightPlace]) -> [LightweightPlace] {
+        var seen = Set<String>()
+        return places.filter { seen.insert($0.place_id.lowercased()).inserted }
+    }
+
     /// The places a selection keeps; nil ("All") keeps everything.
     static func apply(_ selection: String?, to places: [LightweightPlace]) -> [LightweightPlace] {
         guard let selection else { return places }
