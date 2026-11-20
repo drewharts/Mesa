@@ -19,6 +19,12 @@ final class ListTypeFilterViewModel: ObservableObject {
     /// Tags of EVERY place in the list (not just loaded pages); drives the chips and the filter once fetched.
     @Published private(set) var fullIndex: ListTagIndex?
 
+    /// True when the selected chip still has places that could not be loaded (network failure); drives a retry state.
+    @Published private(set) var matchesLoadFailed = false
+
+    /// Loads attempted per selection before reporting failure.
+    private static let maxLoadAttempts = 2
+
     private let tagSourceLoader: (String) async -> [LightweightPlace]?
     private let cache: ListTagSourceCache
     private var hasRefreshedSource = false
@@ -91,6 +97,13 @@ final class ListTypeFilterViewModel: ObservableObject {
     /// Selects a chip. Tapping the selected chip again goes back to "All".
     func select(_ chip: ListTypeChip) {
         selection = (chip.tag == selection) ? nil : chip.tag
+        matchesLoadFailed = false
+    }
+
+    /// Marks matches as loading straight away when the new selection has unloaded places, so the list shows a
+    /// loading state instead of a flash of the empty state before the load task starts.
+    func beginLoadingMatchesIfNeeded(loaded: [LightweightPlace]) {
+        isLoadingMatches = selection != nil && !unloadedMatchIds(loaded: loaded).isEmpty
     }
 
     /// Whether a chip is the active one ("All" is active when nothing is selected).
@@ -105,14 +118,25 @@ final class ListTypeFilterViewModel: ObservableObject {
     }
 
     /// Loads the rest of the list when the selected chip matches places that are not loaded yet, so the chip
-    /// shows ALL its places. `loaded` reads the current places; `loadAll` fetches the remaining pages.
+    /// shows ALL its places. `loaded` reads the current places; `loadAll` fetches the remaining pages and is
+    /// retried once when matches are still missing afterwards.
     func loadMatchesIfNeeded(loaded: () -> [LightweightPlace], loadAll: () async -> Void) async {
         let chosen = selection
-        guard chosen != nil, !unloadedMatchIds(loaded: loaded()).isEmpty else { return }
+        guard chosen != nil, !unloadedMatchIds(loaded: loaded()).isEmpty else {
+            isLoadingMatches = false
+            return
+        }
         isLoadingMatches = true
-        await loadAll()
+        matchesLoadFailed = false
+        var attempts = 0
+        while attempts < Self.maxLoadAttempts, selection == chosen, !unloadedMatchIds(loaded: loaded()).isEmpty {
+            await loadAll()
+            attempts += 1
+        }
         // A newer selection owns the spinner now.
-        if selection == chosen { isLoadingMatches = false }
+        guard selection == chosen else { return }
+        matchesLoadFailed = !unloadedMatchIds(loaded: loaded()).isEmpty
+        isLoadingMatches = false
     }
 
     /// Fetches the whole-list tag source when it is missing, stale (places were added or removed) or not yet

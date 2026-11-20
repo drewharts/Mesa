@@ -98,6 +98,7 @@ class ListPopupPaginationViewModel: ObservableObject {
         let loadedCount = listsVM.lightweightPlaceListPlaces[ListPlaceCount.normalizedId(listId)]?.count
             ?? listsVM.lightweightPlaceListPlaces[listId]?.count
             ?? 0
+        await waitForPageLoadToFinish(listId: listId)
         let alreadyComplete = paginationStates[listId]?.hasMorePlaces == false && loadedCount > 0
         guard !alreadyComplete, paginationStates[listId]?.isLoadingMore != true else { return }
 
@@ -123,6 +124,19 @@ class ListPopupPaginationViewModel: ObservableObject {
             state.isLoadingMore = false
         }
     }
+
+    /// Suspends until an in-flight page load for the list finishes (bounded), so a full load requested right
+    /// after a scroll-triggered page load waits for it instead of silently doing nothing.
+    private func waitForPageLoadToFinish(listId: String) async {
+        var waited = 0
+        while paginationStates[listId]?.isLoadingMore == true, waited < Self.maxPageWaitMillis, !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            waited += 50
+        }
+    }
+
+    /// Longest a full load waits for an in-flight page load before giving up.
+    private static let maxPageWaitMillis = 10_000
 
     /// Fetches a list's places chunk by chunk; returns what loaded and whether the end of the list was reached.
     private func fetchAllPages(listId: String, listsVM: ProfileListsViewModel) async -> (places: [LightweightPlace], complete: Bool) {

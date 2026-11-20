@@ -28,7 +28,8 @@ struct ListTagIndex {
     /// The places carrying a tag; nil ("All") keeps everything.
     func places(tagged tag: String?, in places: [LightweightPlace]) -> [LightweightPlace] {
         guard let tag else { return places }
-        return places.filter { tagsByPlaceId[$0.place_id]?.contains(tag) ?? false }
+        let matching = placeIds(tagged: tag)
+        return places.filter { matching.contains($0.place_id.lowercased()) }
     }
 
     /// Ids (lowercased) of every place carrying the tag.

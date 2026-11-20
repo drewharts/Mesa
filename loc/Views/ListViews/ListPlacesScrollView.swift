@@ -69,11 +69,9 @@ struct ListPlacesScrollView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
                 } else if display.tiles.isEmpty && !isLoadingInitial && !filterVM.isLoadingMatches {
-                    Text("No places match this filter")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                    ListFilterEmptyState(loadFailed: filterVM.matchesLoadFailed) {
+                        Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
+                    }
                 } else if isCollapsed {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: 12) {
@@ -98,12 +96,16 @@ struct ListPlacesScrollView: View {
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
             .onChange(of: filterVM.selection) { _, _ in
+                filterVM.beginLoadingMatchesIfNeeded(loaded: places)
                 onLoadMore()
                 Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
             }
             .task(id: places.count) {
                 guard showsTypeFilter, let listId else { return }
                 await filterVM.refreshTagSource(listId: listId, loaded: places)
+                // The whole-list index may arrive after a chip was tapped; load that chip's missing places now.
+                // Unstructured: a changing place count restarts this task and must not cancel the network load.
+                Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
             }
             .onAppear {
                 for p in places { if let la = p.latitude, let lo = p.longitude {

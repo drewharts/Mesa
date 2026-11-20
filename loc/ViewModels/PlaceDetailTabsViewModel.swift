@@ -76,6 +76,11 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
+    /// In-flight per-place loads; cancelled whenever the place changes so a slow result can't land on another place.
+    private var photoFallbackTask: Task<Void, Never>?
+    private var metadataRefreshTask: Task<Void, Never>?
+    private var membershipTask: Task<Void, Never>?
+
     // MARK: - Initialization (Data-Driven - No ViewModel Dependencies in Child ViewModels)
     /// Creates PlaceDetailTabsViewModel with minimal ViewModel dependencies
     /// Child ViewModels are fully refactored with data-driven approach
@@ -157,8 +162,11 @@ class PlaceDetailTabsViewModel: ObservableObject {
         }
 
         // Wire up metadata refresh callback to update SelectedPlaceViewModel
+        // Dropped unless the shared selection is still that place: a late result for a page the user left
+        // must not overwrite the place now selected.
         self.onPlaceMetadataRefreshed = { [weak selectedPlaceVM] refreshedPlace in
-            selectedPlaceVM?.selectionState.updatePlaceDetails(refreshedPlace)
+            guard let selectedPlaceVM, Self.isCurrentSelection(selectedPlaceVM.selectedPlace, for: refreshedPlace) else { return }
+            selectedPlaceVM.selectionState.updatePlaceDetails(refreshedPlace)
         }
 
         setupObservers()
@@ -316,6 +324,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
     /// Called by View when selected place changes.
     func setPlace(_ place: DetailPlace?) {
+        cancelPlaceLoads()
         // Clear all stale display state BEFORE updating currentPlace
         // This prevents the reactive CombineLatest subscription from briefly
         // showing cached data from a previous visit to the same place
@@ -346,8 +355,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
         aboutTabViewModel.setPlace(place)
 
         // Check place list membership
-        Task {
-            await checkPlaceListMembership(place: place)
+        membershipTask = Task { [weak self] in
+            await self?.checkPlaceListMembership(place: place)
         }
 
         // Trigger backend photo fallback if place has no cached photos
@@ -408,9 +417,11 @@ class PlaceDetailTabsViewModel: ObservableObject {
                 userId: userId,
                 placeId: placeId
             )
+            guard isCurrent(placeId) else { return }
             isPlaceInList = isSaved || isFavorite
         } catch {
             print("❌ [PlaceDetailTabsVM] Error checking place list membership: \(error)")
+            guard isCurrent(placeId) else { return }
             isPlaceInList = isFavorite
         }
     }
@@ -423,8 +434,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
         postsCacheService.loadPosts(forPlaceId: placeId)
         placePhotosViewModel.setPlace(place)
         placeSaversViewModel.setPlace(placeId)
-        Task {
-            await checkPlaceListMembership(place: place)
+        membershipTask?.cancel()
+        membershipTask = Task { [weak self] in
+            await self?.checkPlaceListMembership(place: place)
         }
         refreshPlaceMetadata(for: place)
     }
@@ -435,14 +447,18 @@ class PlaceDetailTabsViewModel: ObservableObject {
             isRefreshing = false
             return
         }
-        Task {
-            defer { isRefreshing = false }
+        metadataRefreshTask?.cancel()
+        let requestedId = place.id.uuidString
+        metadataRefreshTask = Task { [weak self] in
+            defer { self?.isRefreshing = false }
             do {
-                let refreshed = try await placeRepository.resolvePlace(
+                guard let repository = self?.placeRepository else { return }
+                let refreshed = try await repository.resolvePlace(
                     googlePlaceId: place.googlePlaceId,
-                    fallbackId: place.id.uuidString,
+                    fallbackId: requestedId,
                     existingPlace: place
                 )
+                guard let self, !Task.isCancelled, self.isCurrent(requestedId, googlePlaceId: refreshed.googlePlaceId) else { return }
                 self.refreshPlaceData(refreshed)
                 self.onPlaceMetadataRefreshed?(refreshed)
             } catch {
@@ -463,6 +479,36 @@ class PlaceDetailTabsViewModel: ObservableObject {
         placeSaversViewModel.configure(userProfileNavigationViewModel: userProfileNavigationViewModel)
     }
     
+    /// Cancels every in-flight per-place load; called when the shown place changes.
+    private func cancelPlaceLoads() {
+        photoFallbackTask?.cancel()
+        metadataRefreshTask?.cancel()
+        membershipTask?.cancel()
+        photoFallbackTask = nil
+        metadataRefreshTask = nil
+        membershipTask = nil
+    }
+
+    /// Whether a result requested for `placeId` (or the same Google place) still belongs to the place shown.
+    private func isCurrent(_ placeId: String, googlePlaceId: String? = nil) -> Bool {
+        PlaceSelectionIdentity.isSamePlace(
+            oldId: currentPlace?.id.uuidString,
+            oldGooglePlaceId: currentPlace?.googlePlaceId,
+            newId: placeId,
+            newGooglePlaceId: googlePlaceId
+        )
+    }
+
+    /// Whether the shared selection is still the place a refreshed copy belongs to.
+    private static func isCurrentSelection(_ selected: DetailPlace?, for refreshed: DetailPlace) -> Bool {
+        PlaceSelectionIdentity.isSamePlace(
+            oldId: selected?.id.uuidString,
+            oldGooglePlaceId: selected?.googlePlaceId,
+            newId: refreshed.id.uuidString,
+            newGooglePlaceId: refreshed.googlePlaceId
+        )
+    }
+
     private func handlePlaceChanged(_ place: DetailPlace?) {
         currentPlace = place
         placeName = place?.name ?? "Loading..."
@@ -493,13 +539,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
         let needsFallback = urls.isEmpty || urls.allSatisfy { ImageLoadingUtility.isTransientGoogleURL($0) }
         guard needsFallback else { return }
 
-        Task {
+        let requestedId = place.id.uuidString
+        photoFallbackTask = Task { [weak self] in
             guard let refreshed = try? await MesaBackendService.shared.fetchPlaceDetails(placeId: googlePlaceId, source: "google") else { return }
             let merged = PlaceDataAssembler.merge(base: place, overlay: refreshed)
-            await MainActor.run {
-                self.refreshPlaceData(merged)
-                self.onPlaceMetadataRefreshed?(merged)
-            }
+            // The user moved to another place while this loaded: drop the result.
+            guard let self, !Task.isCancelled, self.isCurrent(requestedId, googlePlaceId: googlePlaceId) else { return }
+            self.refreshPlaceData(merged)
+            self.onPlaceMetadataRefreshed?(merged)
         }
     }
 
