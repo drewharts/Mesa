@@ -17,6 +17,10 @@ struct ListTypeFilterRow: View {
     let onBeginSearch: () -> Void
     let onClearOrCloseSearch: () -> Void
     let onCollapseSearch: () -> Void
+    /// Shows the "Find a table" chip after the search button; off when the backend does not offer it.
+    var showsFindTable: Bool = false
+    var isFindTableActive: Bool = false
+    var onFindTable: () -> Void = {}
 
     @ScaledMetric(relativeTo: .subheadline) private var rowHeight: CGFloat = 36
 
@@ -28,6 +32,9 @@ struct ListTypeFilterRow: View {
                 HStack(spacing: 8) {
                     ListChipSearchField(query: searchQuery, isActive: isSearching, onActivate: onBeginSearch,
                                         onClearOrClose: onClearOrCloseSearch, onCollapse: onCollapseSearch)
+                    if showsFindTable {
+                        FindTableChip(isActive: isFindTableActive, onTap: onFindTable)
+                    }
                     ForEach(chips) { chip in
                         FilterChip(label: chip.title, isSelected: isSelected(chip), onTap: { onSelect(chip) })
                             .id(chip.id)

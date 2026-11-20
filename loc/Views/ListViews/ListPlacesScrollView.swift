@@ -32,6 +32,7 @@ struct ListPlacesScrollView: View {
     var onLoadAll: (() async -> Void)? = nil
 
     @StateObject private var filterVM = ListTypeFilterViewModel()
+    @StateObject private var findTableVM = FindTableViewModel()
     @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
 
     static let rowTileSize: CGFloat = 150
@@ -60,10 +61,44 @@ struct ListPlacesScrollView: View {
                 searchQuery: Binding(get: { filterVM.searchQuery }, set: { filterVM.setSearchQuery($0) }),
                 onBeginSearch: { filterVM.beginSearch() },
                 onClearOrCloseSearch: { filterVM.clearOrCloseSearch() },
-                onCollapseSearch: { filterVM.endSearch() }
+                onCollapseSearch: { filterVM.endSearch() },
+                showsFindTable: showsTypeFilter && listId != nil && findTableVM.isOffered,
+                isFindTableActive: findTableVM.isActive,
+                onFindTable: { findTableVM.presentForm() }
             )
             .padding(.vertical, 4)
         }
+    }
+
+    /// The table-search status line (checking / results summary) with its way back to the full list.
+    @ViewBuilder
+    private var findTableStatusBar: some View {
+        if findTableVM.isLoading {
+            FindTableStatusBar(text: "Checking for tables…", isLoading: true, onExit: { findTableVM.exit() })
+        } else if let summary = findTableVM.resultsSummary {
+            FindTableStatusBar(text: summary, isLoading: false, onExit: { findTableVM.exit() })
+        }
+    }
+
+    /// The error or empty state of a table search; nil while loading or when there are tables to show.
+    @ViewBuilder
+    private var findTableMessage: some View {
+        if case .failed = findTableVM.state {
+            FindTableMessageView(title: "Couldn't check right now", detail: "Table availability is unavailable at the moment.",
+                                 primaryTitle: "Try again",
+                                 onPrimary: { if let listId { findTableVM.retry(listId: listId) } },
+                                 onExit: { findTableVM.exit() })
+        } else {
+            FindTableMessageView(title: "No tables found", detail: "Nothing open for \(findTableVM.partySize) · \(findTableVM.selectionSummary).",
+                                 primaryTitle: "Change search", onPrimary: { findTableVM.presentForm() },
+                                 onExit: { findTableVM.exit() })
+        }
+    }
+
+    /// Whether the table search ended with nothing to show (an error, or no place with tables).
+    private var findTableShowsMessage: Bool {
+        if case .failed = findTableVM.state { return true }
+        return findTableVM.scopeIds?.isEmpty == true
     }
 
     private func isSelected(_ place: LightweightPlace) -> Bool {
@@ -73,7 +108,8 @@ struct ListPlacesScrollView: View {
 
     var body: some View {
         // Chips, de-duplicated tiles and load-more ids are memoized in the view model: computed once per render.
-        let display = filterVM.display(for: places, filtersByType: showsTypeFilter)
+        let listDisplay = filterVM.display(for: places, filtersByType: showsTypeFilter)
+        let display = findTableVM.scopeIds.map { listDisplay.narrowed(toPlaceIds: $0) } ?? listDisplay
         return ScrollViewReader { proxy in
             Group {
                 if places.isEmpty && !isLoadingInitial {
@@ -82,7 +118,9 @@ struct ListPlacesScrollView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
-                } else if display.tiles.isEmpty && !isLoadingInitial && !filterVM.isLoadingMatches {
+                } else if findTableShowsMessage {
+                    findTableMessage
+                } else if display.tiles.isEmpty && !isLoadingInitial && !filterVM.isLoadingMatches && !findTableVM.isActive {
                     ListFilterEmptyState(loadFailed: filterVM.matchesLoadFailed, message: filterVM.hasSearchQuery ? "No places match your search" : nil) {
                         Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
                     }
@@ -106,7 +144,21 @@ struct ListPlacesScrollView: View {
                     .transition(.opacity)
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 8) { typeFilterRow(display: display) }
+            .safeAreaInset(edge: .top, spacing: 8) {
+                VStack(spacing: 6) {
+                    typeFilterRow(display: display)
+                    findTableStatusBar
+                }
+            }
+            .sheet(isPresented: $findTableVM.isFormPresented) {
+                FindTableSheet(viewModel: findTableVM, onSearch: { if let listId { findTableVM.search(listId: listId) } })
+            }
+            // Results cover the whole list, so make sure every place is loaded before narrowing the tiles and map.
+            .onChange(of: findTableVM.scopeIds) { _, ids in
+                guard ids != nil else { return }
+                Task { await onLoadAll?() }
+            }
+            .onChange(of: listId) { _, _ in findTableVM.exit() }
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
             .onChange(of: filterVM.selection) { _, _ in
@@ -170,7 +222,7 @@ struct ListPlacesScrollView: View {
 
     @ViewBuilder
     private func content(_ display: ListTypeFilterViewModel.Display, tileWidth: CGFloat?) -> some View {
-        if places.isEmpty {
+        if places.isEmpty || findTableVM.isLoading || (findTableVM.isActive && display.tiles.isEmpty) {
             ForEach(0..<6, id: \.self) { _ in
                 ListPlaceTileSkeleton(width: tileWidth)
             }
@@ -182,6 +234,9 @@ struct ListPlacesScrollView: View {
                     isSelected: isSelected(place),
                     showAddedBy: showAddedBy,
                     width: tileWidth,
+                    availability: findTableVM.availability(for: place.place_id),
+                    timeText: { findTableVM.timeText(minutes: $0) },
+                    onSlotTap: { if let found = findTableVM.availability(for: place.place_id) { findTableVM.openBooking(for: found) } },
                     onTap: { onSelect(place) }
                 )
                 .id(place.place_id)
@@ -226,6 +281,10 @@ struct ListPlaceTileView: View {
     let showAddedBy: Bool
     /// Fixed width for the horizontal row; nil fills the grid column.
     let width: CGFloat?
+    /// Table availability to show as time pills under the tile (table search results only).
+    var availability: PlaceTableAvailability? = nil
+    var timeText: ((Int) -> String)? = nil
+    var onSlotTap: (() -> Void)? = nil
     let onTap: () -> Void
 
     private let radius: CGFloat = 12
@@ -291,6 +350,10 @@ struct ListPlaceTileView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                if let availability, let timeText, let onSlotTap {
+                    TableSlotPills(slots: availability.sortedSlots, timeText: timeText, onTap: onSlotTap)
+                        .padding(.top, 2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(.horizontal, 2)
