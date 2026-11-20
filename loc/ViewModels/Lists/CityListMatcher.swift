@@ -12,7 +12,8 @@
 //  2. An exact name match beats an alias match ("New York City" beats "Brooklyn"); among several,
 //     the list with the most places wins, then A-Z, then list id, so the pick is deterministic.
 //  3. Only lists the user owns can receive a save: lists shared with the user and paid lists are skipped.
-//  4. List names that merely contain the city ("NYC Restaurants", "Paris trip") never match.
+//  4. Cities follow the city-boundary rule in CanonicalCityResolver (Decatur -> Atlanta, hikes -> Upstate NY).
+//  5. List names that merely contain the city ("NYC Restaurants", "Paris trip") never match.
 //
 
 import Foundation
@@ -34,12 +35,14 @@ enum CityListMatcher {
         "la": "los angeles", "l a": "los angeles",
         "dc": "washington dc", "washington d c": "washington dc",
         "philly": "philadelphia", "vegas": "las vegas", "nola": "new orleans",
+        "upstate nyc": "upstate ny", "upstate new york": "upstate ny",
         "cdmx": "mexico city", "ciudad de mexico": "mexico city"
     ]
 
     /// The display city for a place: the stored city or address locality, or nil when neither says.
     static func cityName(storedCity: String?, address: String?) -> String? {
-        SavedLibraryBuilder.city(storedCity: storedCity, address: address)?.city
+        CanonicalCityResolver.resolve(address: address, storedCity: storedCity)
+            ?? SavedLibraryBuilder.city(storedCity: storedCity, address: address)?.city
     }
 
     /// Identity of a city or list name: equal keys mean "the same city" (NYC == New York). Borough names
