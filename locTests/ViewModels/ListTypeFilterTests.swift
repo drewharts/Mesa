@@ -62,7 +62,7 @@ final class ListTypeFilterTests: XCTestCase {
 
     func testTags_UnmappedCategoriesAreDropped() {
         XCTAssertTrue(tags("Mystery", "restaurant").isEmpty)
-        XCTAssertTrue(tags("Mystery", "Fast food restaurant").isEmpty)
+        XCTAssertTrue(tags("Mystery", "Family restaurant").isEmpty)
         XCTAssertTrue(tags("Mystery", nil).isEmpty)
     }
 
@@ -71,8 +71,8 @@ final class ListTypeFilterTests: XCTestCase {
         XCTAssertEqual(tags("Dante", "Cocktail bar"), ["Cocktails"])
         XCTAssertEqual(tags("Terroir", "Wine bar"), ["Wine Bar"])
         XCTAssertEqual(tags("McSorley's", "Bar"), ["Bar"])
-        XCTAssertEqual(tags("Strand", "Book store"), ["Shopping"])
-        XCTAssertEqual(tags("Beacon's Closet", "Vintage clothing store"), ["Vintage", "Shopping"])
+        XCTAssertEqual(tags("Strand", "Book store"), ["Books"])
+        XCTAssertEqual(tags("Beacon's Closet", "Vintage clothing store"), ["Vintage Clothing"])
     }
 
     func testTags_NameWordsDoNotMisfire() {
@@ -140,7 +140,7 @@ final class ListTypeFilterTests: XCTestCase {
     }
 
     func testTags_UsefulCategoryIsNotFirst() {
-        XCTAssertEqual(tags("A", categories: ["Chinese restaurant", "Ramen restaurant", "Noodle shop"]), ["Ramen", "Japanese", "Chinese"])
+        XCTAssertEqual(tags("A", categories: ["Chinese restaurant", "Ramen restaurant", "Noodle shop"]), ["Ramen", "Japanese", "Chinese", "Noodles"])
     }
 
     func testTags_UserCorrectedCategoryWins() {
@@ -154,7 +154,7 @@ final class ListTypeFilterTests: XCTestCase {
         XCTAssertEqual(tags("Joe's Pizza", categories: generic), ["Pizza"])
         XCTAssertEqual(tags("Blue Bottle Coffee", categories: generic), ["Coffee"])
         XCTAssertEqual(tags("Levain Bakery", categories: generic), ["Bakery"])
-        XCTAssertEqual(tags("Terroir Wine", categories: generic), ["Wine Bar"])
+        XCTAssertEqual(tags("Terroir Wine Bar", categories: generic), ["Wine Bar"])
     }
 
     func testTags_MissingCategoriesFallBackToPlaceType() {

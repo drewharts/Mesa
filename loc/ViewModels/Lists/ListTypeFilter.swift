@@ -2,10 +2,11 @@
 //  ListTypeFilter.swift
 //  loc
 //
-//  Pure rules for the tag chips inside a list (All, Sushi, Japanese, Coffee, Bar, ...), in the style of
+//  Pure engine for the tag chips inside a list (All, Sushi, Japanese, Coffee, Bar, ...), in the style of
 //  Spotify's Liked Songs chips: specific tags derived from the places actually in the list. Every raw category
 //  (Google snake_case types and human "Sushi restaurant" labels), the user-corrected category and name keywords
-//  are mapped to clean tags; generic and unmapped categories are dropped. Unit tested in ListTypeFilterTests.
+//  are mapped to tags by the data table in PlaceTaxonomy; generic and unmapped categories are dropped. A place's
+//  primary category decides which family of tags it may carry. Unit tested in ListTypeFilterTests.
 //
 
 import Foundation
@@ -49,141 +50,108 @@ enum ListTypeFilter {
     /// Lists with fewer places than this show tags that only one place has.
     static let smallListSize = 10
 
-    /// One tag and the phrases that earn it: from a normalized category (contained as whole words, or
-    /// matching the whole category for `exact`) and (for safe words) the place's name.
-    private struct Rule {
-        let tag: String
-        let category: [String]
-        let exact: [String]
-        let name: [String]
-        /// Name-word prefixes (a word merely starting with the phrase, e.g. "SUSHIRO" for "sushi"). Keep rare.
-        let namePrefix: [String]
-        let implies: [String]
+    /// One raw category after normalization: the tag rules it earns, and how much it says about the place's primary type.
+    private struct ClassifiedCategory {
+        /// Read from a purely human-readable list ("Sushi restaurant", ...), where Google puts the primary label first
+        /// and the rest alphabetically. Lists with snake_case types ("sushi_restaurant") carry no usable order.
+        let isOrdered: Bool
+        /// A generic "Restaurant"-style label that is not a tag but still marks a dining place when it comes first.
+        let isDiningHint: Bool
+        let rules: [PlaceTagRule]
+    }
 
-        init(_ tag: String, category: [String], exact: [String] = [], name: [String] = [], namePrefix: [String] = [], implies: [String] = []) {
-            self.tag = tag
-            self.category = category.map(ListTypeFilter.padded)
-            self.exact = exact.map(ListTypeFilter.padded)
-            self.name = name.map(ListTypeFilter.padded)
-            self.namePrefix = namePrefix.map { ListTypeFilter.padded($0).trimmingCharacters(in: .whitespaces) }
-            self.implies = implies
+    /// The clean tags for a place, in taxonomy order. The place's primary category picks one family of tags
+    /// (dining, shopping, stay, ...) and only tags from that family survive, so a cafe that also lists "Home goods
+    /// store" is never a shop. A user-corrected category that maps to a tag replaces the original categories.
+    static func tags(of place: LightweightPlace) -> [String] {
+        let nameRules = rulesMatching(name: PlaceTaxonomy.padded(place.name))
+        let sources = categorySources(of: place)
+        let family = keptFamily(sources: sources, nameRules: nameRules)
+        let kept = (sources.flatMap(\.rules) + nameRules).filter { family == nil || $0.group.family == family }
+        return dropRedundantTags(expandedTags(from: kept))
+    }
+
+    /// The classified categories to read: the user-corrected category when it maps to a tag, else all the place's
+    /// categories (and place type), in their original order.
+    private static func categorySources(of place: LightweightPlace) -> [ClassifiedCategory] {
+        let corrected = classified([place.user_corrected_category].compactMap { $0 }, allOrdered: true)
+        if corrected.contains(where: { !$0.rules.isEmpty }) { return corrected }
+        return classified((place.categories ?? []) + [place.place_type].compactMap { $0 }, allOrdered: false)
+    }
+
+    /// Classifies each raw category; they count as ordered only when every one is a human-readable label.
+    private static func classified(_ raw: [String], allOrdered: Bool) -> [ClassifiedCategory] {
+        let ordered = allOrdered || raw.allSatisfy(isHumanReadable)
+        return raw.compactMap { classify($0, ordered: ordered) }
+    }
+
+    /// Whether a raw category is a human-readable label rather than a lowercase snake_case Google type.
+    private static func isHumanReadable(_ raw: String) -> Bool {
+        raw.contains { !($0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "_")) }
+    }
+
+    /// The rules one raw category earns; nil when it earns none and is not a dining hint.
+    private static func classify(_ raw: String, ordered: Bool) -> ClassifiedCategory? {
+        let isHint = ordered && PlaceTaxonomy.diningHints.contains(PlaceTaxonomy.padded(raw).trimmingCharacters(in: .whitespaces))
+        let rules = normalizedCategory(raw).map(rulesMatching(category:)) ?? []
+        return rules.isEmpty && !isHint ? nil : ClassifiedCategory(isOrdered: ordered, isDiningHint: isHint, rules: rules)
+    }
+
+    /// Normalizes a raw category (either format), dropping the word "restaurant"; nil for blank and generic ones.
+    private static func normalizedCategory(_ raw: String) -> String? {
+        let words = PlaceTaxonomy.padded(raw).split(separator: " ").filter { $0 != "restaurant" && $0 != "restaurants" }
+        let text = " " + words.joined(separator: " ") + " "
+        return words.isEmpty || PlaceTaxonomy.genericCategories.contains(text.trimmingCharacters(in: .whitespaces)) ? nil : text
+    }
+
+    /// The rules earned by one normalized category. A rule can suppress a broader one (Vintage Clothing over
+    /// Clothing), and a retail or other non-dining noun wins over a cuisine adjective ("Japanese grocery store").
+    private static func rulesMatching(category text: String) -> [PlaceTagRule] {
+        var matched = PlaceTaxonomy.rules.filter { rule in
+            rule.category.contains { text.contains($0) } || rule.exact.contains(text)
+        }
+        let suppressed = Set(matched.flatMap(\.suppresses))
+        matched.removeAll { suppressed.contains($0.tag) }
+        if matched.contains(where: { $0.group.family != .dining }) { matched.removeAll { $0.group == .food } }
+        return matched
+    }
+
+    /// The rules earned by the (padded) place name through its conservative keywords.
+    private static func rulesMatching(name: String) -> [PlaceTagRule] {
+        PlaceTaxonomy.rules.filter { rule in
+            rule.name.contains { name.contains($0) } || rule.namePrefix.contains { name.contains(" " + $0) }
         }
     }
 
-    /// Categories that say nothing about what a place is; ignored (compared after normalization).
-    private static let genericCategories: Set<String> = [
-        "establishment", "point of interest", "food", "restaurant", "store", "meal takeaway", "meal delivery",
-        "lounge", "event venue", "place"
-    ]
-
-    /// Cuisine tags that make the generic "Asian" tag redundant.
-    private static let specificAsianTags: Set<String> = [
-        "Sushi", "Omakase", "Ramen", "Japanese", "Korean BBQ", "Korean", "Thai", "Vietnamese", "Chinese", "Indian"
-    ]
-
-    /// Rules in display-priority order. A phrase matches whole words only.
-    private static let rules: [Rule] = [
-        Rule("Sushi", category: ["sushi"], name: ["sushi"], namePrefix: ["sushi"], implies: ["Japanese"]),
-        Rule("Omakase", category: ["omakase"], name: ["omakase"], implies: ["Japanese"]),
-        Rule("Ramen", category: ["ramen"], name: ["ramen"], implies: ["Japanese"]),
-        Rule("Japanese", category: ["japanese", "izakaya", "yakitori", "tempura", "udon"], name: ["japanese", "izakaya", "yakitori"]),
-        Rule("Korean BBQ", category: ["korean barbecue", "korean bbq"], name: ["kbbq", "korean bbq"], implies: ["Korean"]),
-        Rule("Korean", category: ["korean"], name: ["korean"]),
-        Rule("Thai", category: ["thai"], name: ["thai"]),
-        Rule("Vietnamese", category: ["vietnamese", "pho"], name: ["vietnamese", "pho"]),
-        Rule("Chinese", category: ["chinese", "dim sum", "dumpling", "szechuan", "sichuan", "cantonese"], name: ["dim sum", "dumpling", "dumplings"]),
-        Rule("Mexican", category: ["mexican", "taco", "tacos", "taqueria"], name: ["taqueria", "taco", "tacos", "burrito"]),
-        Rule("Italian", category: ["italian", "trattoria", "osteria"], name: ["trattoria", "osteria", "italian"]),
-        Rule("Pizza", category: ["pizza", "pizzeria"], name: ["pizza", "pizzeria"]),
-        Rule("French", category: ["french", "bistro", "brasserie"], name: ["bistro", "brasserie"]),
-        Rule("Indian", category: ["indian"], name: ["indian"]),
-        Rule("Israeli", category: ["israeli"], name: ["israeli"]),
-        Rule("Middle Eastern", category: ["middle eastern", "lebanese", "turkish", "falafel", "kebab", "shawarma"], name: ["falafel", "kebab", "shawarma"]),
-        Rule("Mediterranean", category: ["mediterranean"], name: ["mediterranean"]),
-        Rule("American", category: [], exact: ["american", "new american", "traditional american", "modern american", "contemporary american"]),
-        Rule("Asian", category: [], exact: ["asian", "pan asian", "asian fusion"]),
-        Rule("Greek", category: ["greek"], name: ["greek"]),
-        Rule("Spanish", category: ["spanish", "tapas"], name: ["tapas"]),
-        Rule("Steak", category: ["steak house", "steakhouse", "steak"], name: ["steakhouse", "steak house"]),
-        Rule("Seafood", category: ["seafood"], name: ["seafood", "oyster", "oysters"]),
-        Rule("BBQ", category: ["barbecue", "bbq"], name: ["barbecue", "bbq"]),
-        Rule("Burgers", category: ["burger", "burgers", "hamburger"], name: ["burger", "burgers"]),
-        Rule("Sandwiches", category: ["sandwich", "sandwiches", "deli", "delicatessen"], name: ["sandwich", "sandwiches", "deli"]),
-        Rule("Vegan", category: ["vegan", "vegetarian"], name: ["vegan"]),
-        Rule("Bakery", category: ["bakery", "patisserie", "bagel", "bagels"], name: ["bakery", "patisserie", "boulangerie", "bagel", "bagels"]),
-        Rule("Dessert", category: ["dessert", "candy", "chocolate", "confectionery"], name: ["dessert", "desserts"]),
-        Rule("Ice Cream", category: ["ice cream", "gelato", "frozen yogurt"], name: ["ice cream", "gelato", "creamery"]),
-        Rule("Coffee", category: ["coffee", "cafe", "espresso"], name: ["coffee", "espresso", "roasters", "roastery", "cafe"]),
-        Rule("Matcha", category: ["matcha"], name: ["matcha"]),
-        Rule("Tea", category: ["tea house", "tea store", "tea room", "bubble tea"], name: ["tea house", "teahouse"]),
-        Rule("Brunch", category: ["brunch", "breakfast"], name: ["brunch"]),
-        Rule("Lunch", category: ["lunch"]),
-        Rule("Fine Dining", category: ["fine dining"]),
-        Rule("Chicken", category: ["chicken", "wings"], name: ["fried chicken"]),
-        Rule("Cheese", category: ["cheese shop", "cheese"], name: ["cheese shop", "cheesemonger"]),
-        Rule("Wine Bar", category: ["wine bar"], name: ["wine bar", "wine", "vino"]),
-        Rule("Wine Shop", category: ["wine store", "wine shop", "liquor store", "bottle shop"], name: ["wine shop", "liquor"]),
-        Rule("Cocktails", category: ["cocktail", "cocktails", "speakeasy"], name: ["cocktail", "cocktails", "speakeasy"]),
-        Rule("Brewery", category: ["brewery", "brewpub", "beer"], name: ["brewery", "brewing", "brewpub"]),
-        Rule("Bar", category: [], exact: ["bar", "bars", "pub", "gastropub", "irish pub", "lounge bar", "sports bar", "night club", "nightclub", "dive bar"], name: ["pub"]),
-        Rule("Grocery", category: ["grocery", "supermarket", "convenience store", "farmers market", "market"], name: ["grocery", "supermarket"]),
-        Rule("Vintage", category: ["vintage", "thrift", "consignment", "second hand", "antique"], name: ["vintage", "thrift", "consignment"]),
-        Rule("Shopping", category: ["clothing store", "book store", "bookstore", "boutique", "shopping mall", "department store",
-                                   "gift shop", "jewelry store", "shoe store", "furniture store", "home goods store", "record store"]),
-        Rule("Museum", category: ["museum", "art gallery", "gallery"], name: ["museum"]),
-        Rule("Park", category: ["park", "garden", "botanical garden", "national park"]),
-        Rule("Hotel", category: ["hotel", "lodging", "resort", "hostel", "motel", "inn"], name: ["hotel"])
-    ]
-
-    /// Lowercased, accent-folded text with punctuation removed, wrapped in spaces so whole words match.
-    private static func padded(_ text: String) -> String {
-        let folded = text.folding(options: .diacriticInsensitive, locale: nil).lowercased()
-        let spaced = String(folded.map { $0.isLetter || $0.isNumber ? $0 : " " })
-        return " " + spaced.split(separator: " ").joined(separator: " ") + " "
+    /// The one family whose tags a place keeps; nil keeps every family. In an ordered list the first category is the
+    /// primary type. Otherwise (no order): lodging wins, then a tag the name confirms, then dining.
+    private static func keptFamily(sources: [ClassifiedCategory], nameRules: [PlaceTagRule]) -> PlaceTagFamily? {
+        if let primary = sources.first(where: \.isOrdered) {
+            if let family = primary.rules.first?.group.family { return family }
+            return primary.isDiningHint ? .dining : nil
+        }
+        let categoryRules = sources.flatMap(\.rules)
+        let families = Set((categoryRules.isEmpty ? nameRules : categoryRules).map { $0.group.family })
+        if families.contains(.stay) { return .stay }
+        let categoryTags = Set(categoryRules.map(\.tag))
+        if let confirmed = nameRules.first(where: { categoryTags.contains($0.tag) }) { return confirmed.group.family }
+        return families.contains(.dining) ? .dining : nil
     }
 
-    /// The clean tags for a place, in rule order, from all its categories and its name. A user-corrected
-    /// category that maps to a tag replaces the original categories. Generic/unmapped categories yield none.
-    static func tags(of place: LightweightPlace) -> [String] {
-        let name = padded(place.name)
-        let corrected = normalizedCategories([place.user_corrected_category].compactMap { $0 })
-        let correctedMapsToTag = !matchedRules(for: corrected, name: "").isEmpty
-        let sources = correctedMapsToTag ? corrected : normalizedCategories((place.categories ?? []) + [place.place_type].compactMap { $0 })
+    /// The tags (each followed by the tags it implies) for the kept rules, in taxonomy order without duplicates.
+    private static func expandedTags(from kept: [PlaceTagRule]) -> [String] {
+        let keptTags = Set(kept.map(\.tag))
         var tags: [String] = []
-        for rule in withoutWineBarFalsePositive(matchedRules(for: sources, name: name), sources: sources) {
+        for rule in PlaceTaxonomy.rules where keptTags.contains(rule.tag) {
             for tag in [rule.tag] + rule.implies where !tags.contains(tag) { tags.append(tag) }
         }
-        return dropRedundantTags(tags)
-    }
-
-    /// Normalizes raw categories (either format) and drops blank and generic ones.
-    private static func normalizedCategories(_ raw: [String]) -> [String] {
-        raw.compactMap { category -> String? in
-            let words = padded(category).split(separator: " ").filter { $0 != "restaurant" && $0 != "restaurants" }
-            let text = " " + words.joined(separator: " ") + " "
-            return words.isEmpty || genericCategories.contains(text.trimmingCharacters(in: .whitespaces)) ? nil : text
-        }
-    }
-
-    /// The rules earned by any of the normalized categories or by the (padded) name.
-    private static func matchedRules(for categories: [String], name: String) -> [Rule] {
-        rules.filter { rule in
-            categories.contains { text in
-                rule.category.contains { text.contains($0) } || rule.exact.contains(text)
-            } || rule.name.contains { name.contains($0) } || rule.namePrefix.contains { name.contains(" " + $0) }
-        }
-    }
-
-    /// Drops "Wine Bar" for a wine shop unless one of its categories really says wine bar (its name rule matches "wine").
-    private static func withoutWineBarFalsePositive(_ matched: [Rule], sources: [String]) -> [Rule] {
-        guard matched.contains(where: { $0.tag == "Wine Shop" }), !sources.contains(where: { $0.contains(" wine bar ") }) else { return matched }
-        return matched.filter { $0.tag != "Wine Bar" }
+        return tags
     }
 
     /// Removes tags made redundant by a more specific one (BBQ under Korean BBQ, Asian under any specific Asian cuisine).
     private static func dropRedundantTags(_ tags: [String]) -> [String] {
         var result = tags.contains("Korean BBQ") ? tags.filter { $0 != "BBQ" } : tags
-        if !Set(result).isDisjoint(with: specificAsianTags) { result.removeAll { $0 == "Asian" } }
+        if !PlaceTaxonomy.specificAsianTags.isDisjoint(with: result) { result.removeAll { $0 == "Asian" } }
         return result
     }
 
