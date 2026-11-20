@@ -23,6 +23,10 @@ struct ListTypeChip: Hashable, Identifiable {
 struct ListTagIndex {
     let chips: [ListTypeChip]
     let tagsByPlaceId: [String: [String]]
+    /// Every tag any place carries (including tags with a single place), most common first; the search universe.
+    var allTags: [String] = []
+    /// Pre-normalized search text per place, keyed by lowercased place id.
+    var searchEntries: [String: ListTagSearch.PlaceEntry] = [:]
 
     static let empty = ListTagIndex(chips: [], tagsByPlaceId: [:])
 
@@ -171,13 +175,17 @@ enum ListTypeFilter {
     /// Computes every place's tags and the chip row once. Chips are empty when the list has too few tags to filter.
     static func index(for places: [LightweightPlace]) -> ListTagIndex {
         var tagsByPlaceId: [String: [String]] = [:]
+        var searchEntries: [String: ListTagSearch.PlaceEntry] = [:]
         var counts: [String: Int] = [:]
         for place in places {
             let tags = tags(of: place)
             tagsByPlaceId[place.place_id] = tags
+            searchEntries[place.place_id.lowercased()] = ListTagSearch.entry(for: place, tags: tags)
             for tag in tags { counts[tag, default: 0] += 1 }
         }
-        return ListTagIndex(chips: chips(from: counts, placeCount: places.count), tagsByPlaceId: tagsByPlaceId)
+        let allTags = counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+        return ListTagIndex(chips: chips(from: counts, placeCount: places.count), tagsByPlaceId: tagsByPlaceId,
+                            allTags: allTags, searchEntries: searchEntries)
     }
 
     /// "All" followed by the qualifying tags, most common first (ties alphabetical), all of them. Empty below the minimum.

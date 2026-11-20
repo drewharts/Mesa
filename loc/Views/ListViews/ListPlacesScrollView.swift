@@ -50,10 +50,19 @@ struct ListPlacesScrollView: View {
 
     /// The chip row, or nothing when filtering is off or the list has too few tags.
     @ViewBuilder
-    private func typeFilterRow(chips: [ListTypeChip]) -> some View {
-        if !chips.isEmpty {
-            ListTypeFilterRow(chips: chips, isSelected: { filterVM.isSelected($0) }, onSelect: { chip in withAnimation(.easeInOut(duration: 0.2)) { filterVM.select(chip) } })
-                .padding(.vertical, 4)
+    private func typeFilterRow(display: ListTypeFilterViewModel.Display) -> some View {
+        if display.showsFilterRow {
+            ListTypeFilterRow(
+                chips: display.chips,
+                isSelected: { filterVM.isSelected($0) },
+                onSelect: { chip in withAnimation(.easeInOut(duration: 0.2)) { filterVM.handleChipTap(chip) } },
+                isSearching: filterVM.isSearching,
+                searchQuery: Binding(get: { filterVM.searchQuery }, set: { filterVM.setSearchQuery($0) }),
+                onBeginSearch: { filterVM.beginSearch() },
+                onClearOrCloseSearch: { filterVM.clearOrCloseSearch() },
+                onCollapseSearch: { filterVM.endSearch() }
+            )
+            .padding(.vertical, 4)
         }
     }
 
@@ -74,7 +83,7 @@ struct ListPlacesScrollView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
                 } else if display.tiles.isEmpty && !isLoadingInitial && !filterVM.isLoadingMatches {
-                    ListFilterEmptyState(loadFailed: filterVM.matchesLoadFailed) {
+                    ListFilterEmptyState(loadFailed: filterVM.matchesLoadFailed, message: filterVM.hasSearchQuery ? "No places match your search" : nil) {
                         Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
                     }
                 } else if isCollapsed {
@@ -97,11 +106,21 @@ struct ListPlacesScrollView: View {
                     .transition(.opacity)
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 8) { typeFilterRow(chips: display.chips) }
+            .safeAreaInset(edge: .top, spacing: 8) { typeFilterRow(display: display) }
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
             .onChange(of: filterVM.selection) { _, _ in
                 filterVM.beginLoadingMatchesIfNeeded(loaded: places)
+                filterVM.prefetchImages(for: display.tiles, tileSide: tileSide)
+                if filterVM.mayHaveUnloadedMatches(loaded: places) { onLoadMore() }
+                Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
+            }
+            // Typing narrows the list instantly from memory; paging in unloaded matches waits for a pause in typing.
+            .onChange(of: filterVM.searchQuery) { _, _ in filterVM.beginLoadingMatchesIfNeeded(loaded: places) }
+            .task(id: filterVM.searchQuery) {
+                guard filterVM.hasSearchQuery else { return }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
                 filterVM.prefetchImages(for: display.tiles, tileSide: tileSide)
                 if filterVM.mayHaveUnloadedMatches(loaded: places) { onLoadMore() }
                 Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
