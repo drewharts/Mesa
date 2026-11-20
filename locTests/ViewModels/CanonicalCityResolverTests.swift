@@ -27,6 +27,12 @@ final class CanonicalCityResolverTests: XCTestCase {
         XCTAssertEqual(city("Harriman State Park, Southfields, NY 10975", stored: "New York City"), "Upstate NY")
     }
 
+    func testShortAddressesWithoutStreet() {
+        XCTAssertEqual(city("Elizabethtown, NY 12964"), "Upstate NY")
+        XCTAssertEqual(city("Bolton, NY"), "Upstate NY")
+        XCTAssertEqual(city("Brooklyn, NY 11201"), "New York City")
+    }
+
     func testOtherRegionsAndCities() {
         XCTAssertEqual(city("Ricketts Glen State Park, Benton, PA 17814, USA"), "Pennsylvania")
         XCTAssertEqual(city("1 Newark Ave, Jersey City, NJ 07302, USA"), "Jersey City")

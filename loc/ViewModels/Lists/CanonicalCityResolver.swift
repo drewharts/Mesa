@@ -149,7 +149,7 @@ enum CanonicalCityResolver {
     private static func parse(_ address: String?) -> Parsed {
         var p = Parsed()
         guard let addr = address?.trimmingCharacters(in: .whitespacesAndNewlines), !addr.isEmpty else { return p }
-        let pattern = #",\s*([A-Za-z .]+?),?\s+([A-Z]{2})(?:\s+(\d{5})(?:-\d{4})?)?\s*(?:,\s*(?:USA|US|United States))?\s*$"#
+        let pattern = #"(?:^|,)\s*([A-Za-z .]+?),?\s+([A-Z]{2})(?:\s+(\d{5})(?:-\d{4})?)?\s*(?:,\s*(?:USA|US|United States))?\s*$"#
         if let re = try? NSRegularExpression(pattern: pattern),
            let m = re.firstMatch(in: addr, range: NSRange(addr.startIndex..., in: addr)),
            let cityR = Range(m.range(at: 1), in: addr), let stR = Range(m.range(at: 2), in: addr),
