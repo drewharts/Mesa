@@ -45,8 +45,6 @@ struct ListTagIndex {
 enum ListTypeFilter {
     /// Fewest qualifying tags a list needs before the chip row is worth showing.
     static let minTagsForChips = 2
-    /// Most tag chips shown (not counting "All").
-    static let maxTagChips = 15
     /// Lists with fewer places than this show tags that only one place has.
     static let smallListSize = 10
 
@@ -77,6 +75,11 @@ enum ListTypeFilter {
         "lounge", "event venue", "place"
     ]
 
+    /// Cuisine tags that make the generic "Asian" tag redundant.
+    private static let specificAsianTags: Set<String> = [
+        "Sushi", "Omakase", "Ramen", "Japanese", "Korean BBQ", "Korean", "Thai", "Vietnamese", "Chinese", "Indian"
+    ]
+
     /// Rules in display-priority order. A phrase matches whole words only.
     private static let rules: [Rule] = [
         Rule("Sushi", category: ["sushi"], name: ["sushi"], namePrefix: ["sushi"], implies: ["Japanese"]),
@@ -97,6 +100,7 @@ enum ListTypeFilter {
         Rule("Middle Eastern", category: ["middle eastern", "lebanese", "turkish", "falafel", "kebab", "shawarma"], name: ["falafel", "kebab", "shawarma"]),
         Rule("Mediterranean", category: ["mediterranean"], name: ["mediterranean"]),
         Rule("American", category: [], exact: ["american", "new american", "traditional american", "modern american", "contemporary american"]),
+        Rule("Asian", category: [], exact: ["asian", "pan asian", "asian fusion"]),
         Rule("Greek", category: ["greek"], name: ["greek"]),
         Rule("Spanish", category: ["spanish", "tapas"], name: ["tapas"]),
         Rule("Steak", category: ["steak house", "steakhouse", "steak"], name: ["steakhouse", "steak house"]),
@@ -112,10 +116,15 @@ enum ListTypeFilter {
         Rule("Matcha", category: ["matcha"], name: ["matcha"]),
         Rule("Tea", category: ["tea house", "tea store", "tea room", "bubble tea"], name: ["tea house", "teahouse"]),
         Rule("Brunch", category: ["brunch", "breakfast"], name: ["brunch"]),
+        Rule("Lunch", category: ["lunch"]),
+        Rule("Fine Dining", category: ["fine dining"]),
+        Rule("Chicken", category: ["chicken", "wings"], name: ["fried chicken"]),
+        Rule("Cheese", category: ["cheese shop", "cheese"], name: ["cheese shop", "cheesemonger"]),
         Rule("Wine Bar", category: ["wine bar"], name: ["wine bar", "wine", "vino"]),
+        Rule("Wine Shop", category: ["wine store", "wine shop", "liquor store", "bottle shop"], name: ["wine shop", "liquor"]),
         Rule("Cocktails", category: ["cocktail", "cocktails", "speakeasy"], name: ["cocktail", "cocktails", "speakeasy"]),
         Rule("Brewery", category: ["brewery", "brewpub", "beer"], name: ["brewery", "brewing", "brewpub"]),
-        Rule("Bar", category: [], exact: ["bar", "bars", "pub", "gastropub", "irish pub", "sports bar", "night club", "nightclub", "dive bar"], name: ["pub"]),
+        Rule("Bar", category: [], exact: ["bar", "bars", "pub", "gastropub", "irish pub", "lounge bar", "sports bar", "night club", "nightclub", "dive bar"], name: ["pub"]),
         Rule("Grocery", category: ["grocery", "supermarket", "convenience store", "farmers market", "market"], name: ["grocery", "supermarket"]),
         Rule("Vintage", category: ["vintage", "thrift", "consignment", "second hand", "antique"], name: ["vintage", "thrift", "consignment"]),
         Rule("Shopping", category: ["clothing store", "book store", "bookstore", "boutique", "shopping mall", "department store",
@@ -140,7 +149,7 @@ enum ListTypeFilter {
         let correctedMapsToTag = !matchedRules(for: corrected, name: "").isEmpty
         let sources = correctedMapsToTag ? corrected : normalizedCategories((place.categories ?? []) + [place.place_type].compactMap { $0 })
         var tags: [String] = []
-        for rule in matchedRules(for: sources, name: name) {
+        for rule in withoutWineBarFalsePositive(matchedRules(for: sources, name: name), sources: sources) {
             for tag in [rule.tag] + rule.implies where !tags.contains(tag) { tags.append(tag) }
         }
         return dropRedundantTags(tags)
@@ -164,9 +173,17 @@ enum ListTypeFilter {
         }
     }
 
-    /// Removes tags made redundant by a more specific one (plain BBQ under Korean BBQ).
+    /// Drops "Wine Bar" for a wine shop unless one of its categories really says wine bar (its name rule matches "wine").
+    private static func withoutWineBarFalsePositive(_ matched: [Rule], sources: [String]) -> [Rule] {
+        guard matched.contains(where: { $0.tag == "Wine Shop" }), !sources.contains(where: { $0.contains(" wine bar ") }) else { return matched }
+        return matched.filter { $0.tag != "Wine Bar" }
+    }
+
+    /// Removes tags made redundant by a more specific one (BBQ under Korean BBQ, Asian under any specific Asian cuisine).
     private static func dropRedundantTags(_ tags: [String]) -> [String] {
-        tags.contains("Korean BBQ") ? tags.filter { $0 != "BBQ" } : tags
+        var result = tags.contains("Korean BBQ") ? tags.filter { $0 != "BBQ" } : tags
+        if !Set(result).isDisjoint(with: specificAsianTags) { result.removeAll { $0 == "Asian" } }
+        return result
     }
 
     /// Computes every place's tags and the chip row once. Chips are empty when the list has too few tags to filter.
@@ -181,12 +198,11 @@ enum ListTypeFilter {
         return ListTagIndex(chips: chips(from: counts, placeCount: places.count), tagsByPlaceId: tagsByPlaceId)
     }
 
-    /// "All" followed by the qualifying tags, most common first (ties alphabetical), capped. Empty below the minimum.
+    /// "All" followed by the qualifying tags, most common first (ties alphabetical), all of them. Empty below the minimum.
     private static func chips(from counts: [String: Int], placeCount: Int) -> [ListTypeChip] {
         let threshold = placeCount < smallListSize ? 1 : 2
         let qualifying = counts.filter { $0.value >= threshold }
             .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
-            .prefix(maxTagChips)
         guard qualifying.count >= minTagsForChips else { return [] }
         return [ListTypeChip(tag: nil, title: "All")] + qualifying.map { ListTypeChip(tag: $0.key, title: $0.key) }
     }

@@ -112,6 +112,27 @@ final class ListTypeFilterTests: XCTestCase {
         XCTAssertEqual(tags("A", categories: ["Cocktail bar"]), ["Cocktails"])
     }
 
+    func testTags_NewCategoryMappings() {
+        XCTAssertEqual(tags("A", categories: ["Asian restaurant"]), ["Asian"])
+        XCTAssertEqual(tags("A", categories: ["Asian restaurant", "Thai restaurant"]), ["Thai"])
+        XCTAssertEqual(tags("A", categories: ["Fine dining restaurant"]), ["Fine Dining"])
+        XCTAssertEqual(tags("A", categories: ["Chicken restaurant"]), ["Chicken"])
+        XCTAssertEqual(tags("A", categories: ["Lunch restaurant"]), ["Lunch"])
+        XCTAssertEqual(tags("A", categories: ["Cheese shop"]), ["Cheese"])
+        XCTAssertEqual(tags("A", categories: ["Breakfast restaurant"]), ["Brunch"])
+        XCTAssertEqual(tags("A", categories: ["Lounge bar"]), ["Bar"])
+        XCTAssertEqual(tags("A", categories: ["Sandwich shop"]), ["Sandwiches"])
+        XCTAssertEqual(tags("A", categories: ["Gourmet grocery store"]), ["Grocery"])
+        XCTAssertEqual(tags("A", categories: ["Grocery or supermarket"]), ["Grocery"])
+        XCTAssertEqual(tags("A", categories: ["Steak house"]), ["Steak"])
+    }
+
+    func testTags_WineShopIsNotWineBar() {
+        XCTAssertEqual(tags("Astor Wine & Spirits", categories: ["Wine store"]), ["Wine Shop"])
+        XCTAssertEqual(tags("Chambers", categories: ["Liquor store"]), ["Wine Shop"])
+        XCTAssertEqual(tags("Terroir", categories: ["Wine bar"]), ["Wine Bar"])
+    }
+
     func testTags_KoreanBarbecueIsKoreanBBQAndKorean() {
         XCTAssertEqual(tags("A", categories: ["Korean barbecue restaurant"]), ["Korean BBQ", "Korean"])
         XCTAssertEqual(tags("A", categories: ["korean_restaurant"]), ["Korean"])
@@ -161,7 +182,6 @@ final class ListTypeFilterTests: XCTestCase {
         for expected in ["Sushi", "Japanese", "Bar", "Wine Bar", "Italian", "Coffee", "Mexican", "Pizza", "Korean"] {
             XCTAssertTrue(chips.contains(expected), "missing chip \(expected) in \(chips)")
         }
-        XCTAssertLessThanOrEqual(chips.count, 1 + ListTypeFilter.maxTagChips)
         // Japanese = sushi (implied) 16 + 13; Coffee = 8 + 5, so Japanese outranks Coffee.
         XCTAssertLessThan(chips.firstIndex(of: "Japanese")!, chips.firstIndex(of: "Coffee")!)
     }
@@ -206,11 +226,11 @@ final class ListTypeFilterTests: XCTestCase {
         XCTAssertTrue(ListTypeFilter.chips(for: group("a", "Thai restaurant", count: 12)).isEmpty)
     }
 
-    func testChips_CappedAtFifteenTags() {
+    func testChips_ShowsEveryQualifyingTag() {
         let categories = ["Thai", "Korean", "Indian", "French", "Greek", "Spanish", "Seafood", "Bakery", "Dessert", "Museum",
                           "Park", "Hotel", "Coffee shop", "Wine bar", "Brewery", "Mexican", "Italian", "Pizza"]
         let places = categories.flatMap { group($0, $0, count: 2) }
-        XCTAssertEqual(ListTypeFilter.chips(for: places).count, 1 + ListTypeFilter.maxTagChips)
+        XCTAssertEqual(ListTypeFilter.chips(for: places).count, 1 + 18)
     }
 
     func testChips_MultiTagPlaceCountsTowardEachTag() {
