@@ -16,12 +16,22 @@ struct TableAvailabilityRequest: Encodable, Equatable {
     let date: String
     let timeStart: String
     let timeEnd: String
+    /// Restricts the check to these places (one chunk of a streamed search); nil checks the whole list.
+    var placeIds: [String]? = nil
 
     enum CodingKeys: String, CodingKey {
         case partySize = "party_size"
         case date
         case timeStart = "time_start"
         case timeEnd = "time_end"
+        case placeIds = "place_ids"
+    }
+
+    /// The same search limited to one chunk of places.
+    func restricted(to ids: [String]) -> TableAvailabilityRequest {
+        var copy = self
+        copy.placeIds = ids
+        return copy
     }
 
     /// Builds a request from a party size, a day and a time window, formatting the day in the given calendar.

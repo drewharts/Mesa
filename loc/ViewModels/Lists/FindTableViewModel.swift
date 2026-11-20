@@ -22,11 +22,17 @@ final class FindTableViewModel: ObservableObject {
         var id: String { rawValue }
     }
 
-    /// What the last search produced.
+    /// What the search has produced so far (final once `isComplete`).
     struct Results: Equatable {
-        let response: TableAvailabilityResponse
         let request: TableAvailabilityRequest
         let withTables: [PlaceTableAvailability]
+        /// Places the provider checked, as reported by the responses.
+        let checkedOnProvider: Int
+        let processed: Int
+        let total: Int
+        let providerName: String
+        let failedChunks: Int
+        let isComplete: Bool
     }
 
     /// Where the search is.
@@ -52,16 +58,22 @@ final class FindTableViewModel: ObservableObject {
     // MARK: - Private State
 
     private let service: TableAvailabilityFetching
+    private let cache: TableAvailabilityCache
     private let now: () -> Date
     private let calendar: Calendar
     private var searchTask: Task<Void, Never>?
     private var searchToken = UUID()
+    private var accumulator = TableSearchAccumulator(total: 0, chunkCount: 0)
+    private var scope = TableSearchScope(placeIds: [], label: nil)
+    private var searchKey: TableSearchKey?
 
     /// Creates the view model with the defaults for "now": today, next half hour through 10:30 PM.
     init(service: TableAvailabilityFetching = TableAvailabilityService.shared,
+         cache: TableAvailabilityCache = .shared,
          now: @escaping () -> Date = Date.init,
          calendar: Calendar = .current) {
         self.service = service
+        self.cache = cache
         self.now = now
         self.calendar = calendar
         self.selection = TableSearchSelection.tonight(now: now(), calendar: calendar)
@@ -90,12 +102,45 @@ final class FindTableViewModel: ObservableObject {
     /// True when the form can be submitted.
     var canSearch: Bool { selection.window.isValid && !isLoading }
 
-    /// "Checked N places on Resy · M have tables" for the results header; nil outside results.
+    /// True while chunks are still being checked (results may already be showing).
+    var isStreaming: Bool {
+        if case .results(let results) = state { return !results.isComplete }
+        return false
+    }
+
+    /// True when a finished search found no place with tables.
+    var hasNoTables: Bool {
+        guard case .results(let results) = state else { return false }
+        return results.isComplete && results.withTables.isEmpty
+    }
+
+    /// Fraction checked (0...1) while streaming; nil when not streaming.
+    var progress: Double? {
+        guard case .results(let results) = state, !results.isComplete else { return nil }
+        return results.total == 0 ? nil : Double(results.processed) / Double(results.total)
+    }
+
+    /// "Checking 12 Sushi places" before the first results arrive.
+    var loadingText: String {
+        "Checking \(placesPhrase(count: scope.placeIds.count))"
+    }
+
+    /// "Checked 40 of 117 · 6 have tables" while streaming; "Checked N Sushi places on Resy · M have tables" when done.
     var resultsSummary: String? {
         guard case .results(let results) = state else { return nil }
-        let checked = results.response.checked
-        let noun = checked == 1 ? "place" : "places"
-        return "Checked \(checked) \(noun) on \(results.response.providerName) · \(results.withTables.count) have tables"
+        let tables = results.withTables.count
+        guard results.isComplete else {
+            return "Checked \(results.processed) of \(results.total) · \(tables) \(tables == 1 ? "has" : "have") tables"
+        }
+        var text = "Checked \(placesPhrase(count: results.checkedOnProvider)) on \(results.providerName) · \(tables) have tables"
+        if results.failedChunks > 0 { text += " · some couldn't be checked" }
+        return text
+    }
+
+    /// "12 Sushi places" / "1 place" using the scope's label.
+    private func placesPhrase(count: Int) -> String {
+        let noun = count == 1 ? "place" : "places"
+        return [String(count), scope.label, noun].compactMap { $0 }.joined(separator: " ")
     }
 
     /// "Fri, Nov 21 · 7:30 PM – 10:30 PM" for the form and the empty state.
@@ -166,61 +211,134 @@ final class FindTableViewModel: ObservableObject {
 
     // MARK: - Search
 
-    /// Closes the sheet and checks the list's places for the chosen party size, day and window.
-    func search(listId: String) {
+    /// Closes the sheet and checks the places in `scope` for the chosen party size, day and window.
+    func search(listId: String, scope: TableSearchScope) {
         guard canSearch else { return }
         isFormPresented = false
-        run(listId: listId)
+        run(listId: listId, scope: scope)
     }
 
     /// Repeats the last search (used by the error state's retry).
     func retry(listId: String) {
         guard selection.window.isValid else { return }
-        run(listId: listId)
+        run(listId: listId, scope: scope)
     }
 
-    /// Starts a search, cancelling any in flight; only the newest search may publish a result.
-    private func run(listId: String) {
+    /// Starts a search, cancelling any in flight; shows a fresh cached result at once, then streams the real one.
+    private func run(listId: String, scope: TableSearchScope) {
         searchTask?.cancel()
         let token = UUID()
         searchToken = token
-        state = .loading
+        self.scope = scope
         let request = TableAvailabilityRequest.make(partySize: partySize, date: selection.date, window: selection.window, calendar: calendar)
+        let chunks = TableSearchPlanner.chunks(scope.placeIds)
+        let key = TableSearchKey(listId: listId, request: request, scope: scope)
+        searchKey = key
+        let cached = cache.value(for: key)
+        accumulator = TableSearchAccumulator(total: scope.placeIds.count, chunkCount: chunks.count, stale: cached?.places ?? [])
+        guard !chunks.isEmpty else {
+            publish(request: request)
+            return
+        }
+        if cached != nil { publish(request: request) } else { state = .loading }
         searchTask = Task { [weak self, service] in
-            do {
-                let response = try await service.search(listId: listId, request: request)
-                self?.finish(token: token, request: request, response: response)
-            } catch is CancellationError {
-                return
-            } catch let error as TableAvailabilityError {
-                self?.fail(token: token, error: error)
-            } catch {
-                if (error as? URLError)?.code == .cancelled { return }
-                self?.fail(token: token, error: .failed)
-            }
+            await self?.stream(chunks: chunks, listId: listId, request: request, token: token, service: service)
         }
     }
 
-    /// Publishes a successful search unless a newer one replaced it.
-    private func finish(token: UUID, request: TableAvailabilityRequest, response: TableAvailabilityResponse) {
-        guard token == searchToken else { return }
-        if response.allChecksFailed {
+    /// Checks the chunks with a few requests in flight at once, publishing after each one returns.
+    private func stream(chunks: [[String]], listId: String, request: TableAvailabilityRequest,
+                        token: UUID, service: TableAvailabilityFetching) async {
+        await withTaskGroup(of: ChunkOutcome.self) { group in
+            var next = 0
+            while next < min(TableSearchPlanner.maxConcurrentChunks, chunks.count) {
+                let chunk = chunks[next]
+                group.addTask { await Self.fetch(chunk: chunk, listId: listId, request: request, service: service) }
+                next += 1
+            }
+            while let outcome = await group.next() {
+                guard token == searchToken, !Task.isCancelled else {
+                    group.cancelAll()
+                    return
+                }
+                if apply(outcome, request: request) == .stop {
+                    group.cancelAll()
+                    return
+                }
+                if next < chunks.count {
+                    let chunk = chunks[next]
+                    group.addTask { await Self.fetch(chunk: chunk, listId: listId, request: request, service: service) }
+                    next += 1
+                }
+            }
+        }
+        guard token == searchToken, !Task.isCancelled else { return }
+        finish(request: request)
+    }
+
+    /// One chunk's request; never throws, so a failing chunk cannot end the search.
+    private nonisolated static func fetch(chunk: [String], listId: String, request: TableAvailabilityRequest,
+                                          service: TableAvailabilityFetching) async -> ChunkOutcome {
+        do {
+            let response = try await service.search(listId: listId, request: request.restricted(to: chunk))
+            return ChunkOutcome(chunk: chunk, result: .success(response))
+        } catch let error as TableAvailabilityError {
+            return ChunkOutcome(chunk: chunk, result: .failure(error))
+        } catch {
+            return ChunkOutcome(chunk: chunk, result: .failure(.failed))
+        }
+    }
+
+    /// A chunk and what came back for it.
+    private struct ChunkOutcome {
+        let chunk: [String]
+        let result: Result<TableAvailabilityResponse, TableAvailabilityError>
+    }
+
+    /// Whether the search should go on after a chunk.
+    private enum Flow { case proceed, stop }
+
+    /// Folds a chunk into the results and publishes them; an unavailable backend ends the search.
+    private func apply(_ outcome: ChunkOutcome, request: TableAvailabilityRequest) -> Flow {
+        switch outcome.result {
+        case .success(let response):
+            accumulator.applySuccess(chunk: outcome.chunk, response: response)
+        case .failure(.unavailable):
+            searchToken = UUID()
+            isOffered = false
+            state = .idle
+            return .stop
+        case .failure:
+            accumulator.applyFailure(chunk: outcome.chunk)
+        }
+        if !accumulator.isComplete { publish(request: request) }
+        return .proceed
+    }
+
+    /// Shows what has been found so far.
+    private func publish(request: TableAvailabilityRequest) {
+        state = .results(Results(
+            request: request,
+            withTables: accumulator.withTables,
+            checkedOnProvider: accumulator.checkedOnProvider,
+            processed: accumulator.processedPlaces,
+            total: accumulator.total,
+            providerName: accumulator.providerName ?? "Resy",
+            failedChunks: accumulator.failedChunks,
+            isComplete: accumulator.isComplete || accumulator.total == 0
+        ))
+    }
+
+    /// Publishes the final results (or the error state) and remembers clean searches for five minutes.
+    private func finish(request: TableAvailabilityRequest) {
+        if accumulator.allFailed || accumulator.everyPlaceErrored {
             state = .failed
             return
         }
-        let withTables = response.placesWithTables
-        state = .results(Results(response: response, request: request, withTables: withTables))
-    }
-
-    /// Publishes a failure; an unavailable backend hides the entry point and leaves search mode.
-    private func fail(token: UUID, error: TableAvailabilityError) {
-        guard token == searchToken else { return }
-        if error == .unavailable {
-            isOffered = false
-            state = .idle
-        } else {
-            state = .failed
-        }
+        publish(request: request)
+        guard accumulator.failedChunks == 0, let searchKey else { return }
+        cache.store(CachedTableSearch(places: accumulator.displayed, checked: accumulator.checkedOnProvider,
+                                      total: accumulator.total, providerName: accumulator.providerName ?? "Resy"), for: searchKey)
     }
 
     /// Leaves search mode and shows the full list again.

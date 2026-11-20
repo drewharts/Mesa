@@ -74,9 +74,9 @@ struct ListPlacesScrollView: View {
     @ViewBuilder
     private var findTableStatusBar: some View {
         if findTableVM.isLoading {
-            FindTableStatusBar(text: "Checking for tables…", isLoading: true, onExit: { findTableVM.exit() })
+            FindTableStatusBar(text: findTableVM.loadingText, isLoading: true, onExit: { findTableVM.exit() })
         } else if let summary = findTableVM.resultsSummary {
-            FindTableStatusBar(text: summary, isLoading: false, onExit: { findTableVM.exit() })
+            FindTableStatusBar(text: summary, isLoading: false, progress: findTableVM.progress, onExit: { findTableVM.exit() })
         }
     }
 
@@ -98,7 +98,7 @@ struct ListPlacesScrollView: View {
     /// Whether the table search ended with nothing to show (an error, or no place with tables).
     private var findTableShowsMessage: Bool {
         if case .failed = findTableVM.state { return true }
-        return findTableVM.scopeIds?.isEmpty == true
+        return findTableVM.hasNoTables
     }
 
     private func isSelected(_ place: LightweightPlace) -> Bool {
@@ -151,14 +151,15 @@ struct ListPlacesScrollView: View {
                 }
             }
             .sheet(isPresented: $findTableVM.isFormPresented) {
-                FindTableSheet(viewModel: findTableVM, onSearch: { if let listId { findTableVM.search(listId: listId) } })
+                FindTableSheet(viewModel: findTableVM, onSearch: { if let listId { findTableVM.search(listId: listId, scope: filterVM.findTableScope(loaded: places)) } })
             }
             // Results cover the whole list, so make sure every place is loaded before narrowing the tiles and map.
-            .onChange(of: findTableVM.scopeIds) { _, ids in
-                guard ids != nil else { return }
+            .onChange(of: findTableVM.scopeIds) { old, ids in
+                guard old == nil, ids != nil else { return }
                 Task { await onLoadAll?() }
             }
             .onChange(of: listId) { _, _ in findTableVM.exit() }
+            .animation(.easeInOut(duration: 0.3), value: findTableVM.scopeIds)
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
             .onChange(of: filterVM.selection) { _, _ in
