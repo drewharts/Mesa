@@ -57,6 +57,8 @@ enum ListTypeFilter {
         let isOrdered: Bool
         /// A generic "Restaurant"-style label that is not a tag but still marks a dining place when it comes first.
         let isDiningHint: Bool
+        /// The plain "restaurant" type, which marks a dining place even in a list without order.
+        let isRestaurantType: Bool
         let rules: [PlaceTagRule]
     }
 
@@ -66,9 +68,16 @@ enum ListTypeFilter {
     static func tags(of place: LightweightPlace) -> [String] {
         let nameRules = rulesMatching(name: PlaceTaxonomy.padded(place.name))
         let sources = categorySources(of: place)
-        let family = keptFamily(sources: sources, nameRules: nameRules)
-        let kept = (sources.flatMap(\.rules) + nameRules).filter { family == nil || $0.group.family == family }
-        return dropRedundantTags(expandedTags(from: kept))
+        let categoryRules = sources.flatMap(\.rules)
+        let family = keptFamily(sources: sources, categoryRules: categoryRules, nameRules: nameRules)
+        return dropRedundantTags(expandedTags(from: keptRules(in: family, categoryRules: categoryRules, nameRules: nameRules)))
+    }
+
+    /// The rules that survive the family choice. With no family, the categories speak for the place and the name
+    /// keywords only fill in when the categories earned nothing.
+    private static func keptRules(in family: PlaceTagFamily?, categoryRules: [PlaceTagRule], nameRules: [PlaceTagRule]) -> [PlaceTagRule] {
+        guard let family = family else { return categoryRules.isEmpty ? nameRules : categoryRules }
+        return (categoryRules + nameRules).filter { $0.group.family == family }
     }
 
     /// The classified categories to read: the user-corrected category when it maps to a tag, else all the place's
@@ -90,11 +99,14 @@ enum ListTypeFilter {
         raw.contains { !($0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "_")) }
     }
 
-    /// The rules one raw category earns; nil when it earns none and is not a dining hint.
+    /// The rules one raw category earns; nil when it earns none and is not a dining hint or the restaurant type.
     private static func classify(_ raw: String, ordered: Bool) -> ClassifiedCategory? {
-        let isHint = ordered && PlaceTaxonomy.diningHints.contains(PlaceTaxonomy.padded(raw).trimmingCharacters(in: .whitespaces))
+        let key = PlaceTaxonomy.padded(raw).trimmingCharacters(in: .whitespaces)
+        let isHint = ordered && PlaceTaxonomy.diningHints.contains(key)
+        let isRestaurant = PlaceTaxonomy.restaurantTypes.contains(key)
         let rules = normalizedCategory(raw).map(rulesMatching(category:)) ?? []
-        return rules.isEmpty && !isHint ? nil : ClassifiedCategory(isOrdered: ordered, isDiningHint: isHint, rules: rules)
+        guard !rules.isEmpty || isHint || isRestaurant else { return nil }
+        return ClassifiedCategory(isOrdered: ordered, isDiningHint: isHint, isRestaurantType: isRestaurant, rules: rules)
     }
 
     /// Normalizes a raw category (either format), dropping the word "restaurant"; nil for blank and generic ones.
@@ -124,14 +136,15 @@ enum ListTypeFilter {
     }
 
     /// The one family whose tags a place keeps; nil keeps every family. In an ordered list the first category is the
-    /// primary type. Otherwise (no order): lodging wins, then a tag the name confirms, then dining.
-    private static func keptFamily(sources: [ClassifiedCategory], nameRules: [PlaceTagRule]) -> PlaceTagFamily? {
+    /// primary type. Otherwise (no order): lodging wins, then a tag the name confirms, then dining (a dining tag or
+    /// the plain "restaurant" type), so a restaurant that also lists "liquor_store" or "grocery_or_supermarket" is no shop.
+    private static func keptFamily(sources: [ClassifiedCategory], categoryRules: [PlaceTagRule], nameRules: [PlaceTagRule]) -> PlaceTagFamily? {
         if let primary = sources.first(where: \.isOrdered) {
             if let family = primary.rules.first?.group.family { return family }
             return primary.isDiningHint ? .dining : nil
         }
-        let categoryRules = sources.flatMap(\.rules)
-        let families = Set((categoryRules.isEmpty ? nameRules : categoryRules).map { $0.group.family })
+        var families = Set((categoryRules.isEmpty ? nameRules : categoryRules).map { $0.group.family })
+        if sources.contains(where: \.isRestaurantType) { families.insert(.dining) }
         if families.contains(.stay) { return .stay }
         let categoryTags = Set(categoryRules.map(\.tag))
         if let confirmed = nameRules.first(where: { categoryTags.contains($0.tag) }) { return confirmed.group.family }

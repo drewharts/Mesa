@@ -119,6 +119,9 @@ final class PlaceTaxonomyTests: XCTestCase {
         Sample("Lidkøb Østerbro", ["Thrift store", "Cafe", "Clothing store"], ["Vintage Clothing", "Clothing"]),
         Sample("Matcha 108", ["cafe", "art_gallery", "clothing_store", "tea_house"], ["Coffee", "Matcha", "Tea"]),
         Sample("Kettl Matcha Sen Mon Ten", ["point_of_interest", "establishment", "Tea house"], ["Matcha", "Tea"]),
+        Sample("Slackwater Pizza SLC", ["establishment", "food", "liquor_store", "point_of_interest", "restaurant", "store"], ["Pizza"]),
+        Sample("Sushi NOGI", ["establishment", "food", "grocery_or_supermarket", "point_of_interest", "restaurant", "store"], ["Sushi", "Japanese"]),
+        Sample("Indian Wells Tennis Garden Stadium 1", ["stadium", "point_of_interest", "establishment"], ["Recreation"]),
     ]
 
     func testRealPlaces_MapToExpectedTags() {
@@ -198,6 +201,19 @@ final class PlaceTaxonomyTests: XCTestCase {
     func testUnorderedTypes_NameConfirmedRetailBeatsSecondaryCafe() {
         XCTAssertEqual(tags("Housing Works Bookstore", ["book_store", "cafe", "establishment"]), ["Books"])
         XCTAssertEqual(tags("Some Place", ["book_store", "cafe", "establishment"]), ["Coffee"])
+    }
+
+    func testRestaurantTypeBeatsASecondaryStoreType() {
+        let slackwater = ["establishment", "food", "liquor_store", "point_of_interest", "restaurant", "store"]
+        XCTAssertEqual(tags("Slackwater Pizza", slackwater), ["Pizza"])
+        let sushi = ["establishment", "food", "grocery_or_supermarket", "point_of_interest", "restaurant", "store"]
+        XCTAssertEqual(tags("Sushi NOGI", sushi), ["Sushi", "Japanese"])
+        XCTAssertEqual(tags("Plain Place", slackwater), [])
+    }
+
+    func testNameKeywordsOnlyFillInWhenCategoriesEarnedNothing() {
+        XCTAssertEqual(tags("Indian Wells Stadium", ["stadium", "point_of_interest", "establishment"]), ["Recreation"])
+        XCTAssertEqual(tags("Indian Wells", ["point_of_interest", "establishment"]), ["Indian"])
     }
 
     func testMixedLists_AppendedLabelsCountAsUnordered() {

@@ -89,6 +89,9 @@ enum PlaceTaxonomy {
     /// Generic categories that still mark a dining place when they are a place's first (primary) label.
     static let diningHints: Set<String> = Set(diningHintPhrases.map { PlaceTaxonomy.padded($0).trimmingCharacters(in: .whitespaces) })
 
+    /// The plain restaurant type (normalized), a dining signal even when a list has no order.
+    static let restaurantTypes: Set<String> = ["restaurant", "restaurants"]
+
     private static let diningHintPhrases: [String] = ["restaurant", "restaurants", "food", "meal takeaway", "meal delivery", "takeout", "delivery", "family", "caterer"]
 
     /// Categories that say nothing about what a place is (Google structural types, non-venue businesses,
