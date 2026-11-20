@@ -43,11 +43,16 @@ struct ListPlacesScrollView: View {
 
     private var isCollapsed: Bool { sheetVM.detent == .peek }
 
+    /// Side of a square tile in points, used to warm images at the size the tiles will request.
+    private var tileSide: CGFloat {
+        isCollapsed ? Self.rowTileSize : ListTypeFilterViewModel.gridTileSide(screenWidth: UIScreen.main.bounds.width)
+    }
+
     /// The chip row, or nothing when filtering is off or the list has too few tags.
     @ViewBuilder
     private func typeFilterRow(chips: [ListTypeChip]) -> some View {
         if !chips.isEmpty {
-            ListTypeFilterRow(chips: chips, isSelected: { filterVM.isSelected($0) }, onSelect: { filterVM.select($0) })
+            ListTypeFilterRow(chips: chips, isSelected: { filterVM.isSelected($0) }, onSelect: { chip in withAnimation(.easeInOut(duration: 0.2)) { filterVM.select(chip) } })
                 .padding(.vertical, 4)
         }
     }
@@ -97,7 +102,8 @@ struct ListPlacesScrollView: View {
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
             .onChange(of: filterVM.selection) { _, _ in
                 filterVM.beginLoadingMatchesIfNeeded(loaded: places)
-                onLoadMore()
+                filterVM.prefetchImages(for: display.tiles, tileSide: tileSide)
+                if filterVM.mayHaveUnloadedMatches(loaded: places) { onLoadMore() }
                 Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
             }
             .task(id: places.count) {
@@ -113,7 +119,13 @@ struct ListPlacesScrollView: View {
                 } }
                 PlaceHoursStore.shared.prefetch(places.map(\.place_id))
             }
-            .onChange(of: places.count) { _, _ in PlaceHoursStore.shared.prefetch(places.map(\.place_id)) }
+            .onChange(of: places.count) { _, _ in
+                PlaceHoursStore.shared.prefetch(places.map(\.place_id))
+                if filterVM.selection != nil { filterVM.prefetchImages(for: display.tiles, tileSide: tileSide) }
+            }
+            // The map behind the sheet and the header count follow the selected chip.
+            .onChange(of: display.scopeIds) { _, ids in sheetVM.setChipScope(ids) }
+            .onDisappear { sheetVM.setChipScope(nil) }
             .onChange(of: scrollRequest) { _, request in
                 guard let request else { return }
                 scroll(proxy, to: request.placeId, delay: 250_000_000)
@@ -154,6 +166,7 @@ struct ListPlacesScrollView: View {
                     onTap: { onSelect(place) }
                 )
                 .id(place.place_id)
+                .transition(.opacity)
                 .contextMenu {
                     Button {
                         onOpenDetail(place)
@@ -175,8 +188,8 @@ struct ListPlacesScrollView: View {
                     }
                 }
             }
-            if isLoadingMore || filterVM.isLoadingMatches {
-                ListPlaceTileSkeleton(width: tileWidth)
+            // Skeletons only stand in for matches that are still loading, never for tiles already in memory.
+            ForEach(0..<max(isLoadingMore ? 2 : 0, filterVM.pendingSkeletonCount(loaded: places)), id: \.self) { _ in
                 ListPlaceTileSkeleton(width: tileWidth)
             }
         }

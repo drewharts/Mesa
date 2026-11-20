@@ -149,7 +149,8 @@ struct ListPlaceThumbnail: View {
                     url: url,
                     targetSize: CGSize(width: size, height: size),
                     placeholder: { ShimmerView() },
-                    onFailure: { failedUrls.insert(url.absoluteString) }
+                    onFailure: { failedUrls.insert(url.absoluteString) },
+                    fadeInDuration: 0.2
                 )
                 .aspectRatio(contentMode: .fill)
                 .frame(width: size, height: size)

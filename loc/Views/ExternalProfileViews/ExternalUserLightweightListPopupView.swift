@@ -138,8 +138,10 @@ struct ExternalUserLightweightListPopupView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
 
-                Text("\(viewModel.displayedPlaceCount) place\(viewModel.displayedPlaceCount == 1 ? "" : "s")")
+                let shown = sheetVM.headerPlaceCount(total: viewModel.displayedPlaceCount)
+                Text("\(shown) place\(shown == 1 ? "" : "s")")
                     .font(.caption)
+                    .contentTransition(.numericText())
                     .foregroundColor(.gray)
             }
             .padding(.horizontal, 20)

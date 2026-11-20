@@ -70,6 +70,8 @@ struct MapView: View {
         } else {
             annotations = mapViewModel.viewportAnnotations
         }
+        // A selected list tag chip keeps only that category's pins.
+        annotations = ListMapPinFilter.apply(annotations, allowedIds: listSheetVM.chipScopeIds)
 
         // Add preserved annotation if not already present (survives zoom-out culling and My Places filter)
         if let preserved = mapViewModel.preservedSelectedAnnotation,

@@ -6,6 +6,8 @@ struct CachedAsyncImage<Placeholder: View>: View {
     let targetSize: CGSize?
     let placeholder: () -> Placeholder
     let onFailure: (() -> Void)?
+    /// Crossfade length when the image arrives from the network; 0 (default) swaps instantly. Cached images never fade.
+    let fadeInDuration: Double
 
     @State private var loadedImage: UIImage?
 
@@ -14,8 +16,10 @@ struct CachedAsyncImage<Placeholder: View>: View {
         url: URL?,
         targetSize: CGSize?,
         @ViewBuilder placeholder: @escaping () -> Placeholder,
-        onFailure: (() -> Void)? = nil
+        onFailure: (() -> Void)? = nil,
+        fadeInDuration: Double = 0
     ) {
+        self.fadeInDuration = fadeInDuration
         self.url = url
         self.targetSize = targetSize
         self.placeholder = placeholder
@@ -29,8 +33,10 @@ struct CachedAsyncImage<Placeholder: View>: View {
             if let image = loadedImage {
                 Image(uiImage: image)
                     .resizable()
+                    .transition(.opacity)
             } else {
                 placeholder()
+                    .transition(.opacity)
             }
         }
         .task(id: url) {
@@ -46,7 +52,12 @@ struct CachedAsyncImage<Placeholder: View>: View {
             return
         }
         loadedImage = nil
-        loadedImage = await ImageCacheService.shared.fetchImage(for: imageURL, targetSize: targetSize)
+        let fetched = await ImageCacheService.shared.fetchImage(for: imageURL, targetSize: targetSize)
+        if fadeInDuration > 0, fetched != nil {
+            withAnimation(.easeOut(duration: fadeInDuration)) { loadedImage = fetched }
+        } else {
+            loadedImage = fetched
+        }
         if loadedImage == nil && !Task.isCancelled {
             onFailure?()
         }

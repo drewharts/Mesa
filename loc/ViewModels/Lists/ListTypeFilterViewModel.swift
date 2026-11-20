@@ -24,6 +24,10 @@ final class ListTypeFilterViewModel: ObservableObject {
 
     /// Loads attempted per selection before reporting failure.
     private static let maxLoadAttempts = 2
+    /// Most skeleton tiles shown for pending matches.
+    private static let maxSkeletonTiles = 4
+    /// Most tiles whose images are warmed per selection change.
+    private static let prefetchLimit = 24
 
     private let tagSourceLoader: (String) async -> [LightweightPlace]?
     private let cache: ListTagSourceCache
@@ -52,6 +56,8 @@ final class ListTypeFilterViewModel: ObservableObject {
         let tiles: [LightweightPlace]
         /// Ids (lowercased) of the last few tiles; appearing one of them asks for the next page.
         let loadMoreTriggerIds: Set<String>
+        /// Ids (lowercased) of every place in the selected chip (loaded or not); nil on "All".
+        let scopeIds: Set<String>?
     }
 
     /// Number of trailing tiles whose appearance triggers loading the next page.
@@ -71,10 +77,42 @@ final class ListTypeFilterViewModel: ObservableObject {
         let display = Display(
             chips: filtersByType ? (fullIndex?.chips ?? chips(for: places)) : [],
             tiles: tiles,
-            loadMoreTriggerIds: Set(tiles.suffix(Self.loadMoreLookahead).map { $0.place_id.lowercased() })
+            loadMoreTriggerIds: Set(tiles.suffix(Self.loadMoreLookahead).map { $0.place_id.lowercased() }),
+            scopeIds: filtersByType ? scopeIds(loaded: shown) : nil
         )
         cachedDisplay = (places, selection, filtersByType, display)
         return display
+    }
+
+    /// Every place the selected chip keeps: the whole list's matches once the full index is known (so the
+    /// count and map cover unloaded pages too), else the loaded matches. nil on "All".
+    private func scopeIds(loaded shown: [LightweightPlace]) -> Set<String>? {
+        guard let selection else { return nil }
+        if let fullIndex, fullIndex.contains(tag: selection) { return fullIndex.placeIds(tagged: selection) }
+        return Set(shown.map { $0.place_id.lowercased() })
+    }
+
+    /// How many placeholder tiles to show for matches that are still loading (capped so the grid stays calm).
+    func pendingSkeletonCount(loaded: [LightweightPlace]) -> Int {
+        guard isLoadingMatches else { return 0 }
+        return min(max(unloadedMatchIds(loaded: loaded).count, 1), Self.maxSkeletonTiles)
+    }
+
+    /// Whether loading more pages could still reveal matches: always true until the whole-list index is known.
+    func mayHaveUnloadedMatches(loaded: [LightweightPlace]) -> Bool {
+        guard selection != nil else { return true }
+        return fullIndex == nil || !unloadedMatchIds(loaded: loaded).isEmpty
+    }
+
+    /// Width of one grid tile: two columns inside 16pt side padding with a 12pt gap (rounded down like the cache key).
+    static func gridTileSide(screenWidth: CGFloat) -> CGFloat {
+        ((screenWidth - 32 - 12) / 2).rounded(.down)
+    }
+
+    /// Warms the image cache (downsampled to the tile size) for the first tiles that are not already in memory.
+    func prefetchImages(for tiles: [LightweightPlace], tileSide: CGFloat) {
+        let urls = tiles.prefix(Self.prefetchLimit).compactMap { ListTilePhoto.url(for: $0) }
+        ImageCacheService.shared.prefetch(urls: urls, targetSize: CGSize(width: tileSide, height: tileSide))
     }
 
     /// Chips for the places currently loaded.
