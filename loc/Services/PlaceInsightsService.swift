@@ -20,6 +20,8 @@ struct PlaceMention: Codable, Identifiable, Hashable {
     let tip: String?
     let vibe: String?
     let timestampSeconds: Int?
+    /// Richer per-video facts (tips, prices, quote, ...). Absent on older backend deployments.
+    let insights: PlaceMentionInsights?
 
     var id: String { videoId }
 
@@ -30,6 +32,7 @@ struct PlaceMention: Codable, Identifiable, Hashable {
         case thumbnailUrl = "thumbnail_url"
         case author, dishes, tip, vibe
         case timestampSeconds = "timestamp_seconds"
+        case insights
     }
 }
 
@@ -109,6 +112,20 @@ final class PlaceInsightsService {
             throw URLError(.badServerResponse)
         }
         return try JSONDecoder().decode(PlaceInsights.self, from: data)
+    }
+
+    /// URLs of the videos the signed-in user imported for this place (drives "From your import").
+    func fetchMyImportedURLs(placeId: String) async -> [String] {
+        struct Row: Decodable { let url: String? }
+        guard let userId = await SupabaseManager.shared.currentUserId else { return [] }
+        let rows: [Row]? = try? await SupabaseManager.shared.client
+            .from("external_places")
+            .select("url")
+            .eq("place_id", value: placeId)
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        return (rows ?? []).compactMap(\.url)
     }
 
     func fetchFriendActivity(placeId: String) async throws -> [FriendPlaceActivity] {

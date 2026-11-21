@@ -61,11 +61,15 @@ struct ImportProgressView: View {
         }
         .onChange(of: viewModel.savedPlaces.count) { _, _ in
             // A place added by hand after an empty result still gets the one-tap save.
-            if viewModel.isFinished && !viewModel.savedPlaces.isEmpty { prepareListChoices() }
+            if viewModel.isFinished && !viewModel.savedPlaces.isEmpty {
+                Task { await viewModel.autoSave(profile: profile, userSession: userSession) }
+                prepareListChoices()
+            }
         }
         .onChange(of: viewModel.isFinished) { _, finished in
             if finished && !viewModel.savedPlaces.isEmpty {
                 refreshProfileAfterImport()
+                Task { await viewModel.autoSave(profile: profile, userSession: userSession) }
                 prepareListChoices()
             }
         }
@@ -181,7 +185,7 @@ struct ImportProgressView: View {
                         .frame(width: 24)
                     placeThumbnail(item.place)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.place?.name ?? item.name)
+                        Text(item.place?.displayName ?? LightweightPlace.displayName(item.name))
                             .font(.body)
                             .foregroundColor(.primary)
                             .lineLimit(1)
@@ -221,7 +225,7 @@ struct ImportProgressView: View {
                         .padding(.vertical, 5)
                         .background(Capsule().fill(Color(.secondarySystemBackground)))
                 }
-                .accessibilityLabel("Wrong place? Fix \(place.name)")
+                .accessibilityLabel("Wrong place? Fix \(place.displayName)")
             }
 
             if let place = item.place, showsSelectionToggles, item.status == .saved {
@@ -244,7 +248,7 @@ struct ImportProgressView: View {
     }
     /// Per-place checkmarks only make sense once the import is done and there is a choice to make.
     private var showsSelectionToggles: Bool {
-        viewModel.isFinished && viewModel.savedPlaces.count > 1
+        viewModel.isFinished && viewModel.savedPlaces.count > 1 && viewModel.showsListPicker
     }
 
     /// Small photo for a place, loaded from its photo URL once it has been saved.
@@ -322,7 +326,7 @@ struct ImportProgressView: View {
     /// Inline "Save to list" section in the same scroll: header, search (picks or creates), recent lists.
     @ViewBuilder
     private var saveSection: some View {
-        if viewModel.isFinished && !viewModel.savedPlaces.isEmpty, let listViewModel {
+        if viewModel.isFinished && !viewModel.savedPlaces.isEmpty, viewModel.showsListPicker, let listViewModel {
             ImportSaveSection(listViewModel: listViewModel, selectedListId: $selectedListId)
                 .padding(.horizontal)
                 .padding(.top, 16)
@@ -332,7 +336,18 @@ struct ImportProgressView: View {
     /// Pinned bottom action on the sheet's material with a soft top fade (no hard edge).
     private var footer: some View {
         VStack(spacing: 10) {
-            if viewModel.isFinished && !viewModel.savedPlaces.isEmpty, let listViewModel {
+            if let message = viewModel.autoSaveMessage, !viewModel.showsListPicker {
+                SavedBannerView(message: message) {
+                    withAnimation { viewModel.isListPickerRequested = true }
+                }
+                Button("Done") { viewModel.dismiss() }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            } else if viewModel.isFinished && !viewModel.savedPlaces.isEmpty, let listViewModel {
                 ImportSaveButton(
                     listViewModel: listViewModel,
                     selectedListId: selectedListId,
@@ -373,7 +388,7 @@ struct ImportProgressView: View {
                 guard !PlaceIdGuard.isPlaceholder(place.id.uuidString) else { return }
                 detailPlaceViewModel.places[place.id.uuidString] = place
                 viewModel.appendManualPlace(place)
-                showAddAllConfirmation("Added \(place.name)")
+                showAddAllConfirmation("Added \(place.displayName)")
             }
             .environmentObject(profile)
         }
@@ -384,7 +399,7 @@ struct ImportProgressView: View {
                 detailPlaceViewModel.places[place.id.uuidString] = place
                 excludedPlaceIds.remove(wrong.id.uuidString)
                 Task { await viewModel.replacePlace(wrong, with: place) }
-                showAddAllConfirmation("Changed to \(place.name)")
+                showAddAllConfirmation("Changed to \(place.displayName)")
             }
             .environmentObject(profile)
         }

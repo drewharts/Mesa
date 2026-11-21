@@ -12,35 +12,19 @@ import SwiftUI
 struct FavoritesSelectionRow: View {
     let isFavorited: Bool
     let onToggle: () -> Void
-    /// `.autoSortSaved` shows the same row as "Saved".
-    var style: Style = .favorites
-
-    enum Style { case favorites, autoSortSaved }
-
     var body: some View {
         Button(action: onToggle) {
             HStack(spacing: 12) {
                 // Star icon
-                Image(systemName: style == .autoSortSaved ? "square.stack.3d.up.fill" : "star.fill")
+                Image(systemName: "star.fill")
                     .font(.title3)
-                    .foregroundColor(style == .autoSortSaved ? .mesaAccent : .yellow)
+                    .foregroundColor(.yellow)
                     .frame(width: 32, height: 32)
 
                 // Label
-                if style == .autoSortSaved {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Saved")
-                            .font(.body)
-                            .foregroundStyle(Color.primary)
-                        Text("Sorted by city and type")
-                            .font(.caption)
-                            .foregroundStyle(Color.secondary)
-                    }
-                } else {
-                    Text("Favorites")
-                        .font(.body)
-                        .foregroundStyle(Color.primary)
-                }
+                Text("Favorites")
+                    .font(.body)
+                    .foregroundStyle(Color.primary)
 
                 Spacer()
 

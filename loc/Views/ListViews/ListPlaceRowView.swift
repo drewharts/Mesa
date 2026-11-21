@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import Combine
 
 // MARK: - Row
 
@@ -31,7 +32,7 @@ struct ListPlaceRowView: View {
             ListPlaceThumbnail(place: place, size: Self.thumbnailSize)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(place.name)
+                Text(LightweightPlace.displayName(place.name))
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
@@ -121,12 +122,13 @@ struct ListPlaceThumbnail: View {
     var cornerRadius: CGFloat = 10
     var showsShadow: Bool = true
 
-    @ObservedObject private var externalMetadataCache = ExternalMetadataCache.shared
+    /// Resolved video thumbnail for `place.content_url`. Tracked per tile (not by observing the whole cache),
+    /// so a metadata fetch finishing for one tile does not re-render every visible thumbnail.
+    @State private var externalThumbnailUrl: String?
     @State private var failedUrls = Set<String>()
 
     private var imageURL: URL? {
-        if let contentUrl = place.content_url,
-           let cached = externalMetadataCache.getCachedThumbnailUrl(for: contentUrl),
+        if let cached = externalThumbnailUrl,
            !failedUrls.contains(cached),
            let url = URL(string: cached) {
             return url
@@ -147,7 +149,8 @@ struct ListPlaceThumbnail: View {
                     url: url,
                     targetSize: CGSize(width: size, height: size),
                     placeholder: { ShimmerView() },
-                    onFailure: { failedUrls.insert(url.absoluteString) }
+                    onFailure: { failedUrls.insert(url.absoluteString) },
+                    fadeInDuration: 0.2
                 )
                 .aspectRatio(contentMode: .fill)
                 .frame(width: size, height: size)
@@ -168,13 +171,27 @@ struct ListPlaceThumbnail: View {
                 .stroke(Color.gray.opacity(showsShadow ? 0.2 : 0), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(showsShadow ? 0.08 : 0), radius: 6, x: 0, y: 3)
-        .onAppear {
-            // Kick off the external thumbnail fetch so it replaces the placeholder when ready.
-            if let contentUrl = place.content_url,
-               externalMetadataCache.getCachedThumbnailUrl(for: contentUrl) == nil {
-                Task { _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl) }
-            }
-        }
+        .onReceive(externalThumbnailPublisher) { externalThumbnailUrl = $0 }
+        .task(id: place.content_url) { await fetchExternalThumbnail() }
+    }
+
+    /// Emits the cached external thumbnail URL for this place's video link whenever it changes.
+    private var externalThumbnailPublisher: AnyPublisher<String?, Never> {
+        guard let contentUrl = place.content_url else { return Just(nil).eraseToAnyPublisher() }
+        return ExternalMetadataCache.shared.$cache
+            .map { $0[contentUrl]?.thumbnailURL }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
+    }
+
+    /// Fetches the external thumbnail once the tile has stayed on screen briefly, so rows flung past while
+    /// scrolling fast (the task is cancelled on disappear) never trigger a network call.
+    private func fetchExternalThumbnail() async {
+        guard let contentUrl = place.content_url,
+              ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) == nil else { return }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        guard !Task.isCancelled else { return }
+        _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
     }
 }
 

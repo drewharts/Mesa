@@ -173,6 +173,20 @@ class ImageCacheService {
         }
     }
 
+    /// Warms the cache for URLs not yet in memory (downsampled to `targetSize`), without blocking the caller.
+    /// Downloads are deduplicated with on-screen loads, so a tile that appears mid-prefetch reuses the same request.
+    func prefetch(urls: [URL], targetSize: CGSize) {
+        let missing = urls.filter { memoryImage(for: $0, targetSize: targetSize) == nil }
+        guard !missing.isEmpty else { return }
+        Task.detached(priority: .utility) { [self] in
+            await withTaskGroup(of: Void.self) { group in
+                for url in missing {
+                    group.addTask { _ = await self.fetchImage(for: url, targetSize: targetSize) }
+                }
+            }
+        }
+    }
+
     /// Memory-cache-only lookup (no disk I/O), safe on the main thread.
     func memoryImage(for url: URL, targetSize: CGSize? = nil) -> UIImage? {
         imageCache.object(forKey: cacheKey(for: url, targetSize: targetSize) as NSString)

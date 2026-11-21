@@ -34,6 +34,7 @@ struct AboutTabContent: View {
     // MARK: - View-Owned Presentation State
     @State private var showingNoteSheet = false
     @StateObject private var insightsViewModel = PlaceInsightsViewModel()
+    @StateObject private var reservationViewModel = ReservationViewModel()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -46,7 +47,9 @@ struct AboutTabContent: View {
                     isRefreshing: isRefreshing,
                     onRefresh: onRefresh,
                     onAddPost: onAddPost,
-                    takeText: insightsViewModel.take
+                    takeText: insightsViewModel.take,
+                    reservation: reservationViewModel.link,
+                    onReserveTapped: { reservationViewModel.trackTap() }
                 )
             }
 
@@ -84,6 +87,9 @@ struct AboutTabContent: View {
         }
         .task(id: viewModel.placeId) {
             await insightsViewModel.load(placeId: viewModel.placeId)
+        }
+        .task(id: viewModel.placeId) {
+            await reservationViewModel.load(placeId: viewModel.placeId, place: viewModel.place)
         }
         .onReceive(insightsViewModel.$priorityPhotoURLs) { urls in
             viewModel.placePhotosViewModel.priorityPhotoURLs = urls

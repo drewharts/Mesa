@@ -15,6 +15,11 @@ struct PlaceInfoSection: View {
     var onAddPost: (() -> Void)? = nil
     /// Short AI take (vibe + tips); replaces the generic description when available.
     var takeText: String? = nil
+    /// Reservation link (Resy/OpenTable/...) when available; the button is hidden otherwise.
+    var reservation: ReservationLink? = nil
+    var onReserveTapped: (() -> Void)? = nil
+
+    @Environment(\.openURL) private var openURL
 
     @State private var showingMenu = false
     @State private var showingWebsite = false
@@ -23,7 +28,7 @@ struct PlaceInfoSection: View {
         let hasMenu = place.menuUrl != nil && !place.menuUrl!.isEmpty
         let hasWebsite = place.websiteUrl != nil && !place.websiteUrl!.isEmpty
         let hasPhone = place.phone != nil && !place.phone!.isEmpty
-        return hasMenu || hasWebsite || hasPhone
+        return hasMenu || hasWebsite || hasPhone || reservation?.destinationURL != nil
     }
 
     private func actionButtonLabel(icon: String, text: String) -> some View {
@@ -105,6 +110,17 @@ struct PlaceInfoSection: View {
             if hasActionButtons {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
+                        // Reservation button
+                        if let reservation, let url = reservation.destinationURL {
+                            Button {
+                                onReserveTapped?()
+                                openURL(url)
+                            } label: {
+                                ReserveActionLabel(link: reservation)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         // Menu button
                         if let menuUrl = place.menuUrl, !menuUrl.isEmpty, let url = URL(string: menuUrl) {
                             Button {

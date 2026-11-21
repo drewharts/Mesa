@@ -23,6 +23,19 @@ class ImportProgressViewModel: ObservableObject {
     @Published private(set) var isFinished: Bool = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var savedPlaces: [DetailPlace] = []
+    /// "Added to {City}" / "Added N places to {City}" once the import landed in city lists.
+    @Published private(set) var autoSaveMessage: String?
+    /// True after the user taps "Change" on the auto-save banner (reveals the list picker).
+    @Published var isListPickerRequested: Bool = false
+    /// Place id -> city list id for rows this import added, so each is saved once and can be undone if wrong.
+    private var autoSavedLists: [String: String] = [:]
+    /// Place ids already handled (saved now or already in the list), so a re-run doesn't repeat them.
+    private var autoSavedIds = Set<String>()
+    /// True while a city-list save is running, so the list picker doesn't flash up before the banner.
+    @Published private(set) var isAutoSaving = false
+    private var autoSaveRerunRequested = false
+    private var autoSaveProfile: ProfileViewModel?
+    private var autoSaveSession: UserSession?
     /// Whether the user can leave the app and still be told when the import is done.
     @Published private(set) var notificationsEnabled: Bool = false
 
@@ -169,6 +182,47 @@ class ImportProgressViewModel: ObservableObject {
         Analytics.track(.importFinished, ["success": false])
     }
 
+    // MARK: - Auto-save to city lists
+
+    /// Whether the import was saved automatically, so the list picker waits for "Change".
+    var isAutoSaved: Bool { !autoSavedIds.isEmpty }
+
+    /// Whether the inline list picker should be shown: only after nothing was auto-saved or "Change" was tapped.
+    var showsListPicker: Bool { (!isAutoSaved && !isAutoSaving) || isListPickerRequested }
+
+    /// Saves the found places into their city lists (creating a list per new city) and records where they went.
+    /// A call made while a save is running is folded into one follow-up pass.
+    func autoSave(profile: ProfileViewModel, userSession: UserSession) async {
+        autoSaveProfile = profile
+        autoSaveSession = userSession
+        guard !isAutoSaving else { autoSaveRerunRequested = true; return }
+        isAutoSaving = true
+        repeat {
+            autoSaveRerunRequested = false
+            await saveUnhandledPlaces(profile: profile, userSession: userSession)
+        } while autoSaveRerunRequested
+        isAutoSaving = false
+    }
+
+    /// One pass: saves every found place not yet handled, then records the ids, undo targets and banner text.
+    private func saveUnhandledPlaces(profile: ProfileViewModel, userSession: UserSession) async {
+        let fresh = ImportAutoSave.placesToSave(from: savedPlaces, alreadySaved: autoSavedIds)
+        guard !fresh.isEmpty else { return }
+        let summary = await CitySaveViewModel(profile: profile, userSession: userSession).save(fresh)
+        autoSavedLists.merge(summary.newlyAdded) { _, new in new }
+        // Failed places stay out of the handled set so a later run retries them.
+        autoSavedIds.formUnion(summary.handledIds)
+        autoSaveMessage = summary.message
+    }
+
+    /// Takes a wrongly detected place back out of the city list if this import was the one that added it.
+    private func undoAutoSave(of wrong: DetailPlace) {
+        let id = wrong.id.uuidString
+        autoSavedIds.remove(id)
+        guard let listId = autoSavedLists.removeValue(forKey: id) else { return }
+        autoSaveProfile?.listsViewModel.removePlaceFromLightweightList(listId: listId, place: wrong)
+    }
+
     // MARK: - Actions
 
     /// Adds a place the user picked by hand (already linked to this video via external_places).
@@ -213,6 +267,8 @@ class ImportProgressViewModel: ObservableObject {
         }
         places = applyCorrections(to: places)
         savedPlaces = dedup(places.filter { $0.status == .saved }.compactMap { $0.place })
+        undoAutoSave(of: wrong)
+        if let profile = autoSaveProfile, let session = autoSaveSession { await autoSave(profile: profile, userSession: session) }
         await unlinkFromVideo(wrong)
         Analytics.track(.importPlaceCorrected, ["action": "replace"])
     }
@@ -226,6 +282,8 @@ class ImportProgressViewModel: ObservableObject {
             errorMessage = "No places left. Search for the right one below."
         }
         statusText = "\(savedPlaces.count) place\(savedPlaces.count == 1 ? "" : "s") found"
+        undoAutoSave(of: wrong)
+        if autoSavedIds.isEmpty { autoSaveMessage = nil }
         await unlinkFromVideo(wrong)
         Analytics.track(.importPlaceCorrected, ["action": "remove"])
     }

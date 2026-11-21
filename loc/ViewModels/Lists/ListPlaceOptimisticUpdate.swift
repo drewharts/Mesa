@@ -62,7 +62,9 @@ extension LightweightPlace {
             thumbnail_url: thumbnail_url,
             added_by_user_id: added_by_user_id,
             added_by_name: added_by_name,
-            added_by_photo_url: added_by_photo_url
+            added_by_photo_url: added_by_photo_url,
+            categories: categories,
+            user_corrected_category: user_corrected_category
         )
     }
 }

@@ -54,6 +54,9 @@ if __name__ == "__main__":
         st, d = call("GET", "/v1/profiles?limit=200&filter[name]=" + urllib.parse.quote(name)
                      + "&filter[profileState]=ACTIVE&include=certificates")
         prof = None
+        if st != 200:
+            # Apple's error body (code/title/detail) has no key material.
+            print("PROFILE LIST FAILED", st, json.dumps(d.get("errors")))
         for p in d.get("data", []) if st == 200 else []:
             certs = [c["id"] for c in p.get("relationships", {}).get("certificates", {}).get("data", [])]
             if p["attributes"].get("name") == name and cert_id in certs:
@@ -63,7 +66,7 @@ if __name__ == "__main__":
             st, b = call("GET", "/v1/bundleIds?limit=200&filter[identifier]=" + urllib.parse.quote(ident))
             bid = next((x["id"] for x in b.get("data", []) if x["attributes"]["identifier"] == ident), None)
             if not bid:
-                print("NO BUNDLE ID", ident, st); sys.exit(1)
+                print("NO BUNDLE ID", ident, st, json.dumps(b.get("errors"))); sys.exit(1)
             st, d = call("POST", "/v1/profiles", {"data": {"type": "profiles",
                 "attributes": {"name": name, "profileType": "IOS_APP_STORE"},
                 "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid}},

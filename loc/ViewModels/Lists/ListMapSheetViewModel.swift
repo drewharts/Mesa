@@ -55,6 +55,9 @@ final class ListMapSheetViewModel: ObservableObject {
     @Published private(set) var focusedPlaceId: String?
     @Published private(set) var cameraRequest: CameraRequest?
     @Published private(set) var scrollRequest: ScrollRequest?
+    /// Ids (lowercased) of the places the selected tag chip keeps; nil means "All" (nothing filtered).
+    /// The map shows only these pins and the sheet header counts them.
+    @Published private(set) var chipScopeIds: Set<String>?
 
     // MARK: - Private State
 
@@ -72,6 +75,7 @@ final class ListMapSheetViewModel: ObservableObject {
         hasFitMap = false
         focusedPlaceId = nil
         scrollRequest = nil
+        chipScopeIds = nil
         detent = .default
         Analytics.track(.listOpened, [
             "list_id": listId,
@@ -88,7 +92,22 @@ final class ListMapSheetViewModel: ObservableObject {
         hasFitMap = false
         focusedPlaceId = nil
         scrollRequest = nil
+        chipScopeIds = nil
         detent = .default
+    }
+
+    // MARK: - Chip Scope
+
+    /// Publishes the places the selected chip keeps (nil restores all). Unchanged sets are ignored so the
+    /// map and header are not re-rendered for no-op updates.
+    func setChipScope(_ ids: Set<String>?) {
+        guard ids != chipScopeIds else { return }
+        chipScopeIds = ids
+    }
+
+    /// The place count the header shows: the selected chip's count, or `total` on "All".
+    func headerPlaceCount(total: Int) -> Int {
+        chipScopeIds?.count ?? total
     }
 
     // MARK: - Sheet Height

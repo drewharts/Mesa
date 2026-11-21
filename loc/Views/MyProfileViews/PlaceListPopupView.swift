@@ -179,8 +179,10 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
             }
 
             if let count = count {
-                Text("\(count) place\(count == 1 ? "" : "s")")
+                let shown = sheetVM.headerPlaceCount(total: count)
+                Text("\(shown) place\(shown == 1 ? "" : "s")")
                     .font(.caption)
+                    .contentTransition(.numericText())
                     .foregroundColor(.secondary)
                     .padding(.top, -8)
             }
@@ -212,7 +214,8 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
                 },
                 onSelect: { handleTileTap($0) },
                 onOpenDetail: { openPlaceDetail($0) },
-                onRemove: removeHandler
+                onRemove: removeHandler,
+                showsTypeFilter: true
             )
         }
     }

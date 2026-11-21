@@ -24,7 +24,15 @@ struct ListPlacesScrollView: View {
     let onOpenDetail: (LightweightPlace) -> Void
     /// Optional destructive action (own lists only).
     let onRemove: ((String) -> Void)?
+    /// Shows the tag chips (All, Sushi, Coffee, ...) above the places. Off for the map's "Places here" sheet.
+    var showsTypeFilter: Bool = false
+    /// The list being shown; with `showsTypeFilter` it lets the chips cover every place in the list.
+    var listId: String? = nil
+    /// Loads every remaining place of the list so a selected chip shows all of its matches.
+    var onLoadAll: (() async -> Void)? = nil
 
+    @StateObject private var filterVM = ListTypeFilterViewModel()
+    @StateObject private var findTableVM = FindTableViewModel()
     @ObservedObject private var sheetVM = ListMapSheetViewModel.shared
 
     static let rowTileSize: CGFloat = 150
@@ -36,11 +44,61 @@ struct ListPlacesScrollView: View {
 
     private var isCollapsed: Bool { sheetVM.detent == .peek }
 
-    /// One tile per place. Duplicate ids (same place reached twice, sometimes with different id
-    /// casing) gave LazyVGrid duplicate identities, which left a blank cell and broke the 2-column flow.
-    private var uniquePlaces: [LightweightPlace] {
-        var seen = Set<String>()
-        return places.filter { seen.insert($0.place_id.lowercased()).inserted }
+    /// Side of a square tile in points, used to warm images at the size the tiles will request.
+    private var tileSide: CGFloat {
+        isCollapsed ? Self.rowTileSize : ListTypeFilterViewModel.gridTileSide(screenWidth: UIScreen.main.bounds.width)
+    }
+
+    /// The chip row, or nothing when filtering is off or the list has too few tags.
+    @ViewBuilder
+    private func typeFilterRow(display: ListTypeFilterViewModel.Display) -> some View {
+        if display.showsFilterRow {
+            ListTypeFilterRow(
+                chips: display.chips,
+                isSelected: { filterVM.isSelected($0) },
+                onSelect: { chip in withAnimation(.easeInOut(duration: 0.2)) { filterVM.handleChipTap(chip) } },
+                isSearching: filterVM.isSearching,
+                searchQuery: Binding(get: { filterVM.searchQuery }, set: { filterVM.setSearchQuery($0) }),
+                onBeginSearch: { filterVM.beginSearch() },
+                onClearOrCloseSearch: { filterVM.clearOrCloseSearch() },
+                onCollapseSearch: { filterVM.endSearch() },
+                showsFindTable: showsTypeFilter && listId != nil && findTableVM.isOffered,
+                isFindTableActive: findTableVM.isActive,
+                onFindTable: { findTableVM.presentForm() }
+            )
+            .padding(.vertical, 4)
+        }
+    }
+
+    /// The table-search status line (checking / results summary) with its way back to the full list.
+    @ViewBuilder
+    private var findTableStatusBar: some View {
+        if findTableVM.isLoading {
+            FindTableStatusBar(text: findTableVM.loadingText, isLoading: true, onExit: { findTableVM.exit() })
+        } else if let summary = findTableVM.resultsSummary {
+            FindTableStatusBar(text: summary, isLoading: false, progress: findTableVM.progress, onExit: { findTableVM.exit() })
+        }
+    }
+
+    /// The error or empty state of a table search; nil while loading or when there are tables to show.
+    @ViewBuilder
+    private var findTableMessage: some View {
+        if case .failed = findTableVM.state {
+            FindTableMessageView(title: "Couldn't check right now", detail: "Table availability is unavailable at the moment.",
+                                 primaryTitle: "Try again",
+                                 onPrimary: { if let listId { findTableVM.retry(listId: listId) } },
+                                 onExit: { findTableVM.exit() })
+        } else {
+            FindTableMessageView(title: "No tables found", detail: "Nothing open for \(findTableVM.partySize) · \(findTableVM.selectionSummary).",
+                                 primaryTitle: "Change search", onPrimary: { findTableVM.presentForm() },
+                                 onExit: { findTableVM.exit() })
+        }
+    }
+
+    /// Whether the table search ended with nothing to show (an error, or no place with tables).
+    private var findTableShowsMessage: Bool {
+        if case .failed = findTableVM.state { return true }
+        return findTableVM.hasNoTables
     }
 
     private func isSelected(_ place: LightweightPlace) -> Bool {
@@ -49,7 +107,10 @@ struct ListPlacesScrollView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
+        // Chips, de-duplicated tiles and load-more ids are memoized in the view model: computed once per render.
+        let listDisplay = filterVM.display(for: places, filtersByType: showsTypeFilter)
+        let display = findTableVM.scopeIds.map { listDisplay.narrowed(toPlaceIds: $0) } ?? listDisplay
+        return ScrollViewReader { proxy in
             Group {
                 if places.isEmpty && !isLoadingInitial {
                     Text("No places in this list")
@@ -57,10 +118,16 @@ struct ListPlacesScrollView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
+                } else if findTableShowsMessage {
+                    findTableMessage
+                } else if display.tiles.isEmpty && !isLoadingInitial && !filterVM.isLoadingMatches && !findTableVM.isActive {
+                    ListFilterEmptyState(loadFailed: filterVM.matchesLoadFailed, message: filterVM.hasSearchQuery ? "No places match your search" : nil) {
+                        Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
+                    }
                 } else if isCollapsed {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: 12) {
-                            content(tileWidth: Self.rowTileSize)
+                            content(display, tileWidth: Self.rowTileSize)
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
@@ -69,7 +136,7 @@ struct ListPlacesScrollView: View {
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 16) {
-                            content(tileWidth: nil)
+                            content(display, tileWidth: nil)
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 32)
@@ -77,14 +144,60 @@ struct ListPlacesScrollView: View {
                     .transition(.opacity)
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 8) {
+                VStack(spacing: 6) {
+                    typeFilterRow(display: display)
+                    findTableStatusBar
+                }
+            }
+            .sheet(isPresented: $findTableVM.isFormPresented) {
+                FindTableSheet(viewModel: findTableVM, onSearch: { if let listId { findTableVM.search(listId: listId, scope: filterVM.findTableScope(loaded: places)) } })
+            }
+            // Results cover the whole list, so make sure every place is loaded before narrowing the tiles and map.
+            .onChange(of: findTableVM.scopeIds) { old, ids in
+                guard old == nil, ids != nil else { return }
+                Task { await onLoadAll?() }
+            }
+            .onChange(of: listId) { _, _ in findTableVM.exit() }
+            .animation(.easeInOut(duration: 0.3), value: findTableVM.scopeIds)
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
+            // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.
+            .onChange(of: filterVM.selection) { _, _ in
+                filterVM.beginLoadingMatchesIfNeeded(loaded: places)
+                filterVM.prefetchImages(for: display.tiles, tileSide: tileSide)
+                if filterVM.mayHaveUnloadedMatches(loaded: places) { onLoadMore() }
+                Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
+            }
+            // Typing narrows the list instantly from memory; paging in unloaded matches waits for a pause in typing.
+            .onChange(of: filterVM.searchQuery) { _, _ in filterVM.beginLoadingMatchesIfNeeded(loaded: places) }
+            .task(id: filterVM.searchQuery) {
+                guard filterVM.hasSearchQuery else { return }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+                filterVM.prefetchImages(for: display.tiles, tileSide: tileSide)
+                if filterVM.mayHaveUnloadedMatches(loaded: places) { onLoadMore() }
+                Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
+            }
+            .task(id: places.count) {
+                guard showsTypeFilter, let listId else { return }
+                await filterVM.refreshTagSource(listId: listId, loaded: places)
+                // The whole-list index may arrive after a chip was tapped; load that chip's missing places now.
+                // Unstructured: a changing place count restarts this task and must not cancel the network load.
+                Task { await filterVM.loadMatchesIfNeeded(loaded: { places }, loadAll: { await onLoadAll?() }) }
+            }
             .onAppear {
                 for p in places { if let la = p.latitude, let lo = p.longitude {
                     PlaceTimeZoneCache.shared.registerCoordinate(placeId: p.place_id, latitude: la, longitude: lo)
                 } }
                 PlaceHoursStore.shared.prefetch(places.map(\.place_id))
             }
-            .onChange(of: places.count) { _, _ in PlaceHoursStore.shared.prefetch(places.map(\.place_id)) }
+            .onChange(of: places.count) { _, _ in
+                PlaceHoursStore.shared.prefetch(places.map(\.place_id))
+                if filterVM.selection != nil { filterVM.prefetchImages(for: display.tiles, tileSide: tileSide) }
+            }
+            // The map behind the sheet and the header count follow the selected chip.
+            .onChange(of: display.scopeIds) { _, ids in sheetVM.setChipScope(ids) }
+            .onDisappear { sheetVM.setChipScope(nil) }
             .onChange(of: scrollRequest) { _, request in
                 guard let request else { return }
                 scroll(proxy, to: request.placeId, delay: 250_000_000)
@@ -109,22 +222,26 @@ struct ListPlacesScrollView: View {
     }
 
     @ViewBuilder
-    private func content(tileWidth: CGFloat?) -> some View {
-        if places.isEmpty {
+    private func content(_ display: ListTypeFilterViewModel.Display, tileWidth: CGFloat?) -> some View {
+        if places.isEmpty || findTableVM.isLoading || (findTableVM.isActive && display.tiles.isEmpty) {
             ForEach(0..<6, id: \.self) { _ in
                 ListPlaceTileSkeleton(width: tileWidth)
             }
         } else {
-            ForEach(Array(uniquePlaces.enumerated()), id: \.element.id) { index, place in
+            ForEach(display.tiles) { place in
                 ListPlaceTileView(
                     place: place,
                     locationText: locationText(place.place_id),
                     isSelected: isSelected(place),
                     showAddedBy: showAddedBy,
                     width: tileWidth,
+                    availability: findTableVM.availability(for: place.place_id),
+                    timeText: { findTableVM.timeText(minutes: $0) },
+                    onSlotTap: { if let found = findTableVM.availability(for: place.place_id) { findTableVM.openBooking(for: found) } },
                     onTap: { onSelect(place) }
                 )
                 .id(place.place_id)
+                .transition(.opacity)
                 .contextMenu {
                     Button {
                         onOpenDetail(place)
@@ -141,13 +258,13 @@ struct ListPlacesScrollView: View {
                 }
                 .onAppear {
                     onRowAppear(place)
-                    if index >= uniquePlaces.count - 3 {
+                    if display.loadMoreTriggerIds.contains(place.place_id.lowercased()) {
                         onLoadMore()
                     }
                 }
             }
-            if isLoadingMore {
-                ListPlaceTileSkeleton(width: tileWidth)
+            // Skeletons only stand in for matches that are still loading, never for tiles already in memory.
+            ForEach(0..<max(isLoadingMore ? 2 : 0, filterVM.pendingSkeletonCount(loaded: places)), id: \.self) { _ in
                 ListPlaceTileSkeleton(width: tileWidth)
             }
         }
@@ -165,6 +282,10 @@ struct ListPlaceTileView: View {
     let showAddedBy: Bool
     /// Fixed width for the horizontal row; nil fills the grid column.
     let width: CGFloat?
+    /// Table availability to show as time pills under the tile (table search results only).
+    var availability: PlaceTableAvailability? = nil
+    var timeText: ((Int) -> String)? = nil
+    var onSlotTap: (() -> Void)? = nil
     let onTap: () -> Void
 
     private let radius: CGFloat = 12
@@ -193,7 +314,13 @@ struct ListPlaceTileView: View {
                         .stroke(isSelected ? Color.mesaAccent : Color.gray.opacity(0.15),
                                 lineWidth: isSelected ? 3 : 1)
                 )
-                .shadow(color: Color.black.opacity(isSelected ? 0.16 : 0.07), radius: isSelected ? 8 : 5, x: 0, y: 3)
+                // Shadow is cast by a plain rounded rect behind the photo (cheap, known shape) instead of by the
+                // clipped photo/overlay stack, which forced an offscreen render pass per tile while scrolling.
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: Color.black.opacity(isSelected ? 0.16 : 0.07), radius: isSelected ? 8 : 5, x: 0, y: 3)
+                )
                 .scaleEffect(isSelected ? 1.0 : 0.985)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -210,7 +337,7 @@ struct ListPlaceTileView: View {
                         Text(state.isOpen ? "Open" : "Closed")
                             .fontWeight(.semibold)
                             .foregroundColor(state.isOpen ? .green : .secondary)
-                        if let change = hoursStore.changeText(for: place.place_id) {
+                        if let change = PlaceHours.changeText(for: state, timeZone: hoursStore.timeZone(for: place.place_id)) {
                             Text("· \(change)").foregroundColor(.secondary)
                         }
                     }
@@ -224,6 +351,10 @@ struct ListPlaceTileView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                if let availability, let timeText, let onSlotTap {
+                    TableSlotPills(slots: availability.sortedSlots, timeText: timeText, onTap: onSlotTap)
+                        .padding(.top, 2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(.horizontal, 2)

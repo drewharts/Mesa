@@ -112,7 +112,7 @@ struct PlaceDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 // Header row with place name (matches PlaceDetailTabsView style)
                 HStack(alignment: .center) {
-                    Text(place.name)
+                    Text(place.displayName)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)

@@ -43,16 +43,15 @@ struct PlaceDetailTabsView: View {
     @State private var showingNoteSheet = false
     @State private var showPlacePhotoSelector = false
     @State private var travelSelectorState: TravelTimeSelectorState?
-    /// "New York City · Restaurants" after a one-tap save; nil hides the banner.
-    @State private var quickSaveBanner: String?
-    @State private var quickSaveBannerTask: Task<Void, Never>?
+    /// Owns the "Added to New York City" banner and the city-list save behind the bookmark.
+    @StateObject private var saveBanner = CitySaveBannerViewModel()
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
                 headerRow
-                if let placement = quickSaveBanner {
-                    quickSaveBannerView(placement)
+                if let message = saveBanner.message {
+                    quickSaveBannerView(message)
                 }
                 infoRow
                 
@@ -191,63 +190,31 @@ struct PlaceDetailTabsView: View {
         .padding(.bottom, 3)
     }
     
-    // MARK: - One-tap save (auto_sort_saved)
+    // MARK: - One-tap save (city list)
 
-    /// With auto-sort on, the bookmark saves an unsaved place in one tap (it sorts itself into Saved);
-    /// otherwise, or when already saved, it opens the usual list picker.
+    /// The bookmark saves an unsaved place into its city list in one tap; a saved place (or a dropped
+    /// pin) opens the usual list picker.
     private func handleBookmarkTap() {
-        let autoSort = SavedLibraryGate.isEnabled
-        switch SavedQuickSave.action(isSaved: viewModel.isPlaceInList, autoSortEnabled: autoSort, isDroppedPin: viewModel.isDroppedPin) {
-        case .openListPicker:
+        guard !viewModel.isPlaceInList, !viewModel.isDroppedPin, let place = viewModel.currentPlace else {
             onAddToList()
-        case .saveNow:
-            guard let place = viewModel.currentPlace else { onAddToList(); return }
-            // Same write the picker's Saved row does (favorites table): no new tables, no migration.
-            profile.favoritesViewModel.addFavoritePlace(place: place)
-            viewModel.isPlaceInList = true
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            let placement = SavedQuickSave.placementLabel(
-                name: place.name, storedCity: place.city, address: place.address,
-                categories: place.categories ?? [], corrected: place.userCorrectedCategory
-            )
-            withAnimation(.easeOut(duration: 0.2)) { quickSaveBanner = placement }
-            quickSaveBannerTask?.cancel()
-            quickSaveBannerTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                guard !Task.isCancelled else { return }
-                withAnimation(.easeOut(duration: 0.2)) { quickSaveBanner = nil }
-            }
+            return
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Task { @MainActor in
+            let saved = await saveBanner.save([place], profile: profile, userSession: userSession)
+            if saved { viewModel.isPlaceInList = true }
         }
     }
 
-    private func dismissQuickSaveBanner() {
-        quickSaveBannerTask?.cancel()
-        withAnimation(.easeOut(duration: 0.2)) { quickSaveBanner = nil }
-    }
-
-    /// Low-key confirmation under the title with the one secondary action: add it to a list too.
-    private func quickSaveBannerView(_ placement: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.mesaAccent)
-            Text("Saved to \(placement)")
-                .font(.footnote)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Button("Add to list") {
-                dismissQuickSaveBanner()
-                onAddToList()
-            }
-            .font(.footnote.weight(.semibold))
-            .foregroundColor(.mesaAccent)
+    /// Low-key confirmation under the title with the one secondary action: change the list.
+    private func quickSaveBannerView(_ message: String) -> some View {
+        SavedBannerView(message: message, isError: saveBanner.isError) {
+            saveBanner.dismiss()
+            onAddToList()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.mesaAccent.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
         .padding(.bottom, 6)
         .transition(.opacity.combined(with: .move(edge: .top)))
-        .onChange(of: viewModel.currentPlace?.id) { _, _ in dismissQuickSaveBanner() }
+        .onChange(of: viewModel.currentPlace?.id) { _, _ in saveBanner.dismiss() }
     }
 
     // MARK: - Share Button (Conditional: Menu for custom places, simple button otherwise)

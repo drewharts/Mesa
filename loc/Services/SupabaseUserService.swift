@@ -751,7 +751,7 @@ class SupabaseUserService: ObservableObject {
             .execute()
             .value
         
-        return places
+        return await ListPlaceCategoryLoader.attachCategories(to: places, using: supabase.client)
     }
     
     /// Fetches the first page of places for each list in one request, keyed by list ID (lists with no places map to an empty array).
@@ -768,9 +768,10 @@ class SupabaseUserService: ObservableObject {
             .execute()
             .value
 
+        let enriched = await ListPlaceCategoryLoader.attachCategories(to: rows.map(\.place), using: supabase.client)
         var placesByList = Dictionary(listIds.map { ($0, [LightweightPlace]()) }, uniquingKeysWith: { first, _ in first })
-        for row in rows {
-            placesByList[row.listId, default: []].append(row.place)
+        for (row, place) in zip(rows, enriched) {
+            placesByList[row.listId, default: []].append(place)
         }
         return placesByList
     }

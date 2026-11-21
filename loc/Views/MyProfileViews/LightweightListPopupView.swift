@@ -99,6 +99,11 @@ struct LightweightListPopupView: View {
         listsVM.displayedPlaceCount(forListId: currentList.list_id, metadataCount: currentList.place_count)
     }
     
+    /// Header count: the selected chip's places, or the whole list on "All".
+    private var shownPlaceCount: Int {
+        sheetVM.headerPlaceCount(total: displayedPlaceCount)
+    }
+
     var body: some View {
         NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
@@ -350,8 +355,9 @@ struct LightweightListPopupView: View {
                     }
                 }
 
-                Text("\(displayedPlaceCount) place\(displayedPlaceCount == 1 ? "" : "s")")
+                Text("\(shownPlaceCount) place\(shownPlaceCount == 1 ? "" : "s")")
                     .font(.caption)
+                    .contentTransition(.numericText())
                     .foregroundColor(.gray)
                     .padding(.top, -8)
 
@@ -391,7 +397,10 @@ struct LightweightListPopupView: View {
             onOpenDetail: { openPlaceDetail($0) },
             onRemove: { placeId in
                 profile.listsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
-            }
+            },
+            showsTypeFilter: true,
+            listId: listId,
+            onLoadAll: { await paginationVM.loadAllPlaces(for: listId, expectedCount: displayedPlaceCount) }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

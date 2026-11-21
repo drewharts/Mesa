@@ -731,6 +731,7 @@ struct MainView: View {
         }
         .overlay(bottomNavigationBar)
         .sheet(isPresented: $showSearchPage, onDismiss: {
+            searchCoordinator.presentPendingPlaceDetailIfNeeded()
             if appCoordinator.hasPendingKeywordPopup {
                 appCoordinator.hasPendingKeywordPopup = false
                 DispatchQueue.main.async {

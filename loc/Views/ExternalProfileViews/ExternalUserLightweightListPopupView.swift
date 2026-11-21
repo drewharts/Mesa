@@ -138,8 +138,10 @@ struct ExternalUserLightweightListPopupView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
 
-                Text("\(viewModel.displayedPlaceCount) place\(viewModel.displayedPlaceCount == 1 ? "" : "s")")
+                let shown = sheetVM.headerPlaceCount(total: viewModel.displayedPlaceCount)
+                Text("\(shown) place\(shown == 1 ? "" : "s")")
                     .font(.caption)
+                    .contentTransition(.numericText())
                     .foregroundColor(.gray)
             }
             .padding(.horizontal, 20)
@@ -207,7 +209,8 @@ struct ExternalUserLightweightListPopupView: View {
             onLoadMore: {},
             onSelect: { handleRowTap($0) },
             onOpenDetail: { openPlaceDetail($0) },
-            onRemove: nil
+            onRemove: nil,
+            showsTypeFilter: true
         )
     }
 }

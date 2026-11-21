@@ -6,6 +6,8 @@ struct CachedAsyncImage<Placeholder: View>: View {
     let targetSize: CGSize?
     let placeholder: () -> Placeholder
     let onFailure: (() -> Void)?
+    /// Crossfade length when the image arrives from the network; 0 (default) swaps instantly. Cached images never fade.
+    let fadeInDuration: Double
 
     @State private var loadedImage: UIImage?
 
@@ -14,12 +16,16 @@ struct CachedAsyncImage<Placeholder: View>: View {
         url: URL?,
         targetSize: CGSize?,
         @ViewBuilder placeholder: @escaping () -> Placeholder,
-        onFailure: (() -> Void)? = nil
+        onFailure: (() -> Void)? = nil,
+        fadeInDuration: Double = 0
     ) {
+        self.fadeInDuration = fadeInDuration
         self.url = url
         self.targetSize = targetSize
         self.placeholder = placeholder
         self.onFailure = onFailure
+        // A memory-cache hit renders on the first frame: lazily re-created rows (scrolling back) never flash the placeholder.
+        _loadedImage = State(initialValue: url.flatMap { ImageCacheService.shared.memoryImage(for: $0, targetSize: targetSize) })
     }
 
     var body: some View {
@@ -27,8 +33,10 @@ struct CachedAsyncImage<Placeholder: View>: View {
             if let image = loadedImage {
                 Image(uiImage: image)
                     .resizable()
+                    .transition(.opacity)
             } else {
                 placeholder()
+                    .transition(.opacity)
             }
         }
         .task(id: url) {
@@ -38,9 +46,18 @@ struct CachedAsyncImage<Placeholder: View>: View {
 
     /// Loads image via ImageCacheService (cache -> deduplicated fetch -> downsample -> cache), reporting non-cancelled failures.
     private func loadImage() async {
+        guard let imageURL = url else { loadedImage = nil; return }
+        if let cached = ImageCacheService.shared.memoryImage(for: imageURL, targetSize: targetSize) {
+            loadedImage = cached
+            return
+        }
         loadedImage = nil
-        guard let imageURL = url else { return }
-        loadedImage = await ImageCacheService.shared.fetchImage(for: imageURL, targetSize: targetSize)
+        let fetched = await ImageCacheService.shared.fetchImage(for: imageURL, targetSize: targetSize)
+        if fadeInDuration > 0, fetched != nil {
+            withAnimation(.easeOut(duration: fadeInDuration)) { loadedImage = fetched }
+        } else {
+            loadedImage = fetched
+        }
         if loadedImage == nil && !Task.isCancelled {
             onFailure?()
         }

@@ -11,9 +11,13 @@ struct ExternalPlaceSelectionView: View {
     @State private var isBulkAdd = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
     @State private var tripSelectionViewModel: PlaceTripSelectionViewModel?
+    @StateObject private var saveBanner = CitySaveBannerViewModel()
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profile.externalContentViewModel }
+
+    /// Title of the bulk button, which saves every detected place into its city list.
+    private var saveAllTitle: String { "Save all \(externalContentVM.importedPlaces.count)" }
 
     var body: some View {
         NavigationView {
@@ -68,9 +72,14 @@ struct ExternalPlaceSelectionView: View {
                                 place: place,
                                 onBookmarkTapped: {
                                     profile.listsViewModel.ensureListsLoaded()
-                                    isBulkAdd = false
-                                    selectedPlaceForList = place
-                                    showingListSelection = true
+                                    // Saves straight to the city list (banner offers "Change"); picker only if nothing could be saved.
+                                    Task { @MainActor in
+                                        await saveBanner.save([place], profile: profile, userSession: userSession)
+                                        guard saveBanner.message == nil else { return }
+                                        isBulkAdd = false
+                                        selectedPlaceForList = place
+                                        showingListSelection = true
+                                    }
                                 },
                                 onPlaceTapped: {
                                     // First dismiss this sheet, then navigate to place detail
@@ -94,14 +103,29 @@ struct ExternalPlaceSelectionView: View {
                 VStack(spacing: 12) {
                     Divider()
 
+                    if let message = saveBanner.message {
+                        SavedBannerView(message: message, isError: saveBanner.isError) {
+                            // Open the usual picker for exactly the places that were just saved.
+                            isBulkAdd = saveBanner.savedPlaces.count > 1
+                            selectedPlaceForList = saveBanner.savedPlaces.first
+                            saveBanner.dismiss()
+                            showingListSelection = true
+                        }
+                        .padding(.horizontal, 20)
+                    }
+
                     if externalContentVM.importedPlaces.count > 1 {
                         Button {
                             profile.listsViewModel.ensureListsLoaded()
-                            isBulkAdd = true
-                            selectedPlaceForList = externalContentVM.importedPlaces.first
-                            showingListSelection = true
+                            Task { @MainActor in
+                                await saveBanner.save(externalContentVM.importedPlaces, profile: profile, userSession: userSession)
+                                guard saveBanner.message == nil else { return }
+                                isBulkAdd = true
+                                selectedPlaceForList = externalContentVM.importedPlaces.first
+                                showingListSelection = true
+                            }
                         } label: {
-                            Label("Add all \(externalContentVM.importedPlaces.count) to a list", systemImage: "text.badge.plus")
+                            Label(saveAllTitle, systemImage: "text.badge.plus")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
@@ -163,7 +187,7 @@ struct ExternalPlaceSelectionView: View {
                 tripSelectionViewModel = PlaceTripSelectionViewModel()
             }
             if newValue {
-                listSelectionViewModel?.bulkPlaces = isBulkAdd ? externalContentVM.importedPlaces : []
+                listSelectionViewModel?.bulkPlaces = isBulkAdd ? (saveBanner.savedPlaces.count > 1 ? saveBanner.savedPlaces : externalContentVM.importedPlaces) : []
             }
         }
     }

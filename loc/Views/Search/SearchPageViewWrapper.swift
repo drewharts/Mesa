@@ -91,16 +91,10 @@ private struct SearchPageViewContent: View {
                 }
 
                 viewModel.onPlaceSelected = { place in
-                    // Set the place and start map animation FIRST (before any dismiss)
-                    searchCoordinator.prepareMapForPlace(place)
-                    searchCoordinator.presentPlaceDetail()
-
-                    // Then dismiss search (no animation)
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        showSearchPage = false
-                    }
+                    // Start the map flight and queue the detail sheet; MainView presents it once
+                    // the search sheet's dismissal has finished (never two sheets mid-transition).
+                    searchCoordinator.selectPlaceFromSearch(place)
+                    showSearchPage = false
                 }
 
                 viewModel.onUserSelected = { _ in

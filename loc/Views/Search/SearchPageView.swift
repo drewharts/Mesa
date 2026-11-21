@@ -51,7 +51,6 @@ struct SearchPageView: View {
                     onSelectPlace: { place in
                         isSearchFocused = false
                         viewModel.handlePlaceSelection(place)
-                        viewModel.dismiss()
                     },
                     onSelectUser: { user in
                         isSearchFocused = false

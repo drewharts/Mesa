@@ -36,6 +36,13 @@ final class ListPlaceMetaStore: ObservableObject {
     private var queuedKeys = Set<String>()
     private var queue: [PendingLookup] = []
     private var worker: Task<Void, Never>?
+    private var persistTask: Task<Void, Never>?
+
+    /// Most lookups kept waiting. Rows flung past while scrolling fast would otherwise queue hundreds of
+    /// geocodes (minutes of work for rows no longer on screen); the oldest are dropped first.
+    static let maxQueuedLookups = 20
+    /// Longest the persisted neighborhoods may lag behind memory.
+    private static let persistDelayNanoseconds: UInt64 = 3_000_000_000
 
     private init() {
         neighborhoods = (UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String]) ?? [:]
@@ -78,6 +85,7 @@ final class ListPlaceMetaStore: ObservableObject {
               let latitude = place.latitude, let longitude = place.longitude else { return }
         queuedKeys.insert(key)
         queue.append(PendingLookup(key: key, latitude: latitude, longitude: longitude))
+        trimQueue()
         startWorkerIfNeeded()
     }
 
@@ -105,8 +113,16 @@ final class ListPlaceMetaStore: ObservableObject {
         }
     }
 
+    /// Takes the most recently requested lookup: the rows the user is looking at now beat ones already scrolled past.
     private func dequeue() -> PendingLookup? {
-        queue.isEmpty ? nil : queue.removeFirst()
+        queue.popLast()
+    }
+
+    /// Drops the oldest queued lookups beyond the cap, letting those rows re-request if they appear again.
+    private func trimQueue() {
+        while queue.count > Self.maxQueuedLookups {
+            queuedKeys.remove(queue.removeFirst().key)
+        }
     }
 
     private func record(_ outcome: NeighborhoodGeocodingService.Outcome, for key: String) {
@@ -123,7 +139,19 @@ final class ListPlaceMetaStore: ObservableObject {
         }
     }
 
+    /// Schedules one coalesced write of the neighborhoods; rewriting the whole dictionary after every
+    /// lookup blocked the main thread while scrolling.
     private func persist() {
+        guard persistTask == nil else { return }
+        persistTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.persistDelayNanoseconds)
+            self?.writeNeighborhoods()
+        }
+    }
+
+    /// Trims the stored neighborhoods to the cap and saves them to UserDefaults.
+    private func writeNeighborhoods() {
+        persistTask = nil
         if neighborhoods.count > Self.maxPersistedEntries {
             let overflow = neighborhoods.count - Self.maxPersistedEntries
             for key in neighborhoods.keys.prefix(overflow) { neighborhoods.removeValue(forKey: key) }
