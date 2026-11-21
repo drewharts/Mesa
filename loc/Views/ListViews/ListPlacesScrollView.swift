@@ -101,6 +101,18 @@ struct ListPlacesScrollView: View {
         return findTableVM.hasNoTables
     }
 
+    /// The chip row and table-search status as their own row above the places, on an opaque sheet-colored background so tiles never sit under it.
+    private func filterHeader(display: ListTypeFilterViewModel.Display) -> some View {
+        VStack(spacing: 6) {
+            typeFilterRow(display: display)
+            findTableStatusBar
+        }
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .zIndex(1)
+    }
+
     private func isSelected(_ place: LightweightPlace) -> Bool {
         guard let focusedPlaceId else { return false }
         return focusedPlaceId.caseInsensitiveCompare(place.place_id) == .orderedSame
@@ -111,7 +123,9 @@ struct ListPlacesScrollView: View {
         let listDisplay = filterVM.display(for: places, filtersByType: showsTypeFilter)
         let display = findTableVM.scopeIds.map { listDisplay.narrowed(toPlaceIds: $0) } ?? listDisplay
         return ScrollViewReader { proxy in
-            Group {
+            VStack(spacing: 0) {
+                filterHeader(display: display)
+                Group {
                 if places.isEmpty && !isLoadingInitial {
                     Text("No places in this list")
                         .font(.subheadline)
@@ -144,11 +158,8 @@ struct ListPlacesScrollView: View {
                     .transition(.opacity)
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 8) {
-                VStack(spacing: 6) {
-                    typeFilterRow(display: display)
-                    findTableStatusBar
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .sheet(isPresented: $findTableVM.isFormPresented) {
                 FindTableSheet(viewModel: findTableVM, onSearch: { if let listId { findTableVM.search(listId: listId, scope: filterVM.findTableScope(loaded: places)) } })
