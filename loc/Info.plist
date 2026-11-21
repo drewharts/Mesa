@@ -6,6 +6,10 @@
 	<false/>
 	<key>MesaAPIBaseURL</key>
 	<string>$(MESA_API_BASE_URL)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mesa uses the microphone so you can talk about your visit and have it turned into a short review.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Mesa transcribes your voice on your device so it can write your review for you.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Mesa uploads the phone numbers in your contacts to its servers to find friends who already have Mesa accounts. They are used only for this match and are not stored.</string>
 	<key>CFBundleIconName</key>

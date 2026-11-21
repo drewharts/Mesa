@@ -64,6 +64,16 @@ class PlacePostViewModel: ObservableObject {
         !showSentimentSection && wouldReturn == nil
     }
     
+    /// Voice-to-review helper that fills `postText` from a spoken note.
+    lazy var voiceReview = VoiceReviewViewModel(
+        placeName: { [weak self] in self?.place.name ?? "" },
+        getText: { [weak self] in self?.postText ?? "" },
+        setText: { [weak self] in
+            self?.postText = $0
+            self?.showCaptionSection = true
+        }
+    )
+
     // MARK: - Init
     init(place: DetailPlace,
          userId: String,

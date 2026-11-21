@@ -298,6 +298,15 @@ private struct PostOptionalSections: View {
                     }
                 }
                 
+                if viewModel.shouldShowCaptionButton {
+                    AddOptionButton(title: "Just talk", icon: "mic.fill") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.showCaption()
+                        }
+                        viewModel.voiceReview.toggle()
+                    }
+                }
+
                 if viewModel.shouldShowSentimentButton {
                     AddOptionButton(title: "Would Return?", icon: "hand.thumbsup") {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -351,7 +360,7 @@ private struct PostCaptionSection: View {
                             .stroke(Color(.systemGray4), lineWidth: 1)
                     )
 
-                if viewModel.postText.isEmpty {
+                if viewModel.postText.isEmpty && viewModel.voiceReview.phase == .idle {
                     Text("What was your experience like?")
                         .font(.body)
                         .foregroundColor(.gray)
@@ -360,6 +369,8 @@ private struct PostCaptionSection: View {
                         .allowsHitTesting(false)
                 }
             }
+
+            VoiceReviewButton(viewModel: viewModel.voiceReview)
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
@@ -430,7 +441,7 @@ private struct AddOptionButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: "plus.circle.fill")
+                Image(systemName: icon)
                     .font(.system(size: 14))
                 Text(title)
                     .font(.subheadline)
