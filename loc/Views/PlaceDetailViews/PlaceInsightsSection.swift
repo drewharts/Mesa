@@ -20,8 +20,9 @@ struct PlaceInsightsSection: View {
             if showTake, let take = viewModel.take {
                 takeSection(take)
             }
-            // Dish chips only; the TikTok source rows duplicated the Videos section below.
-            if !viewModel.topDishes.isEmpty {
+            if !viewModel.videoSummary.isEmpty {
+                VideoInsightsView(summary: viewModel.videoSummary)
+            } else if !viewModel.topDishes.isEmpty {
                 peopleOrderSection
             }
         }
@@ -190,5 +191,136 @@ private struct MentionRow: View {
         if let author = mention.author, !author.isEmpty { label += " · @\(author.replacingOccurrences(of: "@", with: ""))" }
         if let t = mention.timestampSeconds, t > 0 { label += String(format: " · %d:%02d", t / 60, t % 60) }
         return label
+    }
+}
+
+// MARK: - From videos
+
+/// Structured facts creators stated in imported videos: what to order, tips, and per-video cards.
+/// Renders nothing for empty data, so places without video insights show no empty chrome.
+private struct VideoInsightsView: View {
+    let summary: PlaceVideoInsightsSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("From videos")
+                .font(.headline)
+
+            if !summary.dishChips.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(summary.dishChips, id: \.self) { chip in
+                            Text(chip)
+                                .font(.footnote.weight(.medium))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+
+            if !summary.tips.isEmpty || !summary.prices.isEmpty || !summary.warnings.isEmpty || !summary.occasions.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(summary.tips, id: \.self) { line in
+                        InsightLine(systemImage: "lightbulb", tint: .orange, text: line)
+                    }
+                    ForEach(summary.prices, id: \.self) { line in
+                        InsightLine(systemImage: "dollarsign.circle", tint: .green, text: line)
+                    }
+                    ForEach(summary.warnings, id: \.self) { line in
+                        InsightLine(systemImage: "exclamationmark.triangle", tint: .red, text: line)
+                    }
+                    if !summary.occasions.isEmpty {
+                        InsightLine(systemImage: "person.2", tint: .blue, text: summary.occasions.joined(separator: " · "))
+                    }
+                }
+            }
+
+            if !summary.cards.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(summary.cards) { card in
+                            VideoInsightCard(card: card)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct InsightLine: View {
+    let systemImage: String
+    let tint: Color
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.footnote)
+                .foregroundColor(tint)
+                .frame(width: 18)
+            Text(text)
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct VideoInsightCard: View {
+    let card: PlaceVideoCard
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        Button {
+            if let s = card.sourceURL, let url = URL(string: s) { openURL(url) }
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                AsyncImage(url: URL(string: card.thumbnailURL ?? "")) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 6).fill(Color(.systemGray5))
+                }
+                .frame(width: 44, height: 58)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    if card.isFromYourImport {
+                        Label("From your import", systemImage: "checkmark.circle.fill")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(.accentColor)
+                    }
+                    if let quote = card.quote {
+                        Text("“\(quote)”")
+                            .font(.footnote)
+                            .foregroundColor(.primary)
+                            .lineLimit(4)
+                    }
+                    if !card.highlights.isEmpty {
+                        Text(card.highlights.prefix(3).joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                    Text([card.creator, card.platformLabel].compactMap { $0 }.joined(separator: " · "))
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                }
+                Spacer(minLength: 0)
+            }
+            .multilineTextAlignment(.leading)
+            .padding(10)
+            .frame(width: 280, alignment: .leading)
+            .background(Color(.secondarySystemBackground))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(card.isFromYourImport ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 1.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(card.sourceURL == nil)
     }
 }
