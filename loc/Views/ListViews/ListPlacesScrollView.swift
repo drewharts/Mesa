@@ -157,7 +157,6 @@ struct ListPlacesScrollView: View {
                     }
                     .transition(.opacity)
                 }
-            }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
