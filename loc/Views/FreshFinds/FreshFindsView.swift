@@ -56,7 +56,7 @@ struct FreshFindsView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .task { await viewModel.start() }
+        .task { await viewModel.start(userId: userId) }
         .onChange(of: viewModel.cards.first?.id) { _, newId in
             guard let card = viewModel.cards.first, newId != nil else { return }
             Analytics.track(.discoveryCardViewed, ["place_id": card.item.placeId, "source": card.item.source, "position": viewModel.swipeCount + 1])

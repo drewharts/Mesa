@@ -23,6 +23,8 @@ final class FreshFindsViewModel: ObservableObject {
     @Published private(set) var cards: [FreshFind] = []
     @Published private(set) var isLoading = true
     @Published private(set) var isExhausted = false
+    /// Lowercased ids of every place the user already has (lists, favorites, my places) plus
+    /// anything saved from this deck. Used to hide those places and to make saving idempotent.
     @Published private(set) var savedPlaceIds: Set<String> = []
 
     private let postService = SupabasePostService.shared
@@ -38,8 +40,9 @@ final class FreshFindsViewModel: ObservableObject {
     /// Keep this many loaded cards ahead of the user.
     private let bufferTarget = 4
 
-    func start() async {
+    func start(userId: String?) async {
         guard cards.isEmpty, !isFilling else { return }
+        await loadSavedPlaceIds(userId: userId)
         await fill()
         isLoading = false
         Analytics.track(.discoveryViewed, ["cards_ready": cards.count, "skipped_no_photo": skippedForPhoto])
@@ -59,18 +62,38 @@ final class FreshFindsViewModel: ObservableObject {
         Task { await fill() }
     }
 
+    /// Saves the card's place unless the user already has it. Returns true only when a new save
+    /// happened (so the caller shows the "Saved" toast); already-saved places are a silent no-op.
     func save(_ card: FreshFind, userId: String?, via: String) async -> Bool {
         guard let userId, !userId.isEmpty else { return false }
-        if savedPlaceIds.contains(card.id) { return true }
-        savedPlaceIds.insert(card.id)
+        let key = Self.key(card.item.placeId)
+        guard !savedPlaceIds.contains(key) else { return false }
+        savedPlaceIds.insert(key)
         let result = await FavoritesService.shared.addFavorite(userId: userId, placeId: card.item.placeId)
         switch result {
-        case .success, .duplicate:
+        case .success:
             Analytics.track(.discoverySaved, ["place_id": card.item.placeId, "via": via, "position": swipeCount])
             return true
-        case .error:
-            savedPlaceIds.remove(card.id)
+        case .duplicate:
             return false
+        case .error:
+            savedPlaceIds.remove(key)
+            return false
+        }
+    }
+
+    /// Normalizes a place id for set membership (ids differ in case between tables).
+    private static func key(_ placeId: String) -> String { placeId.lowercased() }
+
+    /// Loads the ids of all places the user already has; on failure the deck still works
+    /// (the save path stays idempotent via the server-side duplicate check).
+    private func loadSavedPlaceIds(userId: String?) async {
+        guard let userId, !userId.isEmpty else { return }
+        do {
+            let places = try await SupabasePlaceService.shared.fetchAllUserPlaces(userId: userId)
+            savedPlaceIds.formUnion(places.map { Self.key($0.id.uuidString) })
+        } catch {
+            print("⚠️ [FreshFinds] could not load saved places: \(error)")
         }
     }
 
@@ -99,7 +122,7 @@ final class FreshFindsViewModel: ObservableObject {
                 for await (i, img) in group { if let img { out[i] = img } }
                 return out
             }
-            for (i, item) in batch.enumerated() {
+            for (i, item) in batch.enumerated() where !savedPlaceIds.contains(Self.key(item.placeId)) {
                 if let img = loaded[i] {
                     cards.append(FreshFind(item: item, image: img))
                 } else {
