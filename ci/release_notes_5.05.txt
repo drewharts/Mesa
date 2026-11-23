@@ -1,0 +1,6 @@
+- Saved places are grouped by city, with category chips and search so you can narrow a list.
+- Find a table shows open Resy reservations for restaurants in your list.
+- Place pages show dishes and tips mentioned in imported videos.
+- You can dictate a review and get a short summary to edit before posting.
+- The explore deck only shows places you have not already saved.
+- Search and category chips no longer cover the first row of photos.
