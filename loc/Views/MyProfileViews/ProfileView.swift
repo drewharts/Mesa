@@ -34,7 +34,11 @@ struct ProfileView: View {
     // Navigation path for followers/following lists
     @State private var navigationPath = NavigationPath()
 
-    init() {
+    /// False when the profile is the root of the Profile tab (nothing to go back to).
+    private let showsBackButton: Bool
+
+    init(showsBackButton: Bool = true) {
+        self.showsBackButton = showsBackButton
         // Configure navigation bar appearance to remove the bottom border
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground() // Use opaque background
@@ -51,7 +55,8 @@ struct ProfileView: View {
                 .modifier(ToolbarModifier(
                     presentationMode: presentationMode,
                     photoImportVM: photoImportVM,
-                    profile: profile
+                    profile: profile,
+                    showsBackButton: showsBackButton
                 ))
                 .navigationDestination(for: FollowListDestination.self) { destination in
                     // Navigate to followers or following list
@@ -217,13 +222,16 @@ struct ToolbarModifier: ViewModifier {
     @Binding var presentationMode: PresentationMode
     @ObservedObject var photoImportVM: PhotoImportViewModel
     @ObservedObject var profile: ProfileViewModel
+    let showsBackButton: Bool
     @EnvironmentObject var serviceContainer: ServiceContainer
 
     func body(content: Content) -> some View {
         content
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    backButton
+                if showsBackButton {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        backButton
+                    }
                 }
             }
             .toolbar {
