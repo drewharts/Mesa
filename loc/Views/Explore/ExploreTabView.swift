@@ -3,8 +3,9 @@
 //  loc
 //
 //  Explore tab: shortcuts (Tonight, Fresh finds), popular lists near the user, browse by city,
-//  and people to follow. Keeps its own NavigationStack; opening a list, a place or another
-//  user's profile hands off to the Map tab through the supplied closures.
+//  and people to follow. Keeps its own NavigationStack: lists, places, cities and profiles are all
+//  pushed onto it (back or edge-swipe returns to the Explore content where it was); while a list is
+//  pushed the map shows its pins.
 //
 
 import SwiftUI
@@ -13,30 +14,28 @@ struct ExploreTabView: View {
     @StateObject private var viewModel = ExploreTabViewModel()
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
+    @StateObject private var navigation = ExploreNavigationViewModel()
 
-    /// Opens a list on the map (second argument: also start "Find a table"); returns false when it could not be shown.
-    let onOpenList: (ExploreList, Bool) async -> Bool
     let onOpenPlaceDetail: (DetailPlace) -> Void
-    let onOpenUser: (String) -> Void
     /// True while the Explore tab is the visible one; a false-to-true change refreshes content.
     var isActive: Bool = true
 
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var path = NavigationPath()
     @State private var activeShortcut: ExploreShortcut?
 
     var body: some View { analyticsBody.analyticsScreen("Explore") }
 
     private var analyticsBody: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: $navigation.path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     featuredSection
                     shortcutsRow
                     popularSection
                     citiesSection
-                    ExplorePeopleSection(viewModel: viewModel.peopleViewModel, onProfileTap: onOpenUser)
+                    ExplorePeopleSection(viewModel: viewModel.peopleViewModel, onProfileTap: { navigation.openProfile($0) })
                     statusFooter
                 }
                 .padding(.top, 4)
@@ -46,13 +45,21 @@ struct ExploreTabView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ExploreDestination.self) { destination in
-                ExploreDestinationView(destination: destination, onListTap: { list in Task { await viewModel.open(list, using: onOpenList) } })
+                ExploreDestinationView(
+                    destination: destination,
+                    onListTap: { navigation.openList($0) },
+                    onPlaceTap: { navigation.openPlace($0) }
+                )
             }
         }
+        .onAppear { navigation.bind(mapCoordinator: mapDisplayCoordinatorVM) }
+        .onChange(of: navigation.path) { _, _ in navigation.syncMapWithPath() }
+        .onReceive(PresentationService.shared.$pendingPlaceNavigation.compactMap { $0 }) { navigation.handleMapPinTap($0) }
         .task(id: userSession.currentUserId) {
             guard let userId = userSession.currentUserId else { return }
             await viewModel.load(userId: userId, location: locationManager.currentLocation)
         }
+        .onChange(of: isActive) { _, active in navigation.setActive(active) }
         .onChange(of: isActive) { _, active in
             guard active, let userId = userSession.currentUserId else { return }
             Task { await viewModel.refreshIfStale(userId: userId, location: locationManager.currentLocation) }
@@ -80,6 +87,11 @@ struct ExploreTabView: View {
         }
     }
 
+    /// Pushes a list (and with the flag, opens its "Find a table" form).
+    private var openList: (ExploreList, Bool) -> Void {
+        { navigation.openList($0, startFindTable: $1) }
+    }
+
     // MARK: - Sections
 
     private var featuredSection: some View {
@@ -89,8 +101,8 @@ struct ExploreTabView: View {
                     config: config,
                     photoURLs: viewModel.photos(forListId: config.listId),
                     isOpening: viewModel.openingListId == config.listId,
-                    onOpen: { Task { await viewModel.openFeatured(config, findTable: false, using: onOpenList) } },
-                    onFindTable: { Task { await viewModel.openFeatured(config, findTable: true, using: onOpenList) } }
+                    onOpen: { Task { await viewModel.openFeatured(config, findTable: false, using: openList) } },
+                    onFindTable: { Task { await viewModel.openFeatured(config, findTable: true, using: openList) } }
                 )
             }
         }
@@ -119,7 +131,7 @@ struct ExploreTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(viewModel.popularLists) { list in
-                            ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { Task { await viewModel.open(list, using: onOpenList) } }
+                            ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { navigation.openList(list) }
                                 .frame(width: 150)
                         }
                     }
@@ -137,7 +149,7 @@ struct ExploreTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
                         ForEach(viewModel.cities) { city in
-                            ExploreCityCard(city: city, photoURL: viewModel.photoURL(for: city)) { path.append(ExploreDestination.city(city)) }
+                            ExploreCityCard(city: city, photoURL: viewModel.photoURL(for: city)) { navigation.openCity(city) }
                         }
                     }
                     .padding(.horizontal, 16)

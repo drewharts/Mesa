@@ -249,6 +249,7 @@ struct MapView: View {
 
     /// Whether a map popup sheet (list, imports, reviews, …) is showing and owns place selection.
     private var isPlacePopupShowing: Bool {
+        mapDisplayCoordinatorVM.tabListPins != nil ||
         mapViewModel.showingListPopup ||
         mapViewModel.showingExternalPlacesPopup ||
         mapViewModel.showingReviewsPopup ||

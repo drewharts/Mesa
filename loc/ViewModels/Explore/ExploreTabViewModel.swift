@@ -233,8 +233,8 @@ final class ExploreTabViewModel: ObservableObject {
 
     // MARK: - Opening Lists
 
-    /// Resolves the featured list (fetching just its row if needed), opens it, and reports a failure instead of doing nothing.
-    func openFeatured(_ config: FeaturedListConfig, findTable: Bool, using open: (ExploreList, Bool) async -> Bool) async {
+    /// Resolves the featured list (fetching just its row if needed) and hands it to `open`; reports a failure instead of doing nothing.
+    func openFeatured(_ config: FeaturedListConfig, findTable: Bool, using open: (ExploreList, Bool) -> Void) async {
         guard openingListId == nil else { return }
         openingListId = config.listId
         defer { openingListId = nil }
@@ -242,21 +242,7 @@ final class ExploreTabViewModel: ObservableObject {
             reportOpenFailure(listId: config.listId, reason: "featured list could not be loaded")
             return
         }
-        await openResolved(list, findTable: findTable, using: open)
-    }
-
-    /// Opens a list from a card, showing a message when it could not be presented.
-    func open(_ list: ExploreList, using open: (ExploreList, Bool) async -> Bool) async {
-        guard openingListId == nil else { return }
-        openingListId = list.id
-        defer { openingListId = nil }
-        await openResolved(list, findTable: false, using: open)
-    }
-
-    /// Hands a resolved list to the presenter and reports a failure when it could not be shown.
-    private func openResolved(_ list: ExploreList, findTable: Bool, using open: (ExploreList, Bool) async -> Bool) async {
-        if await open(list, findTable) { return }
-        reportOpenFailure(listId: list.id, reason: "presenter could not show the list")
+        open(list, findTable)
     }
 
     /// Returns the featured list for a config, fetching its row on demand (twice) if the page load has not finished.

@@ -374,6 +374,34 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
             .onChange(of: mapDisplayCoordinatorViewModel.showExternalFavoritesOnMap) { _, shouldShow in
                 handleExternalFavoritesOnMap(shouldShow)
             }
+            .onChange(of: mapDisplayCoordinatorViewModel.tabListPins) { oldPins, newPins in
+                handleTabListPins(from: oldPins, to: newPins)
+            }
+    }
+
+    /// Filters the map to the list pushed in a tab sheet, or restores all pins once it is popped.
+    private func handleTabListPins(
+        from oldPins: MapDisplayCoordinatorViewModel.TabListPins?,
+        to newPins: MapDisplayCoordinatorViewModel.TabListPins?
+    ) {
+        if let newPins {
+            let photoUrl = newPins.ownerPhotoUrl.flatMap { URL(string: $0) }
+            mapViewModel.showListPinsWithoutSheet(listId: newPins.listId, userId: newPins.ownerId, userPhotoUrl: photoUrl)
+        } else if oldPins != nil {
+            mapViewModel.clearAllFilters()
+        }
+        reloadAnnotationsAfterCameraMoves()
+    }
+
+    /// Reloads the pins for the visible region once the camera request that goes with a filter change has settled.
+    private func reloadAnnotationsAfterCameraMoves() {
+        guard let userId = userSession.currentUserId else { return }
+        Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            if let region = appCoordinator.currentMapRegion {
+                await mapViewModel.onMapCameraSettled(region, userId: userId)
+            }
+        }
     }
 
     /// Handles external reviews on map

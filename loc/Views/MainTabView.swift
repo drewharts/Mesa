@@ -128,9 +128,7 @@ struct MainTabView: View {
 
     private var exploreTab: some View {
         ExploreTabView(
-            onOpenList: { await viewModel.openListOnMap($0, startFindTable: $1) },
             onOpenPlaceDetail: { viewModel.openPlaceOnMap($0) },
-            onOpenUser: { viewModel.openUserProfile(userId: $0) },
             isActive: router.selected == .explore
         )
         .modifier(tabEnvironment)

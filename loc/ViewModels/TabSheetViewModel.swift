@@ -16,22 +16,35 @@ final class TabSheetViewModel: ObservableObject {
 
     @Published private(set) var detent: TabSheetDetent = .large
 
+    /// The height to return to once whatever required the lowered sheet (a pushed list or trip) is gone.
+    private var detentBeforeLowering: TabSheetDetent?
+
     // MARK: - Detent Changes
 
     /// Raises the sheet to its large height (the default whenever a tab opens).
     func presentAtLarge() {
+        detentBeforeLowering = nil
         detent = .large
     }
 
-    /// Lowers the sheet to medium so the map's pins are visible above it.
+    /// Lowers the sheet to medium so the map's pins are visible above it, remembering the height to return to.
     func lowerToMedium() {
+        if detentBeforeLowering == nil { detentBeforeLowering = detent }
         detent = .medium
+    }
+
+    /// Returns the sheet to the height it had before `lowerToMedium` (no-op when it was not lowered).
+    func restoreFromLowered() {
+        guard let previous = detentBeforeLowering else { return }
+        detentBeforeLowering = nil
+        detent = previous
     }
 
     /// Settles on the nearest detent after a drag, projecting the finger's momentum; dragging up grows the sheet.
     /// Returns true when the drag ended low enough that the sheet should be dismissed entirely instead.
     func settle(afterDragTranslation translation: CGFloat, predictedTranslation: CGFloat, containerHeight: CGFloat) -> Bool {
         guard containerHeight > 0 else { return false }
+        detentBeforeLowering = nil
         let projected = detent.height(in: containerHeight) - (translation + (predictedTranslation - translation) * 0.35)
         let medium = TabSheetDetent.medium.height(in: containerHeight)
         let large = TabSheetDetent.large.height(in: containerHeight)

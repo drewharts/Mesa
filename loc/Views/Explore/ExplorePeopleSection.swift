@@ -10,7 +10,7 @@ import SwiftUI
 /// Horizontal row of suggested users with follow buttons.
 struct ExplorePeopleSection: View {
     @ObservedObject var viewModel: ExplorePeopleViewModel
-    let onProfileTap: (String) -> Void
+    let onProfileTap: (ProfileData) -> Void
 
     var body: some View {
         if !viewModel.people.isEmpty {
@@ -23,7 +23,7 @@ struct ExplorePeopleSection: View {
                                 profile: person,
                                 isFollowing: viewModel.followStates[person.id] ?? false,
                                 onFollowTap: { Task { await viewModel.toggleFollow(profileId: person.id) } },
-                                onProfileTap: { onProfileTap(person.id) }
+                                onProfileTap: { onProfileTap(person) }
                             )
                         }
                     }

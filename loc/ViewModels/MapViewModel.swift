@@ -242,6 +242,12 @@ class MapViewModel: ObservableObject {
         PresentationService.shared.present(.externalList(listId: listId))
     }
 
+    /// Filters the map to one list's pins without presenting a sheet (the list is pushed inside a tab sheet).
+    func showListPinsWithoutSheet(listId: String, userId: String, userPhotoUrl: URL?) {
+        clearUserFilters()
+        externalUserViewModel.selectExternalList(listId: listId, userId: userId, userPhotoUrl: userPhotoUrl)
+    }
+
     /// Shows external user's favorites on the map.
     func selectExternalFavorites(userId: String, userPhotoUrl: URL?) {
         clearUserFilters()

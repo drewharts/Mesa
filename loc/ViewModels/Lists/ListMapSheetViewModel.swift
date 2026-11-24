@@ -252,6 +252,13 @@ final class ListMapSheetViewModel: ObservableObject {
         cameraRequest = CameraRequest(target: .region(adjusted))
     }
 
+    /// Frames all of the list's pins again (e.g. after a place page was popped), dropping any focused place.
+    func refitToPlaces(_ places: [LightweightPlace]) {
+        focusedPlaceId = nil
+        hasFitMap = false
+        fitToPlaces(places)
+    }
+
     func fitToPlaces(_ places: [LightweightPlace]) {
         guard !hasFitMap, focusedPlaceId == nil else { return }
         let coordinates = places.compactMap { place -> CLLocationCoordinate2D? in
