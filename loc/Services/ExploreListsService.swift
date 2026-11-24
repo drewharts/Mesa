@@ -15,6 +15,10 @@ final class ExploreListsService {
     static let shared = ExploreListsService()
 
     private let supabase = SupabaseManager.shared
+    private var coverPhotoCache: [String: [String]] = [:]
+    private let coverChunkSize = 5
+    private let coverItemLimit = 400
+    private let coversPerList = 4
     private nonisolated init() {}
 
     private static let columns = "id, name, image, city, created_at, updated_at, user_id, average_location::text, place_list_items(count)"
@@ -33,6 +37,16 @@ final class ExploreListsService {
         let user_id: String
         let average_location: String?
         let place_list_items: [CountRow]?
+    }
+
+    private struct CoverPlaceRow: Decodable {
+        let thumbnail_url: String?
+        let photo_urls: [String]?
+    }
+
+    private struct CoverItemRow: Decodable {
+        let list_id: String
+        let places: CoverPlaceRow?
     }
 
     private struct OwnerRow: Decodable {
@@ -68,6 +82,62 @@ final class ExploreListsService {
             .execute()
             .value
         return rows.compactMap(Self.makeList)
+    }
+
+    // MARK: - Cover Photos
+
+    /// Returns up to four place photo URLs per list (in list order), batching lists into a few
+    /// `place_list_items -> places` queries and caching results for the session. Failed chunks are omitted.
+    func fetchCoverPhotos(listIds: [String]) async -> [String: [String]] {
+        let missing = Array(Set(listIds).filter { coverPhotoCache[$0] == nil })
+        let chunks = stride(from: 0, to: missing.count, by: coverChunkSize).map {
+            Array(missing[$0..<min($0 + coverChunkSize, missing.count)])
+        }
+        await withTaskGroup(of: [String: [String]]?.self) { group in
+            for chunk in chunks {
+                group.addTask { await self.fetchCoverChunk(chunk) }
+            }
+            for await result in group {
+                if let result { coverPhotoCache.merge(result) { _, new in new } }
+            }
+        }
+        return listIds.reduce(into: [:]) { acc, id in
+            if let photos = coverPhotoCache[id] { acc[id] = photos }
+        }
+    }
+
+    /// Fetches list items with their places' photos for one chunk of lists; nil when the query fails.
+    private func fetchCoverChunk(_ ids: [String]) async -> [String: [String]]? {
+        do {
+            let rows: [CoverItemRow] = try await supabase.client
+                .from("place_list_items")
+                .select("list_id, places(thumbnail_url, photo_urls)")
+                .in("list_id", values: ids)
+                .order("list_id", ascending: true)
+                .order("sort_order", ascending: true)
+                .limit(coverItemLimit)
+                .execute()
+                .value
+            return groupPhotos(rows, for: ids)
+        } catch {
+            print("⚠️ [ExploreListsService] Cover photo lookup failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Collects each list's first distinct place photos, keeping server order; lists without photos map to [].
+    private func groupPhotos(_ rows: [CoverItemRow], for ids: [String]) -> [String: [String]] {
+        var result = Dictionary(uniqueKeysWithValues: ids.map { ($0, [String]()) })
+        for row in rows {
+            guard let place = row.places, (result[row.list_id]?.count ?? coversPerList) < coversPerList else { continue }
+            let candidate = [place.thumbnail_url, place.photo_urls?.first]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .first { !$0.isEmpty && URL(string: $0) != nil }
+            if let candidate, result[row.list_id]?.contains(candidate) == false {
+                result[row.list_id]?.append(candidate)
+            }
+        }
+        return result
     }
 
     // MARK: - Owners

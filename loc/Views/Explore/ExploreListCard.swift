@@ -10,6 +10,8 @@ import SwiftUI
 /// Tappable list card with a cover image (or generated placeholder) and caption.
 struct ExploreListCard: View {
     let list: ExploreList
+    /// Place photos used when the list has no cover image of its own.
+    var placePhotoURLs: [String] = []
     let onTap: () -> Void
 
     private let coverCornerRadius: CGFloat = 10
@@ -35,6 +37,8 @@ struct ExploreListCard: View {
                     if let url = coverURL {
                         CachedAsyncImage(url: url, targetSize: CGSize(width: 320, height: 420)) { Color.clear }
                             .aspectRatio(contentMode: .fill)
+                    } else {
+                        ExplorePhotoCollage(photoURLs: placePhotoURLs, cellSize: CGSize(width: 320, height: 420))
                     }
                 }
             }

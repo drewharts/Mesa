@@ -17,6 +17,7 @@ final class ExploreTabViewModel: ObservableObject {
     @Published private(set) var popularLists: [ExploreList] = []
     @Published private(set) var popularTitle = "Popular near you"
     @Published private(set) var cities: [ExploreCity] = []
+    @Published private(set) var coverPhotos: [String: [String]] = [:]
     @Published private(set) var isLoadingLists = false
     @Published private(set) var hasLoadedLists = false
 
@@ -29,11 +30,14 @@ final class ExploreTabViewModel: ObservableObject {
     private let service = ExploreListsService.shared
     private let poolSize = 1000
     private let popularCount = 12
+    private let coverCityLimit = 20
+    private let coverListsPerCity = 2
     private let relocationThresholdMeters: CLLocationDistance = 5_000
     private var pool: [ExploreList] = []
     private var followedIds: Set<String> = []
     private var ownerCache: [String: ExploreListOwner] = [:]
     private var rankedLocation: CLLocation?
+    private var cityCoverListIds: [String: [String]] = [:]
 
     /// True once lists finished loading and nothing public was found.
     var hasNoLists: Bool { hasLoadedLists && popularLists.isEmpty && cities.isEmpty }
@@ -71,6 +75,7 @@ final class ExploreTabViewModel: ObservableObject {
             cities = ExploreListRanker.cities(from: pool)
             followedIds = await service.fetchFollowedUserIds(userId: userId)
             await rankPopular(location: location)
+            await loadCoverPhotos()
         } catch {
             print("❌ [ExploreTabVM] Failed to load public lists: \(error)")
         }
@@ -83,6 +88,7 @@ final class ExploreTabViewModel: ObservableObject {
         guard hasLoadedLists, let location else { return }
         if let rankedLocation, rankedLocation.distance(from: location) < relocationThresholdMeters { return }
         await rankPopular(location: location)
+        await loadCoverPhotos()
     }
 
     /// Picks the top lists near the location (or globally when none are nearby) and attaches owner info.
@@ -110,5 +116,42 @@ final class ExploreTabViewModel: ObservableObject {
             updated.ownerPhotoURL = ownerCache[list.ownerId]?.photoURL
             return updated
         }
+    }
+
+    // MARK: - Cover Photos
+
+    /// Returns the place photos to show on a list's card (empty until loaded or when it has none).
+    func photos(for list: ExploreList) -> [String] {
+        coverPhotos[list.id] ?? []
+    }
+
+    /// Returns a background photo for a city, taken from its top-ranked lists that have photos.
+    func photoURL(for city: ExploreCity) -> String? {
+        cityCoverListIds[city.key]?.lazy.compactMap { self.coverPhotos[$0]?.first }.first
+    }
+
+    /// Fetches place photos for the popular lists first, then for each top city's best lists.
+    private func loadCoverPhotos() async {
+        coverPhotos.merge(await service.fetchCoverPhotos(listIds: popularLists.map(\.id))) { _, new in new }
+        cityCoverListIds = ExploreTabViewModel.topListIds(
+            for: Array(cities.prefix(coverCityLimit)),
+            in: ExploreListRanker.sorted(pool, by: .popular, followedOwnerIds: followedIds),
+            perCity: coverListsPerCity
+        )
+        let ids = cityCoverListIds.values.flatMap { $0 }
+        coverPhotos.merge(await service.fetchCoverPhotos(listIds: ids)) { _, new in new }
+    }
+
+    /// Maps each city key to its first `perCity` lists from a popularity-sorted list array.
+    private static func topListIds(for cities: [ExploreCity], in sortedLists: [ExploreList], perCity: Int) -> [String: [String]] {
+        let wanted = Set(cities.map(\.key))
+        var result: [String: [String]] = [:]
+        for list in sortedLists {
+            guard let city = list.city?.trimmingCharacters(in: .whitespacesAndNewlines), !city.isEmpty else { continue }
+            let key = CityListMatcher.cityKey(city)
+            guard wanted.contains(key), (result[key]?.count ?? 0) < perCity else { continue }
+            result[key, default: []].append(list.id)
+        }
+        return result
     }
 }

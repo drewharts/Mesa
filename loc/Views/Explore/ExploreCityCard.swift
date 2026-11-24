@@ -7,16 +7,21 @@
 
 import SwiftUI
 
-/// Tappable city tile on a generated gradient.
+/// Tappable city tile: place photo under a dark overlay, on a generated gradient fallback.
 struct ExploreCityCard: View {
     let city: ExploreCity
+    /// Photo of a top place in the city; the generated gradient shows until it loads (or without one).
+    var photoURL: String? = nil
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .bottomLeading) {
                 ListCoverPlaceholder(seed: city.key, showsGlyph: false)
-                LinearGradient(colors: [.clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
+                if let photoURL {
+                    ExplorePhotoCollage(photoURLs: [photoURL], cellSize: CGSize(width: 300, height: 192))
+                }
+                LinearGradient(colors: [.black.opacity(0.05), .black.opacity(photoURL == nil ? 0.45 : 0.7)], startPoint: .top, endPoint: .bottom)
                 label
             }
             .frame(width: 150, height: 96)

@@ -89,7 +89,7 @@ struct ExploreTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(viewModel.popularLists) { list in
-                            ExploreListCard(list: list) { path.append(ExploreDestination.list(list)) }
+                            ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { path.append(ExploreDestination.list(list)) }
                                 .frame(width: 150)
                         }
                     }
@@ -107,7 +107,7 @@ struct ExploreTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
                         ForEach(viewModel.cities) { city in
-                            ExploreCityCard(city: city) { path.append(ExploreDestination.city(city)) }
+                            ExploreCityCard(city: city, photoURL: viewModel.photoURL(for: city)) { path.append(ExploreDestination.city(city)) }
                         }
                     }
                     .padding(.horizontal, 16)
