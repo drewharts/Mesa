@@ -48,13 +48,6 @@ struct TripsListView: View {
                         Button("Close") { dismiss() }
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        viewModel.showCreateTrip = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
             }
             .navigationDestination(for: String.self) { tripId in
                 TripDetailView(tripId: tripId)
@@ -136,13 +129,7 @@ struct TripsListView: View {
     private var tripsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if viewModel.currentTrips.isEmpty {
-                    Text("No upcoming trips")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                }
+                NewTripTileView { viewModel.showCreateTrip = true }
                 ForEach(viewModel.currentTrips) { trip in
                     tripLink(trip)
                 }

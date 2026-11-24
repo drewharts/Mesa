@@ -3,8 +3,8 @@
 //  loc
 //
 //  Explore tab: shortcuts (Tonight, Fresh finds), popular lists near the user, browse by city,
-//  and people to follow. Keeps its own NavigationStack; opening a place or another user's
-//  profile hands off to the Map tab through the supplied closures.
+//  and people to follow. Keeps its own NavigationStack; opening a list, a place or another
+//  user's profile hands off to the Map tab through the supplied closures.
 //
 
 import SwiftUI
@@ -14,7 +14,7 @@ struct ExploreTabView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
 
-    let onOpenPlace: (String) -> Void
+    let onOpenList: (ExploreList) -> Void
     let onOpenPlaceDetail: (DetailPlace) -> Void
     let onOpenUser: (String) -> Void
 
@@ -38,12 +38,7 @@ struct ExploreTabView: View {
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: ExploreDestination.self) { destination in
-                ExploreDestinationView(
-                    destination: destination,
-                    onListTap: { path.append(ExploreDestination.list($0)) },
-                    onOpenPlace: onOpenPlace,
-                    onOpenUser: onOpenUser
-                )
+                ExploreDestinationView(destination: destination, onListTap: onOpenList)
             }
             .refreshable {
                 guard let userId = userSession.currentUserId else { return }
@@ -89,7 +84,7 @@ struct ExploreTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(viewModel.popularLists) { list in
-                            ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { path.append(ExploreDestination.list(list)) }
+                            ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { onOpenList(list) }
                                 .frame(width: 150)
                         }
                     }

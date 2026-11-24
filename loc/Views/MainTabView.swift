@@ -11,6 +11,7 @@ import SwiftUI
 struct MainTabView: View {
     @ObservedObject private var router = AppTabRouter.shared
     @StateObject private var viewModel: MainTabViewModel
+    @StateObject private var profileIconViewModel: ProfileTabIconViewModel
 
     let selectedPlaceVM: SelectedPlaceViewModel
     let profileViewModel: ProfileViewModel
@@ -53,9 +54,11 @@ struct MainTabView: View {
         self.deepLinkManager = deepLinkManager
         self.dataManager = dataManager
         self.serviceContainer = serviceContainer
+        self._profileIconViewModel = StateObject(wrappedValue: ProfileTabIconViewModel(profileViewModel: profileViewModel))
         self._viewModel = StateObject(wrappedValue: MainTabViewModel(
             profileViewModel: profileViewModel,
             userProfileNavigationViewModel: userProfileNavigationViewModel,
+            mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
             deepLinkViewModel: deepLinkViewModel,
             selectedPlaceViewModel: selectedPlaceVM,
             userSession: userSession
@@ -77,13 +80,24 @@ struct MainTabView: View {
                 .tag(AppTab.trips)
 
             profileTab
-                .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                .tabItem { profileTabLabel }
                 .tag(AppTab.profile)
         }
         .tint(.mesaAccent)
     }
 
     // MARK: - Tabs
+
+    /// The user's circular avatar (ringed when selected), or the person icon until a photo is available.
+    @ViewBuilder
+    private var profileTabLabel: some View {
+        let icon = router.selected == .profile ? profileIconViewModel.selectedIcon : profileIconViewModel.normalIcon
+        if let icon {
+            Label { Text("Profile") } icon: { Image(uiImage: icon).renderingMode(.original) }
+        } else {
+            Label("Profile", systemImage: "person.crop.circle")
+        }
+    }
 
     private var mapTab: some View {
         MainView(
@@ -104,7 +118,7 @@ struct MainTabView: View {
 
     private var exploreTab: some View {
         ExploreTabView(
-            onOpenPlace: { viewModel.openPlaceOnMap(placeId: $0) },
+            onOpenList: { viewModel.openListOnMap($0) },
             onOpenPlaceDetail: { viewModel.openPlaceOnMap($0) },
             onOpenUser: { viewModel.openUserProfile(userId: $0) }
         )

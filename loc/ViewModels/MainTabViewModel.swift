@@ -18,6 +18,7 @@ final class MainTabViewModel: ObservableObject {
     let router = AppTabRouter.shared
     private let profileViewModel: ProfileViewModel
     private let userProfileNavigationViewModel: UserProfileNavigationViewModel
+    private let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     private let deepLinkViewModel: DeepLinkViewModel
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let userSession: UserSession
@@ -29,10 +30,12 @@ final class MainTabViewModel: ObservableObject {
     init(
         profileViewModel: ProfileViewModel,
         userProfileNavigationViewModel: UserProfileNavigationViewModel,
+        mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel,
         deepLinkViewModel: DeepLinkViewModel,
         selectedPlaceViewModel: SelectedPlaceViewModel,
         userSession: UserSession
     ) {
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
         self.profileViewModel = profileViewModel
         self.userProfileNavigationViewModel = userProfileNavigationViewModel
         self.deepLinkViewModel = deepLinkViewModel
@@ -57,6 +60,40 @@ final class MainTabViewModel: ObservableObject {
         router.select(.map) { [selectedPlaceViewModel] in
             selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             PresentationService.shared.transition(to: .placeDetail)
+        }
+    }
+
+    /// Switches to the Map tab and opens the list in the map's list sheet with its pins shown and the map framed to them.
+    func openListOnMap(_ list: ExploreList) {
+        if list.ownerId.caseInsensitiveCompare(userSession.currentUserId ?? "") == .orderedSame {
+            openOwnListOnMap(listId: list.id)
+        } else {
+            Task { await openExternalListOnMap(list) }
+        }
+    }
+
+    /// Presents one of the user's own lists in the map sheet, filtering and framing the map to it.
+    private func openOwnListOnMap(listId: String) {
+        router.select(.map) { [profileViewModel] in
+            profileViewModel.selectedListIdForMap = listId
+            PresentationService.shared.present(.list(listId: listId))
+        }
+    }
+
+    /// Loads another user's list, then shows it in the map's external list sheet.
+    private func openExternalListOnMap(_ list: ExploreList) async {
+        let fetched = try? await ServiceContainer.shared.userService.fetchPlaceListById(listId: list.id)
+        guard let lightweightList = fetched else { return }
+        router.select(.map) { [mapDisplayCoordinatorViewModel] in
+            mapDisplayCoordinatorViewModel.triggerExternalListOnMap(
+                listId: lightweightList.list_id,
+                userId: list.ownerId,
+                userName: list.ownerName,
+                userPhotoUrl: list.ownerPhotoURL,
+                lists: [lightweightList],
+                listPlaces: [:],
+                dismissProfile: {}
+            )
         }
     }
 
