@@ -35,6 +35,8 @@ final class ExploreTabViewModel: ObservableObject {
     private let coverCityLimit = 20
     private let coverListsPerCity = 2
     private let relocationThresholdMeters: CLLocationDistance = 5_000
+    private let staleAfter: TimeInterval = 60
+    private var lastRefreshedAt = Date()
     private var pool: [ExploreList] = []
     private var followedIds: Set<String> = []
     private var ownerCache: [String: ExploreListOwner] = [:]
@@ -56,9 +58,16 @@ final class ExploreTabViewModel: ObservableObject {
         }
     }
 
-    /// Reloads everything, bypassing the "already loaded" guards (pull to refresh).
+    /// Reloads content when it is older than the staleness window (tab re-shown or app foregrounded).
+    func refreshIfStale(userId: String, location: CLLocation?) async {
+        guard Date().timeIntervalSince(lastRefreshedAt) > staleAfter else { return }
+        await refresh(userId: userId, location: location)
+    }
+
+    /// Reloads everything, bypassing the "already loaded" guards.
     func refresh(userId: String, location: CLLocation?) async {
         hasLoadedLists = false
+        lastRefreshedAt = Date()
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadLists(userId: userId, location: location) }
             group.addTask { await self.peopleViewModel.load(userId: userId, force: true) }

@@ -18,6 +18,10 @@ struct ExploreTabView: View {
     let onOpenListFindTable: (ExploreList) -> Void
     let onOpenPlaceDetail: (DetailPlace) -> Void
     let onOpenUser: (String) -> Void
+    /// True while the Explore tab is the visible one; a false-to-true change refreshes content.
+    var isActive: Bool = true
+
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var path = NavigationPath()
     @State private var activeShortcut: ExploreShortcut?
@@ -45,14 +49,18 @@ struct ExploreTabView: View {
             .navigationDestination(for: ExploreDestination.self) { destination in
                 ExploreDestinationView(destination: destination, onListTap: onOpenList)
             }
-            .refreshable {
-                guard let userId = userSession.currentUserId else { return }
-                await viewModel.refresh(userId: userId, location: locationManager.currentLocation)
-            }
         }
         .task(id: userSession.currentUserId) {
             guard let userId = userSession.currentUserId else { return }
             await viewModel.load(userId: userId, location: locationManager.currentLocation)
+        }
+        .onChange(of: isActive) { _, active in
+            guard active, let userId = userSession.currentUserId else { return }
+            Task { await viewModel.refreshIfStale(userId: userId, location: locationManager.currentLocation) }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, isActive, let userId = userSession.currentUserId else { return }
+            Task { await viewModel.refreshIfStale(userId: userId, location: locationManager.currentLocation) }
         }
         .onChange(of: locationManager.currentLocation) { _, location in
             Task { await viewModel.updateLocation(location) }

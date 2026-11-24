@@ -224,6 +224,7 @@ struct MainView: View {
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
                     .presentationDetents([.fraction(0.75), .large])
+                    .presentationContentInteraction(.resizes)
                     .presentationDragIndicator(.visible)
 
             case .importJob(let jobId):
@@ -232,6 +233,7 @@ struct MainView: View {
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
                     .presentationDetents([.fraction(0.75), .large])
+                    .presentationContentInteraction(.resizes)
                     .presentationDragIndicator(.visible)
 
             // Map Popups (User's Own Data)
@@ -312,6 +314,7 @@ struct MainView: View {
             .environmentObject(serviceContainer)
             .environmentObject(dataManager)
             .presentationDetents([.height(searchCoordinator.minSheetHeight), .height(800)])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.clear)
             .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
@@ -478,6 +481,7 @@ struct MainView: View {
             .environmentObject(mapDisplayCoordinatorViewModel)
             .environmentObject(dataManager)
             .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
             .presentationBackgroundInteraction(.enabled(upThrough: .large))
     }
@@ -507,6 +511,7 @@ struct MainView: View {
         .environmentObject(locationManager)
         .environmentObject(dataManager)
         .presentationDetents([.medium, .large])
+        .presentationContentInteraction(.resizes)
         .presentationDragIndicator(.visible)
     }
 
@@ -520,6 +525,7 @@ struct MainView: View {
             .environmentObject(locationManager)
             .environmentObject(detailPlaceViewModel)
             .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
             .presentationBackgroundInteraction(.enabled(upThrough: .large))
     }
@@ -535,6 +541,7 @@ struct MainView: View {
             .environmentObject(locationManager)
             .environmentObject(mapDisplayCoordinatorViewModel)
             .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
             .presentationBackgroundInteraction(.enabled(upThrough: .large))
     }
@@ -553,6 +560,7 @@ struct MainView: View {
             .environmentObject(serviceContainer)
             .environmentObject(dataManager)
             .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
     }
 
@@ -587,6 +595,7 @@ struct MainView: View {
             .environmentObject(serviceContainer)
             .environmentObject(dataManager)
             .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
     }
 
@@ -810,6 +819,7 @@ extension View {
     func applyMapPopupPresentation() -> some View {
         self
             .presentationDetents([.height(300), .height(800)])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.clear)
             .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))

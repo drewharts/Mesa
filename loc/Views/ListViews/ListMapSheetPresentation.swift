@@ -20,6 +20,7 @@ struct ListMapSheetPresentationModifier: ViewModifier {
                 )
             )
             .presentationDragIndicator(.visible)
+            .presentationContentInteraction(.resizes)
             .presentationBackground(Color(.systemBackground))
             .presentationCornerRadius(24)
             .presentationBackgroundInteraction(.enabled(upThrough: ListSheetDetent.half.presentationDetent))

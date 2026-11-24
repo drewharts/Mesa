@@ -20,6 +20,7 @@ struct ExploreShortcutSheetView: View {
         case .tonight:
             TonightSheet(userSession: userSession, locationManager: locationManager, onOpenPlace: onOpenPlace)
                 .presentationDetents([.medium, .large])
+                .presentationContentInteraction(.resizes)
                 .presentationDragIndicator(.visible)
         case .freshFinds:
             FreshFindsView(userId: userSession.currentUserId, onShowOnMap: onOpenPlace)

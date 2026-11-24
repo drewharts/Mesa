@@ -247,6 +247,7 @@ struct PlaceDetailView: View {
             )
             .environmentObject(selectedPlaceVM)
             .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
         } else {
             Text("No place selected")

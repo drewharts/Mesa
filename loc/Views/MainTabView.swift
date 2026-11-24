@@ -130,13 +130,14 @@ struct MainTabView: View {
             onOpenList: { viewModel.openListOnMap($0) },
             onOpenListFindTable: { viewModel.openListOnMap($0, startFindTable: true) },
             onOpenPlaceDetail: { viewModel.openPlaceOnMap($0) },
-            onOpenUser: { viewModel.openUserProfile(userId: $0) }
+            onOpenUser: { viewModel.openUserProfile(userId: $0) },
+            isActive: router.selected == .explore
         )
         .modifier(tabEnvironment)
     }
 
     private var tripsTab: some View {
-        TripsListView(showsCloseButton: false)
+        TripsListView(showsCloseButton: false, isActive: router.selected == .trips)
             .modifier(tabEnvironment)
     }
 
