@@ -134,6 +134,13 @@ final class ListMapSheetViewModel: ObservableObject {
         findTableRequest = nil
     }
 
+    /// Drops the pending request for `listId` because the list could not be shown.
+    func cancelFindTableRequest(for listId: String) {
+        guard findTableRequest?.listId == listId.lowercased() else { return }
+        FindTableLog.log("request for \(listId.lowercased()) cancelled")
+        findTableRequest = nil
+    }
+
     // MARK: - Chip Scope
 
     /// Publishes the places the selected chip keeps (nil restores all). Unchanged sets are ignored so the

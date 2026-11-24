@@ -55,13 +55,18 @@ final class AppTabRouter: ObservableObject {
     /// Collapses the current tab sheet so the map is fully visible, remembers the tab to return to, and runs `action`
     /// (typically presenting a list or place sheet). Closing that content brings the tab sheet back.
     func handOffToMap(then action: @escaping @MainActor () -> Void) {
-        if selected != .map { returnTab = selected }
-        selected = .map
         Task { @MainActor in
-            // Let the tab sheet start sliding away so the map sheet is not presented mid-transition.
-            try? await Task.sleep(nanoseconds: 120_000_000)
+            await handOffToMap()
             action()
         }
+    }
+
+    /// Collapses the current tab sheet, remembers the tab to return to, and returns once the sheet has started sliding away.
+    func handOffToMap() async {
+        if selected != .map { returnTab = selected }
+        selected = .map
+        // Let the tab sheet start sliding away so the map sheet is not presented mid-transition.
+        try? await Task.sleep(nanoseconds: 120_000_000)
     }
 
     /// Brings back the tab sheet the user came from, if the map is still showing and nothing else moved them.

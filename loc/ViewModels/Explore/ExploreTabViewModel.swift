@@ -8,6 +8,7 @@
 
 import Foundation
 import CoreLocation
+import UIKit
 
 @MainActor
 final class ExploreTabViewModel: ObservableObject {
@@ -21,6 +22,10 @@ final class ExploreTabViewModel: ObservableObject {
     /// Featured lists that finished loading, keyed by lowercased list id.
     @Published private(set) var featuredLists: [String: ExploreList] = [:]
     @Published private(set) var isLoadingLists = false
+    /// Id of the list currently being opened (drives the card's progress state and blocks repeat taps).
+    @Published private(set) var openingListId: String?
+    /// Short message shown over the sheet when a list could not be opened.
+    @Published private(set) var toastMessage: String?
     @Published private(set) var hasLoadedLists = false
 
     // MARK: - Child ViewModels
@@ -37,6 +42,7 @@ final class ExploreTabViewModel: ObservableObject {
     private let relocationThresholdMeters: CLLocationDistance = 5_000
     private let staleAfter: TimeInterval = 60
     private var lastRefreshedAt = Date()
+    private var toastTask: Task<Void, Never>?
     private var pool: [ExploreList] = []
     private var followedIds: Set<String> = []
     private var ownerCache: [String: ExploreListOwner] = [:]
@@ -209,29 +215,70 @@ final class ExploreTabViewModel: ObservableObject {
 
     /// Loads the featured lists, their owners and covers; independent of the rest of the page.
     private func loadFeatured() async {
-        let ids = FeaturedLists.all.map(\.listId)
-        async let coversTask: Void = loadCovers(for: ids, frame: ExploreCoverMetrics.hero)
-        let lists = await service.fetchLists(ids: ids)
+        async let coversTask: Void = loadCovers(for: FeaturedLists.all.map(\.listId), frame: ExploreCoverMetrics.hero)
+        await loadFeaturedRows()
+        await coversTask
+    }
+
+    /// Fetches the featured list rows and their owners (no covers), so opening one never waits on photo downloads.
+    private func loadFeaturedRows() async {
+        let lists = await service.fetchLists(ids: FeaturedLists.all.map(\.listId), includeEmpty: true)
         let owners = await service.fetchOwners(ids: Array(Set(lists.map(\.ownerId))))
         for var list in lists {
             list.ownerName = owners[list.ownerId]?.name
             list.ownerPhotoURL = owners[list.ownerId]?.photoURL
             featuredLists[list.id.lowercased()] = list
         }
-        await coversTask
     }
 
-    /// Resolves the featured list (fetching it if needed) and hands it to `open`; does nothing if it can't be loaded.
-    func openFeatured(_ config: FeaturedListConfig, using open: (ExploreList) -> Void) async {
-        guard let list = await featuredList(for: config) else { return }
-        open(list)
+    // MARK: - Opening Lists
+
+    /// Resolves the featured list (fetching just its row if needed), opens it, and reports a failure instead of doing nothing.
+    func openFeatured(_ config: FeaturedListConfig, findTable: Bool, using open: (ExploreList, Bool) async -> Bool) async {
+        guard openingListId == nil else { return }
+        openingListId = config.listId
+        defer { openingListId = nil }
+        guard let list = await featuredList(for: config) else {
+            reportOpenFailure(listId: config.listId, reason: "featured list could not be loaded")
+            return
+        }
+        await openResolved(list, findTable: findTable, using: open)
     }
 
-    /// Returns the featured list for a config, fetching it on demand if the page load has not finished.
+    /// Opens a list from a card, showing a message when it could not be presented.
+    func open(_ list: ExploreList, using open: (ExploreList, Bool) async -> Bool) async {
+        guard openingListId == nil else { return }
+        openingListId = list.id
+        defer { openingListId = nil }
+        await openResolved(list, findTable: false, using: open)
+    }
+
+    /// Hands a resolved list to the presenter and reports a failure when it could not be shown.
+    private func openResolved(_ list: ExploreList, findTable: Bool, using open: (ExploreList, Bool) async -> Bool) async {
+        if await open(list, findTable) { return }
+        reportOpenFailure(listId: list.id, reason: "presenter could not show the list")
+    }
+
+    /// Returns the featured list for a config, fetching its row on demand (twice) if the page load has not finished.
     func featuredList(for config: FeaturedListConfig) async -> ExploreList? {
-        if let loaded = featuredLists[config.listId] { return loaded }
-        await loadFeatured()
+        for _ in 1...2 {
+            if let loaded = featuredLists[config.listId] { return loaded }
+            await loadFeaturedRows()
+        }
         return featuredLists[config.listId]
+    }
+
+    /// Gives error haptic feedback and shows a short message for a few seconds.
+    private func reportOpenFailure(listId: String, reason: String) {
+        FindTableLog.log("open failed for list \(listId): \(reason)")
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        toastMessage = "Couldn't open this list. Check your connection and try again."
+        toastTask?.cancel()
+        toastTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            guard !Task.isCancelled else { return }
+            self?.toastMessage = nil
+        }
     }
 
     /// Maps each city key to its first `perCity` lists from a popularity-sorted list array.

@@ -92,8 +92,8 @@ final class ExploreListsService {
         return rows.compactMap(Self.makeList)
     }
 
-    /// Fetches specific lists by id (used for featured lists); missing or empty lists are omitted.
-    func fetchLists(ids: [String]) async -> [ExploreList] {
+    /// Fetches specific lists by id (used for featured lists); missing lists are omitted, and so are empty ones unless `includeEmpty`.
+    func fetchLists(ids: [String], includeEmpty: Bool = false) async -> [ExploreList] {
         guard !ids.isEmpty else { return [] }
         do {
             let rows: [ListRow] = try await supabase.client
@@ -102,7 +102,7 @@ final class ExploreListsService {
                 .in("id", values: ids)
                 .execute()
                 .value
-            return rows.compactMap(Self.makeList)
+            return rows.compactMap { Self.makeList($0, requireItems: !includeEmpty) }
         } catch {
             print("⚠️ [ExploreListsService] Featured lists lookup failed: \(error)")
             return []
@@ -255,9 +255,9 @@ final class ExploreListsService {
     // MARK: - Mapping
 
     /// Maps a database row to an ExploreList, dropping empty lists.
-    private static func makeList(_ row: ListRow) -> ExploreList? {
+    private static func makeList(_ row: ListRow, requireItems: Bool = true) -> ExploreList? {
         let placeCount = row.place_list_items?.first?.count ?? 0
-        guard placeCount > 0 else { return nil }
+        guard placeCount > 0 || !requireItems else { return nil }
         let coordinate = LightweightPlaceList(
             list_id: row.id, name: row.name, is_public: true, image: nil,
             created_at: nil, updated_at: nil, distance_meters: nil,

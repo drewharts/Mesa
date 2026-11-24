@@ -46,8 +46,8 @@ struct TripsListView: View {
                     tripsList
                 }
             }
-            .navigationTitle("Trips")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle(showsCloseButton ? "Trips" : "")
+            .navigationBarTitleDisplayMode(showsCloseButton ? .large : .inline)
             .toolbar {
                 if showsCloseButton {
                     ToolbarItem(placement: .topBarLeading) {

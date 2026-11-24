@@ -14,8 +14,8 @@ struct ExploreTabView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
 
-    let onOpenList: (ExploreList) -> Void
-    let onOpenListFindTable: (ExploreList) -> Void
+    /// Opens a list on the map (second argument: also start "Find a table"); returns false when it could not be shown.
+    let onOpenList: (ExploreList, Bool) async -> Bool
     let onOpenPlaceDetail: (DetailPlace) -> Void
     let onOpenUser: (String) -> Void
     /// True while the Explore tab is the visible one; a false-to-true change refreshes content.
@@ -32,7 +32,6 @@ struct ExploreTabView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    compactTitle
                     featuredSection
                     shortcutsRow
                     popularSection
@@ -40,14 +39,14 @@ struct ExploreTabView: View {
                     ExplorePeopleSection(viewModel: viewModel.peopleViewModel, onProfileTap: onOpenUser)
                     statusFooter
                 }
-                .padding(.top, 2)
+                .padding(.top, 4)
                 .padding(.bottom, 12)
             }
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ExploreDestination.self) { destination in
-                ExploreDestinationView(destination: destination, onListTap: onOpenList)
+                ExploreDestinationView(destination: destination, onListTap: { list in Task { await viewModel.open(list, using: onOpenList) } })
             }
         }
         .task(id: userSession.currentUserId) {
@@ -65,6 +64,14 @@ struct ExploreTabView: View {
         .onChange(of: locationManager.currentLocation) { _, location in
             Task { await viewModel.updateLocation(location) }
         }
+        .overlay(alignment: .bottom) {
+            if let message = viewModel.toastMessage {
+                InlineToast(message: message)
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: viewModel.toastMessage)
         .sheet(item: $activeShortcut) { shortcut in
             ExploreShortcutSheetView(shortcut: shortcut) { place in
                 activeShortcut = nil
@@ -75,21 +82,15 @@ struct ExploreTabView: View {
 
     // MARK: - Sections
 
-    /// Compact title shown right under the sheet's grabber instead of a large navigation title.
-    private var compactTitle: some View {
-        Text("Explore")
-            .font(.title2.weight(.bold))
-            .padding(.horizontal, 16)
-    }
-
     private var featuredSection: some View {
         VStack(spacing: 16) {
             ForEach(FeaturedLists.all) { config in
                 ExploreFeaturedCard(
                     config: config,
                     photoURLs: viewModel.photos(forListId: config.listId),
-                    onOpen: { Task { await viewModel.openFeatured(config, using: onOpenList) } },
-                    onFindTable: { Task { await viewModel.openFeatured(config, using: onOpenListFindTable) } }
+                    isOpening: viewModel.openingListId == config.listId,
+                    onOpen: { Task { await viewModel.openFeatured(config, findTable: false, using: onOpenList) } },
+                    onFindTable: { Task { await viewModel.openFeatured(config, findTable: true, using: onOpenList) } }
                 )
             }
         }
@@ -118,7 +119,7 @@ struct ExploreTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(viewModel.popularLists) { list in
-                            ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { onOpenList(list) }
+                            ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { Task { await viewModel.open(list, using: onOpenList) } }
                                 .frame(width: 150)
                         }
                     }

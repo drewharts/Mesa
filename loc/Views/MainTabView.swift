@@ -74,6 +74,7 @@ struct MainTabView: View {
                 TabSheetContainer(
                     viewModel: viewModel.tabSheet,
                     isPresented: router.selected.isSheet,
+                    title: router.selected == .trips ? "Trips" : "Explore",
                     onDismiss: { router.select(.map) }
                 ) {
                     tabSheetContent
@@ -127,8 +128,7 @@ struct MainTabView: View {
 
     private var exploreTab: some View {
         ExploreTabView(
-            onOpenList: { viewModel.openListOnMap($0) },
-            onOpenListFindTable: { viewModel.openListOnMap($0, startFindTable: true) },
+            onOpenList: { await viewModel.openListOnMap($0, startFindTable: $1) },
             onOpenPlaceDetail: { viewModel.openPlaceOnMap($0) },
             onOpenUser: { viewModel.openUserProfile(userId: $0) },
             isActive: router.selected == .explore

@@ -4,8 +4,9 @@
 //
 //  DUMB Component: a bottom sheet laid over the map (Google/Apple Maps style) that hosts a tab's
 //  content. It rests at the medium or large detent chosen by `TabSheetViewModel`, can be dragged
-//  between them by its grabber (or all the way down to dismiss it), and slides out of view when not presented. It is not a system
-//  sheet, so the tab bar stays visible and the map's own sheets are unaffected.
+//  between them by dragging its fixed header strip (grabber + compact title; or all the way down to dismiss it), and slides
+//  out of view when not presented. The strip never scrolls, so dragging it can't be mistaken for scrolling the content. It is
+//  not a system sheet, so the tab bar stays visible and the map's own sheets are unaffected.
 //
 
 import SwiftUI
@@ -13,6 +14,8 @@ import SwiftUI
 struct TabSheetContainer<Content: View>: View {
     @ObservedObject var viewModel: TabSheetViewModel
     let isPresented: Bool
+    /// Compact title shown in the fixed header strip under the grabber.
+    let title: String
     /// Called when the user drags the sheet down far enough to hide it completely.
     let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
@@ -21,6 +24,7 @@ struct TabSheetContainer<Content: View>: View {
 
     private let cornerRadius: CGFloat = 24
     private let minimumHeight: CGFloat = 60
+    private let headerHeight: CGFloat = 60
 
     var body: some View {
         GeometryReader { proxy in
@@ -36,7 +40,7 @@ struct TabSheetContainer<Content: View>: View {
         let resting = viewModel.detent.height(in: containerHeight)
         let height = min(max(resting - dragTranslation, minimumHeight), containerHeight)
         return VStack(spacing: 0) {
-            grabber(containerHeight: containerHeight)
+            header(containerHeight: containerHeight)
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -53,14 +57,23 @@ struct TabSheetContainer<Content: View>: View {
         .accessibilityHidden(!isPresented)
     }
 
-    private func grabber(containerHeight: CGFloat) -> some View {
-        Capsule()
-            .fill(Color(.systemGray3))
-            .frame(width: 36, height: 5)
-            .frame(maxWidth: .infinity)
-            .frame(height: 24)
-            .contentShape(Rectangle())
-            .gesture(dragGesture(containerHeight: containerHeight))
+    private func header(containerHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Capsule()
+                .fill(Color(.systemGray3))
+                .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+            Text(title)
+                .font(.title2.weight(.bold))
+                .padding(.horizontal, 16)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0)
+        }
+        .frame(height: headerHeight)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .gesture(dragGesture(containerHeight: containerHeight))
     }
 
     private func dragGesture(containerHeight: CGFloat) -> some Gesture {

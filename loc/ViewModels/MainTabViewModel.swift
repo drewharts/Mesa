@@ -73,47 +73,64 @@ final class MainTabViewModel: ObservableObject {
         }
     }
 
-    /// Collapses the tab sheet and opens the list in the map's list sheet with its pins shown and the map framed to them;
-    /// with `startFindTable` the sheet also opens its "Find a table" form right away. Dismissing the list leaves the map showing.
-    func openListOnMap(_ list: ExploreList, startFindTable: Bool = false) {
+    /// Opens the list in the map's list sheet with its pins shown and the map framed to them; with `startFindTable` the
+    /// sheet also opens its "Find a table" form. Returns false (leaving the tab sheet where it was) when the list could not be shown.
+    func openListOnMap(_ list: ExploreList, startFindTable: Bool = false) async -> Bool {
         let isOwn = list.ownerId.caseInsensitiveCompare(userSession.currentUserId ?? "") == .orderedSame
         FindTableLog.log("openListOnMap list=\(list.id) own=\(isOwn) findTable=\(startFindTable) tab=\(router.selected)")
-        if isOwn {
-            openOwnListOnMap(list, startFindTable: startFindTable)
-        } else {
-            Task { await openExternalListOnMap(list, startFindTable: startFindTable) }
-        }
+        if isOwn, await presentOwnList(list, startFindTable: startFindTable) { return true }
+        if await presentExternalList(list, startFindTable: startFindTable) { return true }
+        abandonListOpen(list)
+        return false
     }
 
-    /// Presents one of the user's own lists in the map sheet, filtering and framing the map to it.
-    private func openOwnListOnMap(_ list: ExploreList, startFindTable: Bool) {
-        router.handOffToMap { [profileViewModel] in
-            if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
-            profileViewModel.selectedListIdForMap = list.id
-            FindTableLog.log("presenting own list sheet \(list.id)")
-            PresentationService.shared.present(.list(listId: list.id))
-        }
+    /// Presents one of the user's own lists in the map sheet (filtering and framing the map); true once the sheet is up.
+    private func presentOwnList(_ list: ExploreList, startFindTable: Bool) async -> Bool {
+        await router.handOffToMap()
+        if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
+        profileViewModel.selectedListIdForMap = list.id
+        FindTableLog.log("presenting own list sheet \(list.id)")
+        presentationService.transition(to: .list(listId: list.id))
+        if await waitForListSheet() { return true }
+        FindTableLog.log("own list sheet \(list.id) did not appear; falling back to the shared list sheet")
+        profileViewModel.selectedListIdForMap = nil
+        return false
     }
 
-    /// Loads another user's list, then shows it in the map's external list sheet.
-    private func openExternalListOnMap(_ list: ExploreList, startFindTable: Bool) async {
+    /// Loads a list's row, then shows it in the map's shared list sheet (works for any public or own list); true once the sheet is up.
+    private func presentExternalList(_ list: ExploreList, startFindTable: Bool) async -> Bool {
         guard let lightweightList = await fetchLightweightList(listId: list.id) else {
             FindTableLog.log("could not load list \(list.id); nothing to present")
-            return
+            return false
         }
-        router.handOffToMap { [mapDisplayCoordinatorViewModel] in
-            if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
-            FindTableLog.log("presenting external list sheet \(list.id)")
-            mapDisplayCoordinatorViewModel.triggerExternalListOnMap(
-                listId: lightweightList.list_id,
-                userId: list.ownerId,
-                userName: list.ownerName,
-                userPhotoUrl: list.ownerPhotoURL,
-                lists: [lightweightList],
-                listPlaces: [:],
-                dismissProfile: {}
-            )
+        await router.handOffToMap()
+        if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
+        FindTableLog.log("presenting external list sheet \(list.id)")
+        mapDisplayCoordinatorViewModel.triggerExternalListOnMap(
+            listId: lightweightList.list_id,
+            userId: list.ownerId,
+            userName: list.ownerName,
+            userPhotoUrl: list.ownerPhotoURL,
+            lists: [lightweightList],
+            listPlaces: [:],
+            dismissProfile: {}
+        )
+        return await waitForListSheet()
+    }
+
+    /// Waits (up to a few seconds) for a list sheet to become the active map sheet.
+    private func waitForListSheet() async -> Bool {
+        for _ in 0..<30 {
+            if presentationService.isShowingAnyListPopup { return true }
+            try? await Task.sleep(nanoseconds: 100_000_000)
         }
+        return presentationService.isShowingAnyListPopup
+    }
+
+    /// Cleans up after a failed open: forgets the pending Find a table request and raises Explore again if it was lowered.
+    private func abandonListOpen(_ list: ExploreList) {
+        ListMapSheetViewModel.shared.cancelFindTableRequest(for: list.id)
+        if router.selected == .map { router.select(.explore) }
     }
 
     /// Fetches a list's row for the external list sheet, retrying once on a transient failure.
