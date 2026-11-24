@@ -30,6 +30,8 @@ struct ListPlacesScrollView: View {
     var listId: String? = nil
     /// Loads every remaining place of the list so a selected chip shows all of its matches.
     var onLoadAll: (() async -> Void)? = nil
+    /// Whether any place in the list can be reserved; "Find a table" stays hidden when false.
+    var hasReservablePlaces: Bool = true
 
     @StateObject private var filterVM = ListTypeFilterViewModel()
     @StateObject private var findTableVM = FindTableViewModel()
@@ -50,7 +52,7 @@ struct ListPlacesScrollView: View {
     }
 
     /// Whether "Find a table" applies here: a full list (not "Places here") and the backend offers it.
-    private var showsFindTable: Bool { showsTypeFilter && listId != nil && findTableVM.isOffered }
+    private var showsFindTable: Bool { showsTypeFilter && listId != nil && hasReservablePlaces && findTableVM.isOffered }
 
     /// The prominent filled button, shown until a search is running (then the status bar and chip take over).
     @ViewBuilder
@@ -192,7 +194,7 @@ struct ListPlacesScrollView: View {
             .onChange(of: listId) { _, _ in findTableVM.exit() }
             // Opened from Explore's "Find a table": show the form (Tonight, party of 2 by default) once this list is up.
             // Keyed on the request so it also fires for a list that is already open; cancelled with the view.
-            .task(id: sheetVM.findTableRequest) { await openFindTableIfRequested() }
+            .task(id: "\(String(describing: sheetVM.findTableRequest))-\(showsFindTable)") { await openFindTableIfRequested() }
             .animation(.easeInOut(duration: 0.3), value: findTableVM.scopeIds)
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.

@@ -19,6 +19,9 @@ final class ExploreListDetailViewModel: ObservableObject {
     let sheet = ListMapSheetViewModel.shared
     let placeMeta = ListPlaceMetaStore.shared
 
+    /// True/false once known whether any place has a Resy venue; nil while the lookup is pending.
+    @Published private(set) var hasReservablePlaces: Bool?
+
     private var cancellables = Set<AnyCancellable>()
     private var hasLoaded = false
 
@@ -29,6 +32,26 @@ final class ExploreListDetailViewModel: ObservableObject {
     var countLabel: String {
         let count = sheet.headerPlaceCount(total: popup.displayedPlaceCount)
         return "\(count) place\(count == 1 ? "" : "s")"
+    }
+
+    /// True when the list belongs to the signed-in user.
+    func isOwnList(currentUserId: String?) -> Bool {
+        guard let currentUserId else { return false }
+        return currentUserId.caseInsensitiveCompare(list.ownerId) == .orderedSame
+    }
+
+    /// The creator as a profile stub; the profile screen refreshes the full record when it opens.
+    var ownerProfile: ProfileData? {
+        guard let name = list.ownerName, !name.isEmpty else { return nil }
+        let parts = name.split(separator: " ", maxSplits: 1).map(String.init)
+        return ProfileData(
+            id: list.ownerId,
+            firstName: parts.first ?? name,
+            lastName: parts.count > 1 ? parts[1] : "",
+            email: "",
+            profilePhotoURL: list.ownerPhotoURL.flatMap { URL(string: $0) },
+            fullName: name
+        )
     }
 
     // MARK: - Initialization
@@ -65,9 +88,17 @@ final class ExploreListDetailViewModel: ObservableObject {
     func load() async {
         guard !hasLoaded else { return }
         hasLoaded = true
+        async let reservable = ExploreListsService.shared.listHasReservablePlaces(listId: list.id)
         await popup.loadPlacesIfNeeded()
         sheet.fitToPlaces(places)
         placeMeta.prefetchCities(for: places)
+        hasReservablePlaces = await reservable ?? true
+    }
+
+    /// Opens the system share sheet for the list.
+    func shareList() {
+        let shareable = Self.lightweightList(from: list)
+        ServiceContainer.shared.placeShareService.shareLightweightList(shareable, userId: list.ownerId)
     }
 
     /// Frames all of the list's pins again after returning from a place page.

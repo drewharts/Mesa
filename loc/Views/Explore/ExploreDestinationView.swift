@@ -12,13 +12,14 @@ struct ExploreDestinationView: View {
     let destination: ExploreDestination
     let onListTap: (ExploreList) -> Void
     let onPlaceTap: (String) -> Void
+    let onUserTap: (ProfileData) -> Void
 
     var body: some View {
         switch destination {
         case .city(let city):
             ExploreCityListsView(city: city, onListTap: onListTap)
         case .list(let list, _):
-            ExploreListDetailView(list: list, onOpenPlace: onPlaceTap)
+            ExploreListDetailView(list: list, onOpenPlace: onPlaceTap, onOpenProfile: onUserTap)
         case .place(let placeId):
             PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250, shouldAnimateMap: true)
                 .id(placeId)

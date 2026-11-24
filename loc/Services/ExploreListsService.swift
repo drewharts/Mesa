@@ -57,6 +57,10 @@ final class ExploreListsService {
         let place_list_items: [CoverItemRow]?
     }
 
+    private struct ListItemRow: Decodable {
+        let list_id: String
+    }
+
     private struct OwnerRow: Decodable {
         let id: String
         let full_name: String?
@@ -225,6 +229,26 @@ final class ExploreListsService {
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { URL(string: $0) != nil }
         return ImageLoadingUtility.rankedPhotoURLs(all).first
+    }
+
+    // MARK: - Reservations
+
+    /// Returns whether at least one place in the list has a Resy venue; nil when the lookup fails.
+    func listHasReservablePlaces(listId: String) async -> Bool? {
+        do {
+            let rows: [ListItemRow] = try await supabase.client
+                .from("place_list_items")
+                .select("list_id, places!inner(resy_venue_id)")
+                .in("list_id", values: Self.idVariants([listId]))
+                .filter("places.resy_venue_id", operator: "not.is", value: "null")
+                .limit(1)
+                .execute()
+                .value
+            return !rows.isEmpty
+        } catch {
+            print("⚠️ [ExploreListsService] Resy lookup failed for \(listId): \(error)")
+            return nil
+        }
     }
 
     // MARK: - Owners

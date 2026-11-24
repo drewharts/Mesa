@@ -8,22 +8,35 @@
 
 import SwiftUI
 
-/// Pushed from Explore: header (count and owner) above the list's place tiles.
+/// Pushed from Explore: compact header (back, title, share, creator chip) above the list's place tiles.
 struct ExploreListDetailView: View {
     @StateObject private var viewModel: ExploreListDetailViewModel
     let onOpenPlace: (String) -> Void
+    let onOpenProfile: (ProfileData) -> Void
 
+    @EnvironmentObject private var userSession: UserSession
+    @Environment(\.dismiss) private var dismiss
     @State private var hasAppeared = false
 
-    /// Creates the screen for one list; `onOpenPlace` pushes a place page.
-    init(list: ExploreList, onOpenPlace: @escaping (String) -> Void) {
+    /// Creates the screen for one list; `onOpenPlace` and `onOpenProfile` push a place page or the creator's profile.
+    init(list: ExploreList, onOpenPlace: @escaping (String) -> Void, onOpenProfile: @escaping (ProfileData) -> Void) {
         self._viewModel = StateObject(wrappedValue: ExploreListDetailViewModel(list: list))
         self.onOpenPlace = onOpenPlace
+        self.onOpenProfile = onOpenProfile
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            ExploreListHeaderView(
+                title: viewModel.list.name,
+                countLabel: viewModel.countLabel,
+                creatorName: viewModel.list.ownerName,
+                creatorPhotoURL: viewModel.list.ownerPhotoURL,
+                isOwnList: viewModel.isOwnList(currentUserId: userSession.currentUserId),
+                onBack: { dismiss() },
+                onShare: { viewModel.shareList() },
+                onCreatorTap: creatorTap
+            )
             ListPlacesScrollView(
                 places: viewModel.places,
                 isLoadingInitial: viewModel.popup.isLoadingPlaces,
@@ -38,11 +51,11 @@ struct ExploreListDetailView: View {
                 onOpenDetail: { place in viewModel.select(place, open: onOpenPlace) },
                 onRemove: nil,
                 showsTypeFilter: true,
-                listId: viewModel.list.id
+                listId: viewModel.list.id,
+                hasReservablePlaces: viewModel.hasReservablePlaces == true
             )
         }
-        .navigationTitle(viewModel.list.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .task { await viewModel.load() }
         .onAppear {
             if hasAppeared { viewModel.reframePins() }
@@ -50,21 +63,9 @@ struct ExploreListDetailView: View {
         }
     }
 
-    // MARK: - Subviews
-
-    private var header: some View {
-        VStack(spacing: 2) {
-            Text(viewModel.countLabel)
-                .font(.caption)
-                .contentTransition(.numericText())
-                .foregroundStyle(.secondary)
-            if let owner = viewModel.list.ownerName {
-                Text("by \(owner)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, 6)
+    /// Opens the creator's profile, or nil when the creator is unknown.
+    private var creatorTap: (() -> Void)? {
+        guard let profile = viewModel.ownerProfile else { return nil }
+        return { onOpenProfile(profile) }
     }
 }

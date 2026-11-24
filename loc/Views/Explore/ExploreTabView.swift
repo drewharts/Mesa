@@ -48,7 +48,8 @@ struct ExploreTabView: View {
                 ExploreDestinationView(
                     destination: destination,
                     onListTap: { navigation.openList($0) },
-                    onPlaceTap: { navigation.openPlace($0) }
+                    onPlaceTap: { navigation.openPlace($0) },
+                    onUserTap: { navigation.openProfile($0) }
                 )
             }
         }
