@@ -31,8 +31,8 @@ struct ListCoverCollage: View {
     }
 
     private var userImage: String? {
-        guard let url = userImageURL?.trimmingCharacters(in: .whitespaces),
-              !url.isEmpty, URL(string: url) != nil,
+        guard let url = ListCoverImageResolver.customCoverURL(userImageURL),
+              URL(string: url) != nil,
               !failures.failedURLs.contains(url) else { return nil }
         return url
     }

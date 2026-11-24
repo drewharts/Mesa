@@ -230,7 +230,7 @@ final class ExploreListsService {
             id: row.id,
             name: row.name,
             city: row.city,
-            imageURL: row.image,
+            imageURL: ListCoverImageResolver.customCoverURL(row.image),
             ownerId: row.user_id,
             placeCount: placeCount,
             createdAt: row.created_at,

@@ -30,7 +30,7 @@ struct ListCoverView: View {
     }
 
     private var userImageURL: URL? {
-        guard let imageURL, !imageURL.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        guard let imageURL = ListCoverImageResolver.customCoverURL(imageURL) else { return nil }
         return URL(string: imageURL)
     }
 }

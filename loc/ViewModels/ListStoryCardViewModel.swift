@@ -70,7 +70,7 @@ class ListStoryCardViewModel: ObservableObject {
             generatedImage = cardImage
             let shareText = "Check out my list \"\(list.name)\" on Mesa!"
             shareService.shareImage(cardImage, with: shareText)
-            uploadListCover(listId: list.list_id, image: cardImage)
+            uploadShareCard(listId: list.list_id, image: cardImage)
         } catch {
             self.error = error.localizedDescription
         }
@@ -113,7 +113,7 @@ class ListStoryCardViewModel: ObservableObject {
             }
 
             showLinkCopiedInstruction = true
-            uploadListCover(listId: list.list_id, image: cardImage)
+            uploadShareCard(listId: list.list_id, image: cardImage)
         } catch {
             self.error = error.localizedDescription
         }
@@ -145,7 +145,7 @@ class ListStoryCardViewModel: ObservableObject {
             generatedImage = cardImage
             let shareText = "Check out my list \"\(list.name)\" on Mesa!"
             shareService.shareImage(cardImage, with: shareText)
-            uploadListCover(listId: list.list_id, image: cardImage)
+            uploadShareCard(listId: list.list_id, image: cardImage)
         } catch {
             self.error = error.localizedDescription
         }
@@ -314,13 +314,13 @@ class ListStoryCardViewModel: ObservableObject {
         return UIImage(cgImage: cgImage)
     }
 
-    /// Uploads the card image as a list cover for rich link previews.
-    private func uploadListCover(listId: String, image: UIImage) {
+    /// Uploads the card image to storage for rich link previews without changing the list's own cover.
+    private func uploadShareCard(listId: String, image: UIImage) {
         Task {
             do {
-                _ = try await imageService.uploadListCoverImage(listId: listId, image: image)
+                _ = try await imageService.uploadListShareCardImage(listId: listId, image: image)
             } catch {
-                print("⚠️ [ListStoryCardViewModel] Failed to upload list cover: \(error.localizedDescription)")
+                print("⚠️ [ListStoryCardViewModel] Failed to upload share card: \(error.localizedDescription)")
             }
         }
     }

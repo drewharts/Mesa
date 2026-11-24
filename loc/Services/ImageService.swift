@@ -461,6 +461,25 @@ class ImageService {
         return publicURL
     }
 
+    /// Uploads a generated share-card image to Supabase Storage without touching place_lists.image, and returns its public URL.
+    func uploadListShareCardImage(listId: String, image: UIImage) async throws -> URL {
+        let supabase = await SupabaseManager.shared
+
+        guard let imageData = compressImageTo1MB(image) ?? image.jpegData(compressionQuality: 0.8) else {
+            throw NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])
+        }
+
+        let filePath = "\(listId)/\(ListCoverImageResolver.shareCardFileName)"
+        let bucket = await supabase.storage.from("list_covers")
+
+        _ = try await bucket.upload(
+            filePath,
+            data: imageData,
+            options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true)
+        )
+        return try bucket.getPublicURL(path: filePath)
+    }
+
     func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {
         Task {
             do {
