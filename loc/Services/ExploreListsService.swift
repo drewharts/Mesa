@@ -75,7 +75,7 @@ final class ExploreListsService {
             .limit(limit)
             .execute()
             .value
-        return rows.compactMap(Self.makeList)
+        return rows.compactMap { Self.makeList($0) }
     }
 
     /// Fetches public lists tagged with any of the given raw city names.
@@ -89,7 +89,7 @@ final class ExploreListsService {
             .limit(limit)
             .execute()
             .value
-        return rows.compactMap(Self.makeList)
+        return rows.compactMap { Self.makeList($0) }
     }
 
     /// Fetches specific lists by id (used for featured lists); missing lists are omitted, and so are empty ones unless `includeEmpty`.
