@@ -49,6 +49,12 @@ final class ListMapSheetViewModel: ObservableObject {
         static func == (lhs: ScrollRequest, rhs: ScrollRequest) -> Bool { lhs.id == rhs.id }
     }
 
+    /// A one-shot request (from Explore) to open the "Find a table" form once the list's sheet is showing.
+    struct FindTableRequest: Equatable {
+        let listId: String
+        let requestedAt: Date
+    }
+
     // MARK: - Published State
 
     @Published private(set) var detent: ListSheetDetent = .default
@@ -59,8 +65,12 @@ final class ListMapSheetViewModel: ObservableObject {
     /// The map shows only these pins and the sheet header counts them.
     @Published private(set) var chipScopeIds: Set<String>?
 
+    /// Pending "Find a table" start for a list that is about to open (or is already open).
+    @Published private(set) var findTableRequest: FindTableRequest?
+
     // MARK: - Private State
 
+    private let findTableRequestLifetime: TimeInterval = 20
     private var listId: String?
     private var hasFitMap = false
 
@@ -94,6 +104,26 @@ final class ListMapSheetViewModel: ObservableObject {
         scrollRequest = nil
         chipScopeIds = nil
         detent = .default
+    }
+
+    // MARK: - Find a Table Handoff
+
+    /// Asks the list sheet for `listId` to open its "Find a table" form as soon as it shows.
+    func requestFindTable(listId: String) {
+        findTableRequest = FindTableRequest(listId: listId.lowercased(), requestedAt: Date())
+    }
+
+    /// Consumes the pending request when it targets this list and has not expired; returns whether to open the form.
+    func takeFindTableRequest(for listId: String) -> Bool {
+        guard let request = findTableRequest else { return false }
+        let isFresh = Date().timeIntervalSince(request.requestedAt) < findTableRequestLifetime
+        guard isFresh else {
+            findTableRequest = nil
+            return false
+        }
+        guard request.listId == listId.lowercased() else { return false }
+        findTableRequest = nil
+        return true
     }
 
     // MARK: - Chip Scope

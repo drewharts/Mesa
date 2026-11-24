@@ -63,8 +63,10 @@ final class MainTabViewModel: ObservableObject {
         }
     }
 
-    /// Switches to the Map tab and opens the list in the map's list sheet with its pins shown and the map framed to them.
-    func openListOnMap(_ list: ExploreList) {
+    /// Switches to the Map tab and opens the list in the map's list sheet with its pins shown and the map framed to them;
+    /// with `startFindTable` the sheet also opens its "Find a table" form right away.
+    func openListOnMap(_ list: ExploreList, startFindTable: Bool = false) {
+        if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
         if list.ownerId.caseInsensitiveCompare(userSession.currentUserId ?? "") == .orderedSame {
             openOwnListOnMap(listId: list.id)
         } else {

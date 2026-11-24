@@ -9,6 +9,7 @@
 import Foundation
 import CoreLocation
 import Supabase
+import os
 
 @MainActor
 final class ExploreListsService {
@@ -16,9 +17,9 @@ final class ExploreListsService {
 
     private let supabase = SupabaseManager.shared
     private var coverPhotoCache: [String: [String]] = [:]
-    private let coverChunkSize = 5
-    private let coverItemLimit = 400
-    private let coversPerList = 4
+    private let coverChunkSize = 20
+    /// Place rows embedded per list; extra candidates let a collage replace photos that fail to load.
+    private let coversPerList = 8
     private nonisolated init() {}
 
     private static let columns = "id, name, image, city, created_at, updated_at, user_id, average_location::text, place_list_items(count)"
@@ -45,8 +46,12 @@ final class ExploreListsService {
     }
 
     private struct CoverItemRow: Decodable {
-        let list_id: String
         let places: CoverPlaceRow?
+    }
+
+    private struct CoverListRow: Decodable {
+        let id: String
+        let place_list_items: [CoverItemRow]?
     }
 
     private struct OwnerRow: Decodable {
@@ -84,12 +89,45 @@ final class ExploreListsService {
         return rows.compactMap(Self.makeList)
     }
 
+    /// Fetches specific lists by id (used for featured lists); missing or empty lists are omitted.
+    func fetchLists(ids: [String]) async -> [ExploreList] {
+        guard !ids.isEmpty else { return [] }
+        do {
+            let rows: [ListRow] = try await supabase.client
+                .from("place_lists")
+                .select(Self.columns)
+                .in("id", values: ids)
+                .execute()
+                .value
+            return rows.compactMap(Self.makeList)
+        } catch {
+            print("⚠️ [ExploreListsService] Featured lists lookup failed: \(error)")
+            return []
+        }
+    }
+
     // MARK: - Cover Photos
 
-    /// Returns up to four place photo URLs per list (in list order), batching lists into a few
-    /// `place_list_items -> places` queries and caching results for the session. Failed chunks are omitted.
+    /// Returns the cover photos saved by the previous session (may be stale; revalidated by `fetchCoverPhotos`).
+    func persistedSnapshot() -> CoverPhotoSnapshot {
+        CoverPhotoStore.shared.load()
+    }
+
+    /// Saves this session's cover map together with the order lists appear on screen, for the next launch.
+    func persistCovers(displayOrder: [String]) {
+        var snapshot = CoverPhotoStore.shared.load()
+        snapshot.covers.merge(coverPhotoCache) { _, fresh in fresh }
+        snapshot.displayOrder = displayOrder
+        CoverPhotoStore.shared.save(snapshot)
+    }
+
+    /// Returns up to `coversPerList` place photo URLs per list (in list order), fetching lists in a few parallel
+    /// chunks of one embedded query each and caching results for the session. Failed chunks are omitted.
     func fetchCoverPhotos(listIds: [String]) async -> [String: [String]] {
         let missing = Array(Set(listIds).filter { coverPhotoCache[$0] == nil })
+        let signpostId = ImagePerf.signposter.makeSignpostID()
+        let state = ImagePerf.signposter.beginInterval("coverFetch", id: signpostId)
+        let started = Date()
         let chunks = stride(from: 0, to: missing.count, by: coverChunkSize).map {
             Array(missing[$0..<min($0 + coverChunkSize, missing.count)])
         }
@@ -101,21 +139,23 @@ final class ExploreListsService {
                 if let result { coverPhotoCache.merge(result) { _, new in new } }
             }
         }
+        ImagePerf.signposter.endInterval("coverFetch", state)
+        let elapsed = Int(Date().timeIntervalSince(started) * 1000)
+        ImagePerf.logger.info("coverFetch requested=\(listIds.count) fetched=\(missing.count) chunks=\(chunks.count) ms=\(elapsed)")
         return listIds.reduce(into: [:]) { acc, id in
             if let photos = coverPhotoCache[id] { acc[id] = photos }
         }
     }
 
-    /// Fetches list items with their places' photos for one chunk of lists; nil when the query fails.
+    /// Fetches each list's first places with their photos in one query (embedded rows limited per list); nil when it fails.
     private func fetchCoverChunk(_ ids: [String]) async -> [String: [String]]? {
         do {
-            let rows: [CoverItemRow] = try await supabase.client
-                .from("place_list_items")
-                .select("list_id, places(thumbnail_url, photo_urls)")
-                .in("list_id", values: ids)
-                .order("list_id", ascending: true)
-                .order("sort_order", ascending: true)
-                .limit(coverItemLimit)
+            let rows: [CoverListRow] = try await supabase.client
+                .from("place_lists")
+                .select("id, place_list_items(sort_order, places(thumbnail_url, photo_urls))")
+                .in("id", values: ids)
+                .order("sort_order", ascending: true, referencedTable: "place_list_items")
+                .limit(coversPerList, referencedTable: "place_list_items")
                 .execute()
                 .value
             return groupPhotos(rows, for: ids)
@@ -125,19 +165,23 @@ final class ExploreListsService {
         }
     }
 
-    /// Collects each list's first distinct place photos, keeping server order; lists without photos map to [].
-    private func groupPhotos(_ rows: [CoverItemRow], for ids: [String]) -> [String: [String]] {
+    /// Collects one distinct photo per place for each list, keeping list order; lists without photos map to [].
+    private func groupPhotos(_ rows: [CoverListRow], for ids: [String]) -> [String: [String]] {
         var result = Dictionary(uniqueKeysWithValues: ids.map { ($0, [String]()) })
         for row in rows {
-            guard let place = row.places, (result[row.list_id]?.count ?? coversPerList) < coversPerList else { continue }
-            let candidate = [place.thumbnail_url, place.photo_urls?.first]
-                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .first { !$0.isEmpty && URL(string: $0) != nil }
-            if let candidate, result[row.list_id]?.contains(candidate) == false {
-                result[row.list_id]?.append(candidate)
-            }
+            var seen = Set<String>()
+            let photos = (row.place_list_items ?? []).compactMap { $0.places.flatMap(Self.bestPhoto) }.filter { seen.insert($0).inserted }
+            result[row.id] = Array(photos.prefix(coversPerList))
         }
         return result
+    }
+
+    /// Picks a place's most durable valid photo URL (stored images before expiring Google links).
+    private static func bestPhoto(_ place: CoverPlaceRow) -> String? {
+        let all = ([place.thumbnail_url] + (place.photo_urls ?? []).prefix(4).map { Optional($0) })
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { URL(string: $0) != nil }
+        return ImageLoadingUtility.rankedPhotoURLs(all).first
     }
 
     // MARK: - Owners

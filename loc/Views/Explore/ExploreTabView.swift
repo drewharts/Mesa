@@ -15,6 +15,7 @@ struct ExploreTabView: View {
     @EnvironmentObject var locationManager: LocationManager
 
     let onOpenList: (ExploreList) -> Void
+    let onOpenListFindTable: (ExploreList) -> Void
     let onOpenPlaceDetail: (DetailPlace) -> Void
     let onOpenUser: (String) -> Void
 
@@ -27,6 +28,7 @@ struct ExploreTabView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
+                    featuredSection
                     shortcutsRow
                     popularSection
                     citiesSection
@@ -61,6 +63,20 @@ struct ExploreTabView: View {
     }
 
     // MARK: - Sections
+
+    private var featuredSection: some View {
+        VStack(spacing: 16) {
+            ForEach(FeaturedLists.all) { config in
+                ExploreFeaturedCard(
+                    config: config,
+                    photoURLs: viewModel.photos(forListId: config.listId),
+                    onOpen: { Task { await viewModel.openFeatured(config, using: onOpenList) } },
+                    onFindTable: { Task { await viewModel.openFeatured(config, using: onOpenListFindTable) } }
+                )
+            }
+        }
+        .padding(.horizontal, 16)
+    }
 
     private var shortcutsRow: some View {
         HStack(spacing: 12) {

@@ -49,6 +49,17 @@ struct ListPlacesScrollView: View {
         isCollapsed ? Self.rowTileSize : ListTypeFilterViewModel.gridTileSide(screenWidth: UIScreen.main.bounds.width)
     }
 
+    /// Whether "Find a table" applies here: a full list (not "Places here") and the backend offers it.
+    private var showsFindTable: Bool { showsTypeFilter && listId != nil && findTableVM.isOffered }
+
+    /// The prominent filled button, shown until a search is running (then the status bar and chip take over).
+    @ViewBuilder
+    private var findTableButton: some View {
+        if showsFindTable && !findTableVM.isActive {
+            FindTableButton(onTap: { findTableVM.presentForm() })
+        }
+    }
+
     /// The chip row, or nothing when filtering is off or the list has too few tags.
     @ViewBuilder
     private func typeFilterRow(display: ListTypeFilterViewModel.Display) -> some View {
@@ -62,7 +73,7 @@ struct ListPlacesScrollView: View {
                 onBeginSearch: { filterVM.beginSearch() },
                 onClearOrCloseSearch: { filterVM.clearOrCloseSearch() },
                 onCollapseSearch: { filterVM.endSearch() },
-                showsFindTable: showsTypeFilter && listId != nil && findTableVM.isOffered,
+                showsFindTable: showsFindTable && findTableVM.isActive,
                 isFindTableActive: findTableVM.isActive,
                 onFindTable: { findTableVM.presentForm() }
             )
@@ -104,6 +115,7 @@ struct ListPlacesScrollView: View {
     /// The chip row and table-search status as their own row above the places, on an opaque sheet-colored background so tiles never sit under it.
     private func filterHeader(display: ListTypeFilterViewModel.Display) -> some View {
         VStack(spacing: 6) {
+            findTableButton
             typeFilterRow(display: display)
             findTableStatusBar
         }
@@ -111,6 +123,12 @@ struct ListPlacesScrollView: View {
         .frame(maxWidth: .infinity)
         .background(Color(.systemBackground))
         .zIndex(1)
+    }
+
+    /// Opens the "Find a table" form when Explore asked for it for this list.
+    private func openFindTableIfRequested() {
+        guard showsFindTable, let listId, sheetVM.takeFindTableRequest(for: listId) else { return }
+        findTableVM.presentForm()
     }
 
     private func isSelected(_ place: LightweightPlace) -> Bool {
@@ -169,6 +187,9 @@ struct ListPlacesScrollView: View {
                 Task { await onLoadAll?() }
             }
             .onChange(of: listId) { _, _ in findTableVM.exit() }
+            // Opened from Explore's "Find a table": show the form (Tonight, party of 2 by default) once this list is up.
+            .onAppear { openFindTableIfRequested() }
+            .onChange(of: sheetVM.findTableRequest) { _, _ in openFindTableIfRequested() }
             .animation(.easeInOut(duration: 0.3), value: findTableVM.scopeIds)
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.

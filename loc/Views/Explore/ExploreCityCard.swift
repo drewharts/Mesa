@@ -19,7 +19,7 @@ struct ExploreCityCard: View {
             ZStack(alignment: .bottomLeading) {
                 ListCoverPlaceholder(seed: city.key, showsGlyph: false)
                 if let photoURL {
-                    PlacePhotoCollage(photoURLs: [photoURL], cellSize: CGSize(width: 300, height: 192))
+                    PlacePhotoCollage(photoURLs: [photoURL], cellSize: ExploreCoverMetrics.city)
                 }
                 LinearGradient(colors: [.black.opacity(0.05), .black.opacity(photoURL == nil ? 0.45 : 0.7)], startPoint: .top, endPoint: .bottom)
                 label

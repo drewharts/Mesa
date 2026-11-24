@@ -32,7 +32,7 @@ struct ExploreListCard: View {
         Color.clear
             .aspectRatio(3.0 / 4.0, contentMode: .fit)
             .overlay {
-                ListCoverView(seed: list.id, name: list.name, imageURL: list.imageURL, placePhotoURLs: placePhotoURLs)
+                ListCoverView(seed: list.id, name: list.name, imageURL: list.imageURL, placePhotoURLs: placePhotoURLs, cellSize: ExploreCoverMetrics.card)
             }
             .clipShape(RoundedRectangle(cornerRadius: coverCornerRadius))
             .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)

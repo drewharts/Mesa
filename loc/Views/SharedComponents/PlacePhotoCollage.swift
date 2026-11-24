@@ -8,32 +8,40 @@
 import SwiftUI
 
 /// Fades place photos in over whatever is behind it; renders nothing visible until images arrive.
+/// `photoURLs` are candidates: photos that fail to load are skipped in favor of the next candidate.
 struct PlacePhotoCollage: View {
     let photoURLs: [String]
     let cellSize: CGSize
 
+    @ObservedObject private var failures = ImageLoadFailureRegistry.shared
+
     private let spacing: CGFloat = 1.5
     private let fadeDuration = 0.25
 
+    private var visibleURLs: [String] {
+        PlacePhotoCollageLayout.visibleURLs(photoURLs, failed: failures.failedURLs)
+    }
+
     var body: some View {
-        if photoURLs.count >= 4 {
-            grid
-        } else if let first = photoURLs.first {
+        let urls = visibleURLs
+        if urls.count >= PlacePhotoCollageLayout.gridCount {
+            grid(urls)
+        } else if let first = urls.first {
             photo(first, size: cellSize)
         }
     }
 
     // MARK: - Subviews
 
-    private var grid: some View {
+    private func grid(_ urls: [String]) -> some View {
         VStack(spacing: spacing) {
             HStack(spacing: spacing) {
-                photo(photoURLs[0], size: quarterSize)
-                photo(photoURLs[1], size: quarterSize)
+                photo(urls[0], size: quarterSize)
+                photo(urls[1], size: quarterSize)
             }
             HStack(spacing: spacing) {
-                photo(photoURLs[2], size: quarterSize)
-                photo(photoURLs[3], size: quarterSize)
+                photo(urls[2], size: quarterSize)
+                photo(urls[3], size: quarterSize)
             }
         }
     }
@@ -41,13 +49,13 @@ struct PlacePhotoCollage: View {
     /// One cropped, fading photo cell.
     private func photo(_ url: String, size: CGSize) -> some View {
         Color.clear.overlay {
-            CachedAsyncImage(url: URL(string: url), targetSize: size, placeholder: { Color.clear }, fadeInDuration: fadeDuration)
+            CachedAsyncImage(url: URL(string: url), targetSize: size, placeholder: { Color.clear }, onFailure: { ImageLoadFailureRegistry.shared.markFailed(url) }, fadeInDuration: fadeDuration)
                 .aspectRatio(contentMode: .fill)
         }
         .clipped()
     }
 
     private var quarterSize: CGSize {
-        CGSize(width: cellSize.width / 2, height: cellSize.height / 2)
+        PlacePhotoCollageLayout.cellSize(forPhotoCount: PlacePhotoCollageLayout.gridCount, frame: cellSize)
     }
 }

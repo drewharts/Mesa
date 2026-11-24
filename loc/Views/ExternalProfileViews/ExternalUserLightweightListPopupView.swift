@@ -179,7 +179,8 @@ struct ExternalUserLightweightListPopupView: View {
                 placesList(
                     places: viewModel.places(forListAt: index),
                     isLoading: viewModel.isLoading(forListAt: index),
-                    showAddedBy: viewModel.lists[index].isCollaborative
+                    showAddedBy: viewModel.lists[index].isCollaborative,
+                    listId: viewModel.lists[index].list_id
                 )
                 .tag(index)
             }
@@ -191,12 +192,13 @@ struct ExternalUserLightweightListPopupView: View {
         placesList(
             places: viewModel.currentPlaces,
             isLoading: viewModel.isLoadingPlaces,
-            showAddedBy: viewModel.currentList.isCollaborative
+            showAddedBy: viewModel.currentList.isCollaborative,
+            listId: viewModel.currentList.list_id
         )
     }
 
     /// Place rows for one list, wired to the map-first view model.
-    private func placesList(places: [LightweightPlace], isLoading: Bool, showAddedBy: Bool) -> some View {
+    private func placesList(places: [LightweightPlace], isLoading: Bool, showAddedBy: Bool, listId: String) -> some View {
         ListPlacesScrollView(
             places: places,
             isLoadingInitial: isLoading,
@@ -210,7 +212,8 @@ struct ExternalUserLightweightListPopupView: View {
             onSelect: { handleRowTap($0) },
             onOpenDetail: { openPlaceDetail($0) },
             onRemove: nil,
-            showsTypeFilter: true
+            showsTypeFilter: true,
+            listId: listId
         )
     }
 }
