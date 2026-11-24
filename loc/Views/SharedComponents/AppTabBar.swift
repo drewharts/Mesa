@@ -56,7 +56,13 @@ struct AppTabBar: View {
                 .font(.caption2)
         }
         .foregroundStyle(isSelected ? Color.mesaAccent : Color.secondary)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity)
+        .background(
+            Capsule()
+                .fill(Color.mesaAccent.opacity(isSelected ? 0.14 : 0))
+                .padding(.horizontal, 8)
+        )
         .contentShape(Rectangle())
     }
 
@@ -66,7 +72,9 @@ struct AppTabBar: View {
         if item.tab == .profile, let avatar {
             Image(uiImage: avatar).renderingMode(.original)
         } else {
-            Image(systemName: isSelected ? "\(item.symbol).fill" : item.symbol)
+            // symbolVariant falls back to the plain glyph when no .fill exists (e.g. airplane).
+            Image(systemName: item.symbol)
+                .symbolVariant(isSelected ? .fill : .none)
                 .font(.system(size: 22))
         }
     }
