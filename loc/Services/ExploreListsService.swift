@@ -99,10 +99,14 @@ final class ExploreListsService {
             let rows: [ListRow] = try await supabase.client
                 .from("place_lists")
                 .select(Self.columns)
-                .in("id", values: ids)
+                .in("id", values: Self.idVariants(ids))
                 .execute()
                 .value
-            return rows.compactMap { Self.makeList($0, requireItems: !includeEmpty) }
+            let lists = rows.compactMap { Self.makeList($0, requireItems: !includeEmpty) }
+            if lists.count < Set(ids.map { $0.lowercased() }).count {
+                print("⚠️ [ExploreListsService] Lists lookup returned \(lists.count) of \(ids.count) requested ids (\(rows.count) rows)")
+            }
+            return lists
         } catch {
             print("⚠️ [ExploreListsService] Featured lists lookup failed: \(error)")
             return []
@@ -156,7 +160,7 @@ final class ExploreListsService {
             let rows: [CoverListRow] = try await supabase.client
                 .from("place_lists")
                 .select("id, place_list_items(sort_order, places(thumbnail_url, photo_urls))")
-                .in("id", values: ids)
+                .in("id", values: Self.idVariants(ids))
                 .order("sort_order", ascending: true, referencedTable: "place_list_items")
                 .limit(Self.coversPerList, referencedTable: "place_list_items")
                 .execute()
@@ -185,7 +189,7 @@ final class ExploreListsService {
             let rows: [CoverItemRow] = try await supabase.client
                 .from("place_list_items")
                 .select("places(thumbnail_url, photo_urls)")
-                .eq("list_id", value: listId)
+                .in("list_id", values: Self.idVariants([listId]))
                 .order("sort_order", ascending: true)
                 .limit(deepCoverScanLimit)
                 .execute()
@@ -200,8 +204,10 @@ final class ExploreListsService {
     /// Collects one distinct photo per place for each list, keeping list order; lists without photos map to [].
     private func groupPhotos(_ rows: [CoverListRow], for ids: [String]) -> [String: [String]] {
         var result = Dictionary(uniqueKeysWithValues: ids.map { ($0, [String]()) })
+        let requested = Dictionary(ids.map { ($0.lowercased(), $0) }, uniquingKeysWith: { first, _ in first })
         for row in rows {
-            result[row.id] = Self.distinctPhotos(row.place_list_items ?? [])
+            let key = requested[row.id.lowercased()] ?? row.id
+            result[key] = Self.distinctPhotos(row.place_list_items ?? [])
         }
         return result
     }
@@ -253,6 +259,11 @@ final class ExploreListsService {
     }
 
     // MARK: - Mapping
+
+    /// Returns each id in lowercase and uppercase, since `place_lists.id` is text and stored in whichever case the client wrote.
+    private static func idVariants(_ ids: [String]) -> [String] {
+        Array(Set(ids.flatMap { [$0.lowercased(), $0.uppercased()] }))
+    }
 
     /// Maps a database row to an ExploreList, dropping empty lists.
     private static func makeList(_ row: ListRow, requireItems: Bool = true) -> ExploreList? {
