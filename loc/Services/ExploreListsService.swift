@@ -19,7 +19,10 @@ final class ExploreListsService {
     private var coverPhotoCache: [String: [String]] = [:]
     private let coverChunkSize = 20
     /// Place rows embedded per list; extra candidates let a collage replace photos that fail to load.
-    private let coversPerList = 8
+    private static let coversPerList = 8
+    /// Lists whose first places have no photos are re-scanned this deep (and at most this many per fetch).
+    private let deepCoverScanLimit = 60
+    private let deepCoverListCap = 6
     private nonisolated init() {}
 
     private static let columns = "id, name, image, city, created_at, updated_at, user_id, average_location::text, place_list_items(count)"
@@ -116,7 +119,7 @@ final class ExploreListsService {
     /// Saves this session's cover map together with the order lists appear on screen, for the next launch.
     func persistCovers(displayOrder: [String]) {
         var snapshot = CoverPhotoStore.shared.load()
-        snapshot.covers.merge(coverPhotoCache) { _, fresh in fresh }
+        snapshot.covers.merge(coverPhotoCache.filter { !$0.value.isEmpty }) { _, fresh in fresh }
         snapshot.displayOrder = displayOrder
         CoverPhotoStore.shared.save(snapshot)
     }
@@ -155,13 +158,42 @@ final class ExploreListsService {
                 .select("id, place_list_items(sort_order, places(thumbnail_url, photo_urls))")
                 .in("id", values: ids)
                 .order("sort_order", ascending: true, referencedTable: "place_list_items")
-                .limit(coversPerList, referencedTable: "place_list_items")
+                .limit(Self.coversPerList, referencedTable: "place_list_items")
                 .execute()
                 .value
-            return groupPhotos(rows, for: ids)
+            var grouped = groupPhotos(rows, for: ids)
+            await fillEmptyCovers(&grouped)
+            return grouped
         } catch {
             print("⚠️ [ExploreListsService] Cover photo lookup failed: \(error)")
             return nil
+        }
+    }
+
+    /// Re-queries lists whose first few places had no usable photo, scanning deeper into each list (capped per call).
+    private func fillEmptyCovers(_ covers: inout [String: [String]]) async {
+        let empty = covers.filter { $0.value.isEmpty }.map(\.key).prefix(deepCoverListCap)
+        for id in empty {
+            let photos = await fetchDeepCover(listId: id)
+            if !photos.isEmpty { covers[id] = photos }
+        }
+    }
+
+    /// Fetches photos from up to `deepCoverScanLimit` places of one list; empty when the lookup fails or no place has a photo.
+    private func fetchDeepCover(listId: String) async -> [String] {
+        do {
+            let rows: [CoverItemRow] = try await supabase.client
+                .from("place_list_items")
+                .select("places(thumbnail_url, photo_urls)")
+                .eq("list_id", value: listId)
+                .order("sort_order", ascending: true)
+                .limit(deepCoverScanLimit)
+                .execute()
+                .value
+            return Self.distinctPhotos(rows)
+        } catch {
+            print("⚠️ [ExploreListsService] Deep cover lookup failed for \(listId): \(error)")
+            return []
         }
     }
 
@@ -169,11 +201,16 @@ final class ExploreListsService {
     private func groupPhotos(_ rows: [CoverListRow], for ids: [String]) -> [String: [String]] {
         var result = Dictionary(uniqueKeysWithValues: ids.map { ($0, [String]()) })
         for row in rows {
-            var seen = Set<String>()
-            let photos = (row.place_list_items ?? []).compactMap { $0.places.flatMap(Self.bestPhoto) }.filter { seen.insert($0).inserted }
-            result[row.id] = Array(photos.prefix(coversPerList))
+            result[row.id] = Self.distinctPhotos(row.place_list_items ?? [])
         }
         return result
+    }
+
+    /// Returns one distinct best photo per place, in order, capped at `coversPerList`.
+    private static func distinctPhotos(_ items: [CoverItemRow]) -> [String] {
+        var seen = Set<String>()
+        let photos = items.compactMap { $0.places.flatMap(bestPhoto) }.filter { seen.insert($0).inserted }
+        return Array(photos.prefix(coversPerList))
     }
 
     /// Picks a place's most durable valid photo URL (stored images before expiring Google links).

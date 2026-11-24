@@ -29,11 +29,17 @@ final class TabSheetViewModel: ObservableObject {
     }
 
     /// Settles on the nearest detent after a drag, projecting the finger's momentum; dragging up grows the sheet.
-    func settle(afterDragTranslation translation: CGFloat, predictedTranslation: CGFloat, containerHeight: CGFloat) {
-        guard containerHeight > 0 else { return }
+    /// Returns true when the drag ended low enough that the sheet should be dismissed entirely instead.
+    func settle(afterDragTranslation translation: CGFloat, predictedTranslation: CGFloat, containerHeight: CGFloat) -> Bool {
+        guard containerHeight > 0 else { return false }
         let projected = detent.height(in: containerHeight) - (translation + (predictedTranslation - translation) * 0.35)
         let medium = TabSheetDetent.medium.height(in: containerHeight)
         let large = TabSheetDetent.large.height(in: containerHeight)
+        if projected < medium * Self.dismissFraction { return true }
         detent = abs(projected - medium) < abs(projected - large) ? .medium : .large
+        return false
     }
+
+    /// A drag projected below this fraction of the medium height dismisses the sheet.
+    private static let dismissFraction: CGFloat = 0.6
 }

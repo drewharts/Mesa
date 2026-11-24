@@ -2,9 +2,10 @@
 //  MainTabView.swift
 //  loc
 //
-//  Root container: the map is always the base layer. Explore, Trips and Profile are presented as a
-//  bottom sheet over the map with the tab bar staying visible; selecting Map lowers the sheet away.
-//  Each tab keeps its own NavigationStack and state; map sheets (lists, places) sit above the bar.
+//  Root container: the map is always the base layer. Explore and Trips are presented as a bottom
+//  sheet over the map (swipe down to hide it and return to the map) with the tab bar staying visible;
+//  Profile is a full page above the map. Each tab keeps its own NavigationStack and state; map sheets
+//  (lists, places) sit above the bar.
 //
 
 import SwiftUI
@@ -70,8 +71,17 @@ struct MainTabView: View {
         VStack(spacing: 0) {
             ZStack {
                 mapTab
-                TabSheetContainer(viewModel: viewModel.tabSheet, isPresented: router.selected != .map) {
+                TabSheetContainer(
+                    viewModel: viewModel.tabSheet,
+                    isPresented: router.selected.isSheet,
+                    onDismiss: { router.select(.map) }
+                ) {
                     tabSheetContent
+                }
+                if router.visitedTabs.contains(.profile) {
+                    profileTab
+                        .background(Color(.systemBackground))
+                        .tabLayer(isActive: router.selected == .profile)
                 }
             }
             AppTabBar(
@@ -86,7 +96,7 @@ struct MainTabView: View {
 
     // MARK: - Tabs
 
-    /// Explore, Trips and Profile content, created on first visit and kept alive (hidden) afterwards.
+    /// Explore and Trips sheet content, created on first visit and kept alive (hidden) afterwards.
     private var tabSheetContent: some View {
         ZStack {
             if router.visitedTabs.contains(.explore) {
@@ -94,9 +104,6 @@ struct MainTabView: View {
             }
             if router.visitedTabs.contains(.trips) {
                 tripsTab.tabLayer(isActive: router.selected == .trips)
-            }
-            if router.visitedTabs.contains(.profile) {
-                profileTab.tabLayer(isActive: router.selected == .profile)
             }
         }
     }

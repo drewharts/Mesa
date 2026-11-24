@@ -13,4 +13,7 @@ enum AppTab: Hashable {
     case explore
     case trips
     case profile
+
+    /// True for tabs shown as a bottom sheet over the map (Profile is a full page instead).
+    var isSheet: Bool { self == .explore || self == .trips }
 }

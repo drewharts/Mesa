@@ -2,10 +2,10 @@
 //  MainTabViewModel.swift
 //  loc
 //
-//  Coordinates the tab bar over the always-present map: Explore, Trips and Profile are bottom
-//  sheets over the map. Routes map-bound flows (opening a list or place, profile "show on map"
-//  actions, external profile navigation, share-extension imports) by collapsing the tab sheet,
-//  and brings the sheet back when the map content it opened is closed.
+//  Coordinates the tab bar over the always-present map: Explore and Trips are bottom sheets over
+//  the map and Profile is a full page. Routes map-bound flows (opening a list or place, profile "show on map"
+//  actions, external profile navigation, share-extension imports) by moving to the map; closing
+//  that map content leaves the map showing, and closing an external profile brings the tab back.
 //
 
 import Foundation
@@ -74,7 +74,7 @@ final class MainTabViewModel: ObservableObject {
     }
 
     /// Collapses the tab sheet and opens the list in the map's list sheet with its pins shown and the map framed to them;
-    /// with `startFindTable` the sheet also opens its "Find a table" form right away. Closing the list brings the tab sheet back.
+    /// with `startFindTable` the sheet also opens its "Find a table" form right away. Dismissing the list leaves the map showing.
     func openListOnMap(_ list: ExploreList, startFindTable: Bool = false) {
         let isOwn = list.ownerId.caseInsensitiveCompare(userSession.currentUserId ?? "") == .orderedSame
         FindTableLog.log("openListOnMap list=\(list.id) own=\(isOwn) findTable=\(startFindTable) tab=\(router.selected)")
@@ -185,7 +185,7 @@ final class MainTabViewModel: ObservableObject {
 
     // MARK: - Profile → Map handoff
 
-    /// Collapses the Profile tab sheet and then applies the profile's pending map action.
+    /// Moves from the Profile page to the map and then applies the profile's pending map action.
     private func handOffProfileRequestToMap() {
         // Requests raised while already on the map (e.g. import progress) are handled by the map itself.
         guard router.selected == .profile else { return }
@@ -219,20 +219,20 @@ final class MainTabViewModel: ObservableObject {
 
     // MARK: - Tab Sheet Behavior
 
-    /// Opens a tab sheet at its large height whenever it is raised from the map.
+    /// Opens a tab sheet at its large height whenever it is raised from the map or the Profile page.
     private func observeTabSelection() {
         router.$selected
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] tab in
                 guard let self else { return }
-                if self.previousTab == .map && tab != .map { self.tabSheet.presentAtLarge() }
+                if tab.isSheet && !self.previousTab.isSheet { self.tabSheet.presentAtLarge() }
                 self.previousTab = tab
             }
             .store(in: &cancellables)
     }
 
-    /// Watches the map's sheet slot: once content opened from a tab sheet closes, the tab sheet returns.
+    /// Watches the map's sheet slot: once content opened from a tab closes, the map stays on screen by itself.
     private func observeMapSheetClosing() {
         presentationService.$activeSheet
             .map { $0 != nil }
@@ -242,7 +242,7 @@ final class MainTabViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// Cancels a pending restore while a sheet is up and schedules one when the last sheet has gone.
+    /// Cancels a pending settle while a sheet is up and schedules one when the last sheet has gone.
     private func mapSheetPresenceChanged(_ hasSheet: Bool) {
         if hasSheet {
             sawMapSheet = true
@@ -256,8 +256,14 @@ final class MainTabViewModel: ObservableObject {
             // Sheet-to-sheet swaps pass through "no sheet"; only restore if nothing else shows up.
             try? await Task.sleep(nanoseconds: 600_000_000)
             guard let self, !Task.isCancelled else { return }
-            self.restoreTabSheetIfMapIsIdle()
+            self.settleOnMapIfIdle()
         }
+    }
+
+    /// Leaves the user on the map (tab sheet stays hidden) once the content opened from a tab has been dismissed.
+    private func settleOnMapIfIdle() {
+        guard presentationService.activeSheet == nil, presentationService.preservedSheet == nil else { return }
+        router.clearReturnTab()
     }
 
     /// Brings the originating tab sheet back unless a sheet, an external profile or a preserved sheet is taking over.

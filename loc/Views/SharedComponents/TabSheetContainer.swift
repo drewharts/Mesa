@@ -4,7 +4,7 @@
 //
 //  DUMB Component: a bottom sheet laid over the map (Google/Apple Maps style) that hosts a tab's
 //  content. It rests at the medium or large detent chosen by `TabSheetViewModel`, can be dragged
-//  between them by its grabber, and slides out of view when not presented. It is not a system
+//  between them by its grabber (or all the way down to dismiss it), and slides out of view when not presented. It is not a system
 //  sheet, so the tab bar stays visible and the map's own sheets are unaffected.
 //
 
@@ -13,12 +13,14 @@ import SwiftUI
 struct TabSheetContainer<Content: View>: View {
     @ObservedObject var viewModel: TabSheetViewModel
     let isPresented: Bool
+    /// Called when the user drags the sheet down far enough to hide it completely.
+    let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
 
     @GestureState private var dragTranslation: CGFloat = 0
 
     private let cornerRadius: CGFloat = 24
-    private let minimumHeight: CGFloat = 120
+    private let minimumHeight: CGFloat = 60
 
     var body: some View {
         GeometryReader { proxy in
@@ -67,11 +69,12 @@ struct TabSheetContainer<Content: View>: View {
                 state = value.translation.height
             }
             .onEnded { value in
-                viewModel.settle(
+                let shouldDismiss = viewModel.settle(
                     afterDragTranslation: value.translation.height,
                     predictedTranslation: value.predictedEndTranslation.height,
                     containerHeight: containerHeight
                 )
+                if shouldDismiss { onDismiss() }
             }
     }
 }

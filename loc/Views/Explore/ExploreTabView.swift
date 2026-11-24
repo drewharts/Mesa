@@ -28,6 +28,7 @@ struct ExploreTabView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
+                    compactTitle
                     featuredSection
                     shortcutsRow
                     popularSection
@@ -35,10 +36,12 @@ struct ExploreTabView: View {
                     ExplorePeopleSection(viewModel: viewModel.peopleViewModel, onProfileTap: onOpenUser)
                     statusFooter
                 }
-                .padding(.vertical, 12)
+                .padding(.top, 2)
+                .padding(.bottom, 12)
             }
             .navigationTitle("Explore")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ExploreDestination.self) { destination in
                 ExploreDestinationView(destination: destination, onListTap: onOpenList)
             }
@@ -63,6 +66,13 @@ struct ExploreTabView: View {
     }
 
     // MARK: - Sections
+
+    /// Compact title shown right under the sheet's grabber instead of a large navigation title.
+    private var compactTitle: some View {
+        Text("Explore")
+            .font(.title2.weight(.bold))
+            .padding(.horizontal, 16)
+    }
 
     private var featuredSection: some View {
         VStack(spacing: 16) {
