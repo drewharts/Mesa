@@ -70,7 +70,7 @@ final class ListMapSheetViewModel: ObservableObject {
 
     // MARK: - Private State
 
-    private let findTableRequestLifetime: TimeInterval = 20
+    private let findTableRequestLifetime: TimeInterval = 45
     private var listId: String?
     private var hasFitMap = false
 
@@ -109,21 +109,29 @@ final class ListMapSheetViewModel: ObservableObject {
     // MARK: - Find a Table Handoff
 
     /// Asks the list sheet for `listId` to open its "Find a table" form as soon as it shows.
+    /// The request stays pending until a list view reports it presented the form (see `completeFindTableRequest`).
     func requestFindTable(listId: String) {
+        FindTableLog.log("request armed for list \(listId.lowercased())")
         findTableRequest = FindTableRequest(listId: listId.lowercased(), requestedAt: Date())
     }
 
-    /// Consumes the pending request when it targets this list and has not expired; returns whether to open the form.
-    func takeFindTableRequest(for listId: String) -> Bool {
+    /// Whether a fresh request targets this list; expired requests are dropped. Does not consume the request,
+    /// so a list view that is torn down before presenting the form leaves it for the next one.
+    func hasFindTableRequest(for listId: String) -> Bool {
         guard let request = findTableRequest else { return false }
-        let isFresh = Date().timeIntervalSince(request.requestedAt) < findTableRequestLifetime
-        guard isFresh else {
+        guard Date().timeIntervalSince(request.requestedAt) < findTableRequestLifetime else {
+            FindTableLog.log("request for \(request.listId) expired before a list view handled it")
             findTableRequest = nil
             return false
         }
-        guard request.listId == listId.lowercased() else { return false }
+        return request.listId == listId.lowercased()
+    }
+
+    /// Consumes the pending request for `listId` once its form has been shown.
+    func completeFindTableRequest(for listId: String) {
+        guard findTableRequest?.listId == listId.lowercased() else { return }
+        FindTableLog.log("request for \(listId.lowercased()) completed")
         findTableRequest = nil
-        return true
     }
 
     // MARK: - Chip Scope

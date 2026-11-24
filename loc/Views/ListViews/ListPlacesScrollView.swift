@@ -125,10 +125,12 @@ struct ListPlacesScrollView: View {
         .zIndex(1)
     }
 
-    /// Opens the "Find a table" form when Explore asked for it for this list.
-    private func openFindTableIfRequested() {
-        guard showsFindTable, let listId, sheetVM.takeFindTableRequest(for: listId) else { return }
-        findTableVM.presentForm()
+    /// Opens the "Find a table" form when Explore asked for it for this list, and consumes the request only
+    /// once the form is confirmed on screen (a torn-down or too-early instance leaves it for the next one).
+    private func openFindTableIfRequested() async {
+        guard showsFindTable, let listId, sheetVM.hasFindTableRequest(for: listId) else { return }
+        guard await findTableVM.presentFormWhenHostSettled(listId: listId), !Task.isCancelled else { return }
+        sheetVM.completeFindTableRequest(for: listId)
     }
 
     private func isSelected(_ place: LightweightPlace) -> Bool {
@@ -180,6 +182,7 @@ struct ListPlacesScrollView: View {
             }
             .sheet(isPresented: $findTableVM.isFormPresented) {
                 FindTableSheet(viewModel: findTableVM, onSearch: { if let listId { findTableVM.search(listId: listId, scope: filterVM.findTableScope(loaded: places)) } })
+                    .onAppear { findTableVM.formDidAppear() }
             }
             // Results cover the whole list, so make sure every place is loaded before narrowing the tiles and map.
             .onChange(of: findTableVM.scopeIds) { old, ids in
@@ -188,8 +191,8 @@ struct ListPlacesScrollView: View {
             }
             .onChange(of: listId) { _, _ in findTableVM.exit() }
             // Opened from Explore's "Find a table": show the form (Tonight, party of 2 by default) once this list is up.
-            .onAppear { openFindTableIfRequested() }
-            .onChange(of: sheetVM.findTableRequest) { _, _ in openFindTableIfRequested() }
+            // Keyed on the request so it also fires for a list that is already open; cancelled with the view.
+            .task(id: sheetVM.findTableRequest) { await openFindTableIfRequested() }
             .animation(.easeInOut(duration: 0.3), value: findTableVM.scopeIds)
             .animation(.easeInOut(duration: 0.25), value: isCollapsed)
             // A narrower filter may leave too few tiles to scroll; ask for the next page so more can match.

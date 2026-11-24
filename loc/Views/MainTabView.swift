@@ -2,8 +2,9 @@
 //  MainTabView.swift
 //  loc
 //
-//  Native bottom tab bar: Map (home), Explore, Trips, Profile. Each tab keeps its own
-//  NavigationStack and state; map sheets are presented by the Map tab and sit above the bar.
+//  Root container: the map is always the base layer. Explore, Trips and Profile are presented as a
+//  bottom sheet over the map with the tab bar staying visible; selecting Map lowers the sheet away.
+//  Each tab keeps its own NavigationStack and state; map sheets (lists, places) sit above the bar.
 //
 
 import SwiftUI
@@ -66,36 +67,37 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        TabView(selection: $router.selected) {
-            mapTab
-                .tabItem { Label("Map", systemImage: "map") }
-                .tag(AppTab.map)
-
-            exploreTab
-                .tabItem { Label("Explore", systemImage: "safari") }
-                .tag(AppTab.explore)
-
-            tripsTab
-                .tabItem { Label("Trips", systemImage: "airplane") }
-                .tag(AppTab.trips)
-
-            profileTab
-                .tabItem { profileTabLabel }
-                .tag(AppTab.profile)
+        VStack(spacing: 0) {
+            ZStack {
+                mapTab
+                TabSheetContainer(viewModel: viewModel.tabSheet, isPresented: router.selected != .map) {
+                    tabSheetContent
+                }
+            }
+            AppTabBar(
+                selected: router.selected,
+                profileIcon: profileIconViewModel.normalIcon,
+                selectedProfileIcon: profileIconViewModel.selectedIcon,
+                onSelect: { router.select($0) }
+            )
         }
         .tint(.mesaAccent)
     }
 
     // MARK: - Tabs
 
-    /// The user's circular avatar (ringed when selected), or the person icon until a photo is available.
-    @ViewBuilder
-    private var profileTabLabel: some View {
-        let icon = router.selected == .profile ? profileIconViewModel.selectedIcon : profileIconViewModel.normalIcon
-        if let icon {
-            Label { Text("Profile") } icon: { Image(uiImage: icon).renderingMode(.original) }
-        } else {
-            Label("Profile", systemImage: "person.crop.circle")
+    /// Explore, Trips and Profile content, created on first visit and kept alive (hidden) afterwards.
+    private var tabSheetContent: some View {
+        ZStack {
+            if router.visitedTabs.contains(.explore) {
+                exploreTab.tabLayer(isActive: router.selected == .explore)
+            }
+            if router.visitedTabs.contains(.trips) {
+                tripsTab.tabLayer(isActive: router.selected == .trips)
+            }
+            if router.visitedTabs.contains(.profile) {
+                profileTab.tabLayer(isActive: router.selected == .profile)
+            }
         }
     }
 

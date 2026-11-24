@@ -2,9 +2,10 @@
 //  MainTabViewModel.swift
 //  loc
 //
-//  Coordinates the bottom tab bar: routes map-bound flows (profile "show on map" actions,
-//  external profile navigation, share-extension imports) to the Map tab and sends
-//  "open my profile" requests to the Profile tab.
+//  Coordinates the tab bar over the always-present map: Explore, Trips and Profile are bottom
+//  sheets over the map. Routes map-bound flows (opening a list or place, profile "show on map"
+//  actions, external profile navigation, share-extension imports) by collapsing the tab sheet,
+//  and brings the sheet back when the map content it opened is closed.
 //
 
 import Foundation
@@ -16,6 +17,9 @@ final class MainTabViewModel: ObservableObject {
     // MARK: - Dependencies
 
     let router = AppTabRouter.shared
+    /// Height state of the tab sheet over the map.
+    let tabSheet = TabSheetViewModel()
+    private let presentationService = PresentationService.shared
     private let profileViewModel: ProfileViewModel
     private let userProfileNavigationViewModel: UserProfileNavigationViewModel
     private let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
@@ -23,6 +27,9 @@ final class MainTabViewModel: ObservableObject {
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let userSession: UserSession
     private var cancellables = Set<AnyCancellable>()
+    private var previousTab: AppTab = .map
+    private var sawMapSheet = false
+    private var restoreTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -44,49 +51,59 @@ final class MainTabViewModel: ObservableObject {
         observeProfileHandoff()
         observeProfileNavigation()
         observeMapBoundFlows()
+        observeTabSelection()
+        observeMapSheetClosing()
+        observeTripOnMap()
     }
 
     // MARK: - Opening Content From Other Tabs
 
-    /// Switches to the Map tab and opens the place's detail sheet.
+    /// Collapses the tab sheet and opens the place's detail sheet over the map.
     func openPlaceOnMap(placeId: String) {
-        router.select(.map) { [selectedPlaceViewModel] in
+        router.handOffToMap { [selectedPlaceViewModel] in
             selectedPlaceViewModel.navigateToPlace(placeId: placeId)
         }
     }
 
-    /// Switches to the Map tab, flies to the place, and opens its detail sheet.
+    /// Collapses the tab sheet, flies to the place, and opens its detail sheet.
     func openPlaceOnMap(_ place: DetailPlace) {
-        router.select(.map) { [selectedPlaceViewModel] in
+        router.handOffToMap { [selectedPlaceViewModel] in
             selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             PresentationService.shared.transition(to: .placeDetail)
         }
     }
 
-    /// Switches to the Map tab and opens the list in the map's list sheet with its pins shown and the map framed to them;
-    /// with `startFindTable` the sheet also opens its "Find a table" form right away.
+    /// Collapses the tab sheet and opens the list in the map's list sheet with its pins shown and the map framed to them;
+    /// with `startFindTable` the sheet also opens its "Find a table" form right away. Closing the list brings the tab sheet back.
     func openListOnMap(_ list: ExploreList, startFindTable: Bool = false) {
-        if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
-        if list.ownerId.caseInsensitiveCompare(userSession.currentUserId ?? "") == .orderedSame {
-            openOwnListOnMap(listId: list.id)
+        let isOwn = list.ownerId.caseInsensitiveCompare(userSession.currentUserId ?? "") == .orderedSame
+        FindTableLog.log("openListOnMap list=\(list.id) own=\(isOwn) findTable=\(startFindTable) tab=\(router.selected)")
+        if isOwn {
+            openOwnListOnMap(list, startFindTable: startFindTable)
         } else {
-            Task { await openExternalListOnMap(list) }
+            Task { await openExternalListOnMap(list, startFindTable: startFindTable) }
         }
     }
 
     /// Presents one of the user's own lists in the map sheet, filtering and framing the map to it.
-    private func openOwnListOnMap(listId: String) {
-        router.select(.map) { [profileViewModel] in
-            profileViewModel.selectedListIdForMap = listId
-            PresentationService.shared.present(.list(listId: listId))
+    private func openOwnListOnMap(_ list: ExploreList, startFindTable: Bool) {
+        router.handOffToMap { [profileViewModel] in
+            if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
+            profileViewModel.selectedListIdForMap = list.id
+            FindTableLog.log("presenting own list sheet \(list.id)")
+            PresentationService.shared.present(.list(listId: list.id))
         }
     }
 
     /// Loads another user's list, then shows it in the map's external list sheet.
-    private func openExternalListOnMap(_ list: ExploreList) async {
-        let fetched = try? await ServiceContainer.shared.userService.fetchPlaceListById(listId: list.id)
-        guard let lightweightList = fetched else { return }
-        router.select(.map) { [mapDisplayCoordinatorViewModel] in
+    private func openExternalListOnMap(_ list: ExploreList, startFindTable: Bool) async {
+        guard let lightweightList = await fetchLightweightList(listId: list.id) else {
+            FindTableLog.log("could not load list \(list.id); nothing to present")
+            return
+        }
+        router.handOffToMap { [mapDisplayCoordinatorViewModel] in
+            if startFindTable { ListMapSheetViewModel.shared.requestFindTable(listId: list.id) }
+            FindTableLog.log("presenting external list sheet \(list.id)")
             mapDisplayCoordinatorViewModel.triggerExternalListOnMap(
                 listId: lightweightList.list_id,
                 userId: list.ownerId,
@@ -97,6 +114,20 @@ final class MainTabViewModel: ObservableObject {
                 dismissProfile: {}
             )
         }
+    }
+
+    /// Fetches a list's row for the external list sheet, retrying once on a transient failure.
+    private func fetchLightweightList(listId: String) async -> LightweightPlaceList? {
+        for attempt in 1...2 {
+            do {
+                if let list = try await ServiceContainer.shared.userService.fetchPlaceListById(listId: listId) { return list }
+                FindTableLog.log("list \(listId) fetch attempt \(attempt) returned no row")
+            } catch {
+                FindTableLog.log("list \(listId) fetch attempt \(attempt) failed: \(error)")
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        }
+        return nil
     }
 
     /// Opens another user's profile (hosted by the Map tab's navigation stack).
@@ -137,12 +168,12 @@ final class MainTabViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// Routes external-profile navigation and deep-link processing to the Map tab, which hosts both.
+    /// Routes external-profile navigation (returning to the tab sheet afterwards) and deep-link processing to the Map tab, which hosts both.
     private func observeMapBoundFlows() {
         userProfileNavigationViewModel.$isUserDetailPresented
-            .filter { $0 }
+            .removeDuplicates()
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.router.select(.map) }
+            .sink { [weak self] isPresented in self?.externalProfilePresenceChanged(isPresented) }
             .store(in: &cancellables)
 
         deepLinkViewModel.$isProcessingDeepLink
@@ -154,16 +185,11 @@ final class MainTabViewModel: ObservableObject {
 
     // MARK: - Profile → Map handoff
 
-    /// Switches from the Profile tab to the Map tab and then applies the profile's pending map action.
+    /// Collapses the Profile tab sheet and then applies the profile's pending map action.
     private func handOffProfileRequestToMap() {
         // Requests raised while already on the map (e.g. import progress) are handled by the map itself.
         guard router.selected == .profile else { return }
-        router.select(.map)
-        Task { @MainActor [weak self] in
-            // Let the map tab finish appearing so the sheet is not dropped mid-transition.
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            self?.applyPendingProfileAction()
-        }
+        router.handOffToMap { [weak self] in self?.applyPendingProfileAction() }
     }
 
     /// Presents the sheet, list, or map filter the profile asked for, in that order of priority.
@@ -175,6 +201,8 @@ final class MainTabViewModel: ObservableObject {
             PresentationService.shared.present(.list(listId: listId))
         } else if let pending = profileViewModel.pendingMapFilter {
             profileViewModel.pendingMapFilter = nil
+            // A filter has no sheet whose closing would bring the profile back.
+            router.clearReturnTab()
             applyMapFilter(pending)
         }
     }
@@ -187,5 +215,79 @@ final class MainTabViewModel: ObservableObject {
         case .favorites: profileViewModel.showFavoritesOnMap = true
         case .myPlaces: profileViewModel.showMyPlacesOnMap = true
         }
+    }
+
+    // MARK: - Tab Sheet Behavior
+
+    /// Opens a tab sheet at its large height whenever it is raised from the map.
+    private func observeTabSelection() {
+        router.$selected
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] tab in
+                guard let self else { return }
+                if self.previousTab == .map && tab != .map { self.tabSheet.presentAtLarge() }
+                self.previousTab = tab
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Watches the map's sheet slot: once content opened from a tab sheet closes, the tab sheet returns.
+    private func observeMapSheetClosing() {
+        presentationService.$activeSheet
+            .map { $0 != nil }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] hasSheet in self?.mapSheetPresenceChanged(hasSheet) }
+            .store(in: &cancellables)
+    }
+
+    /// Cancels a pending restore while a sheet is up and schedules one when the last sheet has gone.
+    private func mapSheetPresenceChanged(_ hasSheet: Bool) {
+        if hasSheet {
+            sawMapSheet = true
+            restoreTask?.cancel()
+            return
+        }
+        guard sawMapSheet else { return }
+        sawMapSheet = false
+        restoreTask?.cancel()
+        restoreTask = Task { @MainActor [weak self] in
+            // Sheet-to-sheet swaps pass through "no sheet"; only restore if nothing else shows up.
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.restoreTabSheetIfMapIsIdle()
+        }
+    }
+
+    /// Brings the originating tab sheet back unless a sheet, an external profile or a preserved sheet is taking over.
+    private func restoreTabSheetIfMapIsIdle() {
+        guard presentationService.activeSheet == nil,
+              presentationService.preservedSheet == nil,
+              !userProfileNavigationViewModel.isUserDetailPresented else { return }
+        router.restoreReturnTab()
+    }
+
+    /// Hands the external-profile page (hosted by the map) the screen, and returns to the tab sheet when it closes.
+    private func externalProfilePresenceChanged(_ isPresented: Bool) {
+        if isPresented {
+            sawMapSheet = false
+            router.handOffToMap {}
+        } else {
+            restoreTabSheetIfMapIsIdle()
+        }
+    }
+
+    /// Lowers the Trips sheet to medium when a trip is shown on the map so its route and pins are visible.
+    private func observeTripOnMap() {
+        mapDisplayCoordinatorViewModel.$activeTripId
+            .compactMap { $0 }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.router.selected == .trips else { return }
+                self.tabSheet.lowerToMedium()
+            }
+            .store(in: &cancellables)
     }
 }
