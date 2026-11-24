@@ -19,6 +19,14 @@ struct TripsListView: View {
 
     @State private var navigationPath = NavigationPath()
 
+    /// False when the list is the root of the Trips tab (there is nothing to close).
+    private let showsCloseButton: Bool
+
+    /// Creates the trips list; pass `showsCloseButton: false` when hosted as a tab.
+    init(showsCloseButton: Bool = true) {
+        self.showsCloseButton = showsCloseButton
+    }
+
     var body: some View { analyticsBody.analyticsScreen("Trips") }
 
     @ViewBuilder private var analyticsBody: some View {
@@ -35,8 +43,10 @@ struct TripsListView: View {
             .navigationTitle("Trips")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close") { dismiss() }
+                if showsCloseButton {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Close") { dismiss() }
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -63,6 +73,11 @@ struct TripsListView: View {
                     }
                 }
                 .environmentObject(userSession)
+            }
+            .onReceive(NotificationManager.shared.$pendingTripId.compactMap { $0 }) { tripId in
+                // A trip push tapped while this tab already exists (the .task below only runs once).
+                NotificationManager.shared.pendingTripId = nil
+                navigationPath.append(tripId)
             }
             .task {
                 if let userId = userSession.currentUserId {

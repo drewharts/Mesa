@@ -37,7 +37,6 @@ struct MainView: View {
     let serviceContainer: ServiceContainer
 
     // MARK: - Local UI State
-    @State private var shouldNavigateToProfile = false
     @State private var showSearchPage = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
@@ -151,34 +150,6 @@ struct MainView: View {
                     presentationService.restorePreservedSheet()
                 }
             }
-            .fullScreenCover(isPresented: $shouldNavigateToProfile, onDismiss: {
-                // Present pending map sheets after profile is fully dismissed
-                if let sheet = profileViewModel.pendingSheet {
-                    profileViewModel.pendingSheet = nil
-                    PresentationService.shared.present(sheet)
-                } else if let listId = profileViewModel.selectedListIdForMap {
-                    PresentationService.shared.present(.list(listId: listId))
-                } else if let pending = profileViewModel.pendingMapFilter {
-                    profileViewModel.pendingMapFilter = nil
-                    switch pending {
-                    case .externalPlaces: profileViewModel.showExternalPlacesOnMap = true
-                    case .reviews: profileViewModel.showReviewsOnMap = true
-                    case .favorites: profileViewModel.showFavoritesOnMap = true
-                    case .myPlaces: profileViewModel.showMyPlacesOnMap = true
-                    }
-                }
-            }) {
-                ProfileView()
-                    .environmentObject(userProfileNavigationViewModel)
-                    .environmentObject(mapDisplayCoordinatorViewModel)
-                    .environmentObject(deepLinkViewModel)
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(detailPlaceViewModel)
-                    .environmentObject(profileViewModel)
-                    .environmentObject(deepLinkManager)
-                    .environmentObject(dataManager)
-                    .environmentObject(serviceContainer)
-            }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
                     deepLinkViewModel.dismissNoLocationAlert()
@@ -222,12 +193,6 @@ struct MainView: View {
                     mapPosition = .region(MKCoordinateRegion(center: offsetCenter, span: span))
                 }
                 selectedPlaceVM.shouldAnimateMapToPlace = false
-            }
-        }
-        .onChange(of: userProfileNavigationViewModel.shouldNavigateToOwnProfile) { _, newValue in
-            if newValue {
-                shouldNavigateToProfile = true
-                userProfileNavigationViewModel.clearOwnProfileNavigation()
             }
         }
     }
@@ -677,59 +642,37 @@ struct MainView: View {
 
     // MARK: - UI Overlay Layer
     private var uiOverlayLayer: some View {
-        VStack {
-            HStack {
-                Spacer()
-                VStack(spacing: 10) {
-                    Button(action: {
-                        Analytics.track(.navTapped, ["item": "fresh_finds", "from": "map"])
-                        PresentationService.shared.present(.freshFinds)
-                    }) {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.orange)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                            .shadow(radius: 4)
-                    }
-                    .accessibilityLabel("Fresh finds")
-
-                    Menu {
-                        Picker("Display", selection: $annotationDisplayMode) {
-                            ForEach(AnnotationDisplayMode.allCases, id: \.self) { mode in
-                                Label(mode.label, systemImage: mode.iconName).tag(mode)
-                            }
+        ZStack {
+            if shouldShowMapControls {
+                VStack {
+                    MapTopBar(
+                        onSearchTap: {
+                            Analytics.track(.navTapped, ["item": "search", "from": "map"])
+                            showSearchPage = true
+                        },
+                        onFreshFindsTap: {
+                            Analytics.track(.navTapped, ["item": "fresh_finds", "from": "map"])
+                            PresentationService.shared.present(.freshFinds)
                         }
-                    } label: {
-                        Image(systemName: annotationDisplayMode.iconName)
-                            .foregroundColor(.secondary)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                            .shadow(radius: 4)
-                    }
-
-                    Button(action: {
-                        isSatelliteMap.toggle()
-                    }) {
-                        Image(systemName: isSatelliteMap ? "globe.americas.fill" : "globe.americas")
-                            .foregroundColor(.secondary)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                            .shadow(radius: 4)
+                    )
+                    Spacer()
+                }
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        MapBottomControls(
+                            annotationDisplayMode: $annotationDisplayMode,
+                            isSatelliteMap: $isSatelliteMap,
+                            onRecenterTap: {
+                                Analytics.track(.navTapped, ["item": "recenter", "from": "map"])
+                                recenterMap = true
+                            }
+                        )
                     }
                 }
-                .padding(.top, 10)
-                .padding(.trailing, 20)
             }
-
-            Spacer()
         }
-        .overlay(bottomNavigationBar)
         .sheet(isPresented: $showSearchPage, onDismiss: {
             searchCoordinator.presentPendingPlaceDetailIfNeeded()
             if appCoordinator.hasPendingKeywordPopup {
@@ -765,46 +708,10 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Bottom Navigation Bar
-    /// Single Responsibility: Conditionally display bottom navigation bar based on UI state.
-    private var bottomNavigationBar: some View {
-        Group {
-            if shouldShowBottomNavigationBar {
-                VStack(spacing: 10) {
-                    Spacer()
-                    // Current-location button sits bottom-right just above the floating bar
-                    // (Apple Maps style). It lives in the same stack as the bar, so it stays in
-                    // the safe area, never overlaps it, and hides with it whenever a sheet is up.
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            Analytics.track(.navTapped, ["item": "recenter", "from": "map"])
-                            recenterMap = true
-                        }) {
-                            Image(systemName: "location.fill")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(.mesaAccent)
-                                .frame(width: 44, height: 44)
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                                .shadow(radius: 4)
-                        }
-                        .accessibilityLabel("Show my location")
-                        .padding(.trailing, 20)
-                    }
-                    BottomNavigationBar(
-                        showSearchPage: $showSearchPage,
-                        shouldNavigateToProfile: $shouldNavigateToProfile
-                    )
-                    .environmentObject(profileViewModel)
-                }
-            }
-        }
-    }
+    // MARK: - Map Controls
 
-    /// Determines if bottom navigation bar should be visible.
-    private var shouldShowBottomNavigationBar: Bool {
+    /// Determines if the floating search and map controls should be visible (hidden while a sheet is up).
+    private var shouldShowMapControls: Bool {
         presentationService.activeSheet == nil &&
         !isCreatePlacePopupActive
     }

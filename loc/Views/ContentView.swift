@@ -34,7 +34,7 @@ struct ContentView: View {
         // ✅ Staff Engineer: Use visibility, not conditional rendering (prevents destruction)
         ZStack {
             // MainView always exists (never destroyed/recreated)
-            MainView(
+            MainTabView(
                 selectedPlaceVM: selectedPlaceViewModel,
                 profileViewModel: profileViewModel,
                 userProfileNavigationViewModel: userProfileNavigationViewModel,
@@ -46,7 +46,8 @@ struct ContentView: View {
                 searchCoordinator: searchCoordinator,
                 deepLinkManager: deepLinkManager,
                 dataManager: dataManager,
-                serviceContainer: serviceContainer
+                serviceContainer: serviceContainer,
+                userSession: userSession
             )
             .opacity(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding ? 1 : 0)
             .allowsHitTesting(userSession.isUserLoggedIn && !userSession.needsPhoneOnboarding && !userSession.needsProfilePhoto && !userSession.needsListOnboarding)
