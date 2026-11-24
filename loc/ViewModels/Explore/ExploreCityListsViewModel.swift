@@ -14,6 +14,7 @@ final class ExploreCityListsViewModel: ObservableObject {
 
     @Published var sort: ExploreListSort = .popular
     @Published private(set) var lists: [ExploreList] = []
+    @Published private(set) var coverPhotos: [String: [String]] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var hasLoaded = false
 
@@ -22,6 +23,7 @@ final class ExploreCityListsViewModel: ObservableObject {
     let city: ExploreCity
     private let service = ExploreListsService.shared
     private let maxLists = 200
+    private let coverListLimit = 40
     private var followedIds: Set<String> = []
 
     /// The city's lists in the selected sort order.
@@ -57,6 +59,17 @@ final class ExploreCityListsViewModel: ObservableObject {
             followedIds = await service.fetchFollowedUserIds(userId: userId)
         }
         await attachOwners()
+        await loadCoverPhotos()
+    }
+
+    /// Returns the place photos to show on a list's card (empty until loaded or when it has none).
+    func photos(for list: ExploreList) -> [String] {
+        coverPhotos[list.id] ?? []
+    }
+
+    /// Fetches place photos for the lists in display order, so the first cards fill in first.
+    private func loadCoverPhotos() async {
+        coverPhotos = await service.fetchCoverPhotos(listIds: sortedLists.prefix(coverListLimit).map(\.id))
     }
 
     /// Fills in owner names and photos for every list with one batched lookup.

@@ -15,6 +15,8 @@ struct ListCoverCollage: View {
     @Binding var placeColors: [UUID: Color]
     var seed: String = ""
     var listName: String? = nil
+    /// User-set cover image; wins over place photos while it loads successfully.
+    var userImageURL: String? = nil
 
     @ObservedObject private var failures = ImageLoadFailureRegistry.shared
     @ObservedObject private var metadataCache = ExternalMetadataCache.shared
@@ -28,7 +30,23 @@ struct ListCoverCollage: View {
         return ListCoverImageResolver.visibleURLs(candidates: candidates, failed: failures.failedURLs)
     }
 
+    private var userImage: String? {
+        guard let url = userImageURL?.trimmingCharacters(in: .whitespaces),
+              !url.isEmpty, URL(string: url) != nil,
+              !failures.failedURLs.contains(url) else { return nil }
+        return url
+    }
+
     var body: some View {
+        if let userImage {
+            ListCoverCollageCell(urlString: userImage)
+        } else {
+            placeCollage
+        }
+    }
+
+    @ViewBuilder
+    private var placeCollage: some View {
         let urls = visibleURLs
         switch urls.count {
         case 0:

@@ -71,7 +71,7 @@ struct ExploreCityListsView: View {
         } else {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(viewModel.sortedLists) { list in
-                    ExploreListCard(list: list) { onListTap(list) }
+                    ExploreListCard(list: list, placePhotoURLs: viewModel.photos(for: list)) { onListTap(list) }
                 }
             }
             .padding(.horizontal, 16)

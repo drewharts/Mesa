@@ -20,39 +20,21 @@ struct TripListTileView: View {
         }
     }
 
-    /// Square photo collage with fallback for empty lists.
+    /// Square list cover: user image, else place photos, else the generated placeholder.
     private var collageImage: some View {
         Group {
-            if !previewPlaces.isEmpty {
-                ListPhotoCollage(
-                    places: Array(previewPlaces.prefix(3)),
-                    placeColors: $placeColors
-                )
-            } else {
-                emptyListFallback
-            }
+            ListCoverCollage(
+                previewPhotos: list.preview_photos,
+                places: Array(previewPlaces.prefix(3)),
+                placeColors: $placeColors,
+                seed: list.list_id,
+                listName: list.name,
+                userImageURL: list.image
+            )
         }
         .aspectRatio(1, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-    }
-
-    /// Fallback view when list has no preview places.
-    private var emptyListFallback: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 24))
-                .foregroundStyle(.gray.opacity(0.5))
-            Text("No places yet")
-                .font(.caption)
-                .foregroundStyle(.gray)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGray6))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-        )
     }
 
     /// List name and place count text.

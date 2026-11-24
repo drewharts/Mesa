@@ -1,5 +1,5 @@
 //
-//  ExplorePhotoCollage.swift
+//  PlacePhotoCollage.swift
 //  loc
 //
 //  DUMB Component: Fills its frame with place photos (single photo, or a 2x2 grid for four or more).
@@ -8,7 +8,7 @@
 import SwiftUI
 
 /// Fades place photos in over whatever is behind it; renders nothing visible until images arrive.
-struct ExplorePhotoCollage: View {
+struct PlacePhotoCollage: View {
     let photoURLs: [String]
     let cellSize: CGSize
 
