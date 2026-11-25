@@ -18,6 +18,8 @@ struct TabSheetContainer<Content: View>: View {
     let title: String
     /// When true and a destination is pushed (`viewModel.pushedHeader`), the strip shows that header instead of `title`.
     var showsPushedHeader: Bool = false
+    /// Extra space kept clear at the bottom of the content (e.g. the tab bar plus margin) so the last item is reachable.
+    var bottomInset: CGFloat = 0
     /// Called when the user drags the sheet down far enough to hide it completely.
     let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
@@ -45,6 +47,7 @@ struct TabSheetContainer<Content: View>: View {
         return VStack(spacing: 0) {
             header(containerHeight: containerHeight)
             content()
+                .safeAreaPadding(.bottom, bottomInset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity)

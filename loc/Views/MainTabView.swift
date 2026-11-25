@@ -67,6 +67,8 @@ struct MainTabView: View {
         ))
     }
 
+    @State private var tabBarHeight: CGFloat = 0
+
     var body: some View {
         ZStack {
             mapTab
@@ -75,6 +77,7 @@ struct MainTabView: View {
                 isPresented: router.selected.isSheet,
                 title: router.selected == .trips ? "Trips" : "Explore",
                 showsPushedHeader: router.selected == .explore,
+                bottomInset: tabBarHeight + 16,
                 onDismiss: { router.select(.map) }
             ) {
                 tabSheetContent
@@ -93,6 +96,7 @@ struct MainTabView: View {
                 selectedProfileIcon: profileIconViewModel.selectedIcon,
                 onSelect: { router.select($0) }
             )
+            .readHeight(into: $tabBarHeight)
         }
         .tint(.mesaAccent)
     }

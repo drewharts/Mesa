@@ -59,6 +59,13 @@ final class ExplorePeopleViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Dismissing
+
+    /// Removes a suggested user from the row for this session.
+    func dismiss(profileId: String) {
+        people.removeAll { $0.id == profileId }
+    }
+
     // MARK: - Following
 
     /// Toggles follow state for a user with an optimistic update and rollback on failure.

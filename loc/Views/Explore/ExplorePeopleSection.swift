@@ -2,7 +2,7 @@
 //  ExplorePeopleSection.swift
 //  loc
 //
-//  SMART Component: "People to follow" row backed by ExplorePeopleViewModel.
+//  SMART Component: "Suggested for you" row backed by ExplorePeopleViewModel.
 //
 
 import SwiftUI
@@ -17,13 +17,14 @@ struct ExplorePeopleSection: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeaderRow(title: "People to follow")
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 14) {
+                    LazyHStack(spacing: 12) {
                         ForEach(viewModel.people) { person in
-                            RecommendedUserCard(
+                            ExploreSuggestedPersonCard(
                                 profile: person,
                                 isFollowing: viewModel.followStates[person.id] ?? false,
                                 onFollowTap: { Task { await viewModel.toggleFollow(profileId: person.id) } },
-                                onProfileTap: { onProfileTap(person) }
+                                onProfileTap: { onProfileTap(person) },
+                                onDismissTap: { viewModel.dismiss(profileId: person.id) }
                             )
                         }
                     }
