@@ -18,8 +18,8 @@ struct TabSheetContainer<Content: View>: View {
     let title: String
     /// When true and a destination is pushed (`viewModel.pushedHeader`), the strip shows that header instead of `title`.
     var showsPushedHeader: Bool = false
-    /// Extra space kept clear at the bottom of the content (e.g. the tab bar plus margin) so the last item is reachable.
-    var bottomInset: CGFloat = 0
+    /// Screen-space y of the tab bar's top edge (0 if not yet measured); content is kept clear of everything below it.
+    var tabBarTop: CGFloat = 0
     /// Called when the user drags the sheet down far enough to hide it completely.
     let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
@@ -30,10 +30,13 @@ struct TabSheetContainer<Content: View>: View {
     private let minimumHeight: CGFloat = 60
     private let headerHeight: CGFloat = 60
     private let pushedDetailHeaderHeight: CGFloat = 90
+    private let bottomMargin: CGFloat = 24
+    /// Tab bar height plus home-indicator area, used until the bar's position has been measured.
+    private let fallbackBarClearance: CGFloat = 96
 
     var body: some View {
         GeometryReader { proxy in
-            sheet(containerHeight: proxy.size.height)
+            sheet(containerHeight: proxy.size.height, bottomInset: bottomInset(containerBottom: proxy.frame(in: .global).maxY))
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
         }
         .clipped()
@@ -41,14 +44,20 @@ struct TabSheetContainer<Content: View>: View {
 
     // MARK: - Subviews
 
-    private func sheet(containerHeight: CGFloat) -> some View {
+    /// Returns how far the content's bottom edge must be raised so it ends above the tab bar, plus a margin.
+    private func bottomInset(containerBottom: CGFloat) -> CGFloat {
+        let overlap = tabBarTop > 0 ? max(0, containerBottom - tabBarTop) : fallbackBarClearance
+        return overlap + bottomMargin
+    }
+
+    private func sheet(containerHeight: CGFloat, bottomInset: CGFloat) -> some View {
         let resting = viewModel.detent.height(in: containerHeight)
         let height = min(max(resting - dragTranslation, minimumHeight), containerHeight)
         return VStack(spacing: 0) {
             header(containerHeight: containerHeight)
             content()
-                .safeAreaPadding(.bottom, bottomInset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, bottomInset)
         }
         .frame(maxWidth: .infinity)
         .frame(height: height, alignment: .top)

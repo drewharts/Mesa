@@ -23,3 +23,23 @@ extension View {
         .onPreferenceChange(ViewHeightKey.self) { height.wrappedValue = $0 }
     }
 }
+
+private struct ViewTopKey: PreferenceKey {
+    static var defaultValue: CGFloat = .nan
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if !next.isNaN { value = next }
+    }
+}
+
+extension View {
+    /// Writes this view's top edge in global (screen) coordinates into the given binding whenever it changes.
+    func readGlobalTop(into top: Binding<CGFloat>) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: ViewTopKey.self, value: proxy.frame(in: .global).minY)
+            }
+        )
+        .onPreferenceChange(ViewTopKey.self) { if !$0.isNaN { top.wrappedValue = $0 } }
+    }
+}
