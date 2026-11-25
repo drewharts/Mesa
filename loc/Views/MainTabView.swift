@@ -68,23 +68,24 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                mapTab
-                TabSheetContainer(
-                    viewModel: viewModel.tabSheet,
-                    isPresented: router.selected.isSheet,
-                    title: router.selected == .trips ? "Trips" : "Explore",
-                    onDismiss: { router.select(.map) }
-                ) {
-                    tabSheetContent
-                }
-                if router.visitedTabs.contains(.profile) {
-                    profileTab
-                        .background(Color(.systemBackground))
-                        .tabLayer(isActive: router.selected == .profile)
-                }
+        ZStack {
+            mapTab
+            TabSheetContainer(
+                viewModel: viewModel.tabSheet,
+                isPresented: router.selected.isSheet,
+                title: router.selected == .trips ? "Trips" : "Explore",
+                onDismiss: { router.select(.map) }
+            ) {
+                tabSheetContent
             }
+            if router.visitedTabs.contains(.profile) {
+                profileTab
+                    .background(Color(.systemBackground))
+                    .tabLayer(isActive: router.selected == .profile)
+            }
+        }
+        // Inset (not stacked) so the map extends beneath the translucent bar while content still avoids it.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             AppTabBar(
                 selected: router.selected,
                 profileIcon: profileIconViewModel.normalIcon,

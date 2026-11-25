@@ -41,8 +41,8 @@ struct AppTabBar: View {
         .padding(.top, 6)
         .padding(.bottom, 2)
         .frame(maxWidth: .infinity)
-        .background(.bar, ignoresSafeAreaEdges: .bottom)
-        .overlay(alignment: .top) { Divider() }
+        .background(.regularMaterial, ignoresSafeAreaEdges: .bottom)
+        .overlay(alignment: .top) { Color(.separator).opacity(0.6).frame(height: 0.5) }
     }
 
     // MARK: - Subviews
