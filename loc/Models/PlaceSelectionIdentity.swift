@@ -104,3 +104,20 @@ struct PlaceDetailOwnerStack: Equatable {
         selected.isEmpty || PlaceSelectionIdentity.idsMatch(owned, selected)
     }
 }
+
+/// Single rule for "is a place detail on screen", which decides whether the map draws a selected pin.
+enum PlaceDetailVisibility {
+    /// True when the global detail sheet is up, or an in-sheet place page is live in a surface the user can see.
+    /// Tab sheet content stays alive (hidden) when its tab is left or the sheet is dismissed to the map, so a
+    /// live in-sheet page only counts while a tab sheet is selected, another tab page is showing, or a map sheet is up.
+    static func isVisible(
+        isGlobalDetailSheetShowing: Bool,
+        hasInSheetPlacePage: Bool,
+        selectedTab: AppTab,
+        hasMapSheet: Bool
+    ) -> Bool {
+        if isGlobalDetailSheetShowing { return true }
+        guard hasInSheetPlacePage else { return false }
+        return selectedTab != .map || hasMapSheet
+    }
+}

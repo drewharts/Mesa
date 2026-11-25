@@ -22,6 +22,10 @@ struct MapView: View {
 
     /// Map-first list sheet: which list row/pin is focused and where the camera should go.
     @ObservedObject private var listSheetVM = ListMapSheetViewModel.shared
+    /// Inputs of the "place detail visible" rule; observed so the selected pin clears the moment they change.
+    @ObservedObject private var presentationService = PresentationService.shared
+    @ObservedObject private var placeDetailOwnership = PlaceDetailOwnership.shared
+    @ObservedObject private var tabRouter = AppTabRouter.shared
     /// Stored opening hours, for the small "open now" dot on place pins.
     @ObservedObject private var hoursStore = PlaceHoursStore.shared
     /// Mirrors MapPhotoViewModel.imagesRevision (not forwarded through MapViewModel) so baked
@@ -56,12 +60,27 @@ struct MapView: View {
         mapViewModel.showingKeywordPopup
     }
 
+    /// Whether any place detail is on screen right now (derived, so it cannot go stale).
+    private var isPlaceDetailVisible: Bool {
+        PlaceDetailVisibility.isVisible(
+            isGlobalDetailSheetShowing: presentationService.activeSheet == .placeDetail,
+            hasInSheetPlacePage: placeDetailOwnership.stack.top != nil,
+            selectedTab: tabRouter.selected,
+            hasMapSheet: presentationService.activeSheet != nil
+        )
+    }
+
+    /// The selected place's id, or nil when no place detail is visible so the map never keeps a stale pin.
+    private var visibleSelectedPlaceId: String? {
+        isPlaceDetailVisible ? selectedPlaceVM.selectedPlace?.id.uuidString : nil
+    }
+
     // Sort annotations so selected one renders last (on top)
     // MapKit renders annotations in ForEach order, so last = topmost
     // Also includes preserved annotation if it was culled by density reduction
     // In "My Places" mode, filters to only annotations containing the current user
     private var sortedAnnotations: [PlaceAnnotation] {
-        let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString
+        let selectedId = visibleSelectedPlaceId
 
         // Start with viewport annotations, filtered by display mode
         var annotations: [PlaceAnnotation]
@@ -74,7 +93,8 @@ struct MapView: View {
         annotations = ListMapPinFilter.apply(annotations, allowedIds: listSheetVM.chipScopeIds)
 
         // Add preserved annotation if not already present (survives zoom-out culling and My Places filter)
-        if let preserved = mapViewModel.preservedSelectedAnnotation,
+        if isPlaceDetailVisible,
+           let preserved = mapViewModel.preservedSelectedAnnotation,
            !annotations.contains(where: { $0.id == preserved.id }) {
             annotations.append(preserved)
         }
@@ -89,7 +109,7 @@ struct MapView: View {
 
     // Community markers filtered to exclude the currently selected place
     private var filteredCommunityMarkers: [CommunityPlaceMarker] {
-        let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString
+        let selectedId = visibleSelectedPlaceId
         guard let selectedId else { return mapViewModel.communityMarkers }
         return mapViewModel.communityMarkers.filter { $0.id != selectedId }
     }
@@ -140,7 +160,7 @@ struct MapView: View {
                itemPlaceId.caseInsensitiveCompare(focusedId) == .orderedSame {
                 return true
             }
-            guard let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString else { return false }
+            guard let selectedId = visibleSelectedPlaceId else { return false }
             return item.placeId == selectedId
         case .trip(let trip):
             return trip.placeId == mapDisplayCoordinatorVM.selectedTripAnnotationPlaceId

@@ -83,6 +83,7 @@ struct PlaceDetailViewInNavigation: View {
         }
         .onDisappear {
             ownership.release(token: ownerToken)
+            clearSelectionIfAbandoned()
         }
         .onChange(of: selectedPlaceVM.selectedPlace?.id) { _, _ in
             reconcileSelection()
@@ -90,6 +91,16 @@ struct PlaceDetailViewInNavigation: View {
         .onChange(of: ownership.stack.top) { _, _ in
             reconcileSelection()
         }
+    }
+
+    /// Clears the shared selection when this page was popped and no other place page or detail sheet shows that place.
+    private func clearSelectionIfAbandoned() {
+        guard let ownedPlace,
+              ownership.stack.top == nil,
+              !selectedPlaceVM.isDetailSheetPresented,
+              PlaceSelectionIdentity.idsMatch(selectedPlaceVM.selectedPlace?.id.uuidString, ownedPlace.id.uuidString)
+        else { return }
+        selectedPlaceVM.selectedPlace = nil
     }
 
     /// Makes the given place this page's place and marks the page as the visible owner.
