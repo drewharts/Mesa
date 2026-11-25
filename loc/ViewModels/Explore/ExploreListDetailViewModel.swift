@@ -95,6 +95,33 @@ final class ExploreListDetailViewModel: ObservableObject {
         hasReservablePlaces = await reservable ?? true
     }
 
+    /// Builds the header the sheet's strip shows for this list: title, creator chip (tappable unless it's the user's own list), count, share.
+    func header(
+        currentUserId: String?,
+        onBack: @escaping () -> Void,
+        onOpenProfile: @escaping (ProfileData) -> Void
+    ) -> TabSheetHeader {
+        TabSheetHeader(
+            id: "list-\(list.id)",
+            title: list.name,
+            creator: creator(currentUserId: currentUserId, onOpenProfile: onOpenProfile),
+            detail: countLabel,
+            onBack: onBack,
+            onShare: { [weak self] in self?.shareList() }
+        )
+    }
+
+    /// The creator chip content: "You" for the user's own list (not tappable), else the owner's name linking to their profile.
+    private func creator(currentUserId: String?, onOpenProfile: @escaping (ProfileData) -> Void) -> TabSheetHeader.Creator? {
+        if isOwnList(currentUserId: currentUserId) {
+            return .init(name: "You", photoURL: list.ownerPhotoURL, onTap: nil)
+        }
+        guard let name = list.ownerName, !name.isEmpty else { return nil }
+        var onTap: (() -> Void)?
+        if let profile = ownerProfile { onTap = { onOpenProfile(profile) } }
+        return .init(name: name, photoURL: list.ownerPhotoURL, onTap: onTap)
+    }
+
     /// Opens the system share sheet for the list.
     func shareList() {
         let shareable = Self.lightweightList(from: list)

@@ -74,6 +74,7 @@ struct MainTabView: View {
                 viewModel: viewModel.tabSheet,
                 isPresented: router.selected.isSheet,
                 title: router.selected == .trips ? "Trips" : "Explore",
+                showsPushedHeader: router.selected == .explore,
                 onDismiss: { router.select(.map) }
             ) {
                 tabSheetContent
@@ -129,6 +130,7 @@ struct MainTabView: View {
 
     private var exploreTab: some View {
         ExploreTabView(
+            tabSheet: viewModel.tabSheet,
             onOpenPlaceDetail: { viewModel.openPlaceOnMap($0) },
             isActive: router.selected == .explore
         )

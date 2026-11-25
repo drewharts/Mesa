@@ -15,6 +15,7 @@ struct ExploreTabView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
+    let tabSheet: TabSheetViewModel
     @StateObject private var navigation = ExploreNavigationViewModel()
 
     let onOpenPlaceDetail: (DetailPlace) -> Void
@@ -49,12 +50,17 @@ struct ExploreTabView: View {
                     destination: destination,
                     onListTap: { navigation.openList($0) },
                     onPlaceTap: { navigation.openPlace($0) },
-                    onUserTap: { navigation.openProfile($0) }
+                    onUserTap: { navigation.openProfile($0) },
+                    onHeader: { navigation.setHeader($0) },
+                    onBack: { navigation.pop() }
                 )
             }
         }
-        .onAppear { navigation.bind(mapCoordinator: mapDisplayCoordinatorVM) }
-        .onChange(of: navigation.path) { _, _ in navigation.syncMapWithPath() }
+        .onAppear { navigation.bind(mapCoordinator: mapDisplayCoordinatorVM, tabSheet: tabSheet) }
+        .onChange(of: navigation.path) { _, _ in
+            navigation.syncMapWithPath()
+            navigation.clearHeaderIfAtRoot()
+        }
         .onReceive(PresentationService.shared.$pendingPlaceNavigation.compactMap { $0 }) { navigation.handleMapPinTap($0) }
         .task(id: userSession.currentUserId) {
             guard let userId = userSession.currentUserId else { return }

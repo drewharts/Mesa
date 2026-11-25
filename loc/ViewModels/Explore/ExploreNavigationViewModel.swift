@@ -18,6 +18,7 @@ final class ExploreNavigationViewModel: ObservableObject {
     // MARK: - Private State
 
     private weak var mapCoordinator: MapDisplayCoordinatorViewModel?
+    private weak var tabSheet: TabSheetViewModel?
     private let listSheetViewModel = ListMapSheetViewModel.shared
     private let presentationService = PresentationService.shared
     private var pinnedListId: String?
@@ -33,9 +34,29 @@ final class ExploreNavigationViewModel: ObservableObject {
 
     // MARK: - Setup
 
-    /// Connects the map coordinator that shows and clears list pins.
-    func bind(mapCoordinator: MapDisplayCoordinatorViewModel) {
+    /// Connects the map coordinator that shows and clears list pins, and the sheet whose header strip follows the path.
+    func bind(mapCoordinator: MapDisplayCoordinatorViewModel, tabSheet: TabSheetViewModel) {
         self.mapCoordinator = mapCoordinator
+        self.tabSheet = tabSheet
+    }
+
+    // MARK: - Header
+
+    /// Shows the destination on top of the path in the sheet's header strip (ignored once the path is back at the root).
+    func setHeader(_ header: TabSheetHeader) {
+        guard !path.isEmpty else { return }
+        tabSheet?.setPushedHeader(header)
+    }
+
+    /// Pops the destination on top of the path.
+    func pop() {
+        guard !path.isEmpty else { return }
+        path.removeLast()
+    }
+
+    /// Restores the plain "Explore" strip once nothing is pushed.
+    func clearHeaderIfAtRoot() {
+        if path.isEmpty { tabSheet?.setPushedHeader(nil) }
     }
 
     // MARK: - Pushing

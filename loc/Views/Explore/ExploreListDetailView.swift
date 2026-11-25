@@ -8,35 +8,35 @@
 
 import SwiftUI
 
-/// Pushed from Explore: compact header (back, title, share, creator chip) above the list's place tiles.
+/// Pushed from Explore: the list's place tiles; its header (back, title, share, creator chip) lives in the sheet's strip.
 struct ExploreListDetailView: View {
     @StateObject private var viewModel: ExploreListDetailViewModel
     let onOpenPlace: (String) -> Void
     let onOpenProfile: (ProfileData) -> Void
+    let onHeader: (TabSheetHeader) -> Void
+    let onBack: () -> Void
 
     @EnvironmentObject private var userSession: UserSession
-    @Environment(\.dismiss) private var dismiss
-    @State private var hasAppeared = false
+        @State private var hasAppeared = false
 
-    /// Creates the screen for one list; `onOpenPlace` and `onOpenProfile` push a place page or the creator's profile.
-    init(list: ExploreList, onOpenPlace: @escaping (String) -> Void, onOpenProfile: @escaping (ProfileData) -> Void) {
+    /// Creates the screen for one list; `onOpenPlace` and `onOpenProfile` push a place page or the creator's profile,
+    /// `onHeader` publishes the list's header (title, creator, count, share) to the sheet's strip and `onBack` pops it.
+    init(
+        list: ExploreList,
+        onOpenPlace: @escaping (String) -> Void,
+        onOpenProfile: @escaping (ProfileData) -> Void,
+        onHeader: @escaping (TabSheetHeader) -> Void,
+        onBack: @escaping () -> Void
+    ) {
         self._viewModel = StateObject(wrappedValue: ExploreListDetailViewModel(list: list))
         self.onOpenPlace = onOpenPlace
         self.onOpenProfile = onOpenProfile
+        self.onHeader = onHeader
+        self.onBack = onBack
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ExploreListHeaderView(
-                title: viewModel.list.name,
-                countLabel: viewModel.countLabel,
-                creatorName: viewModel.list.ownerName,
-                creatorPhotoURL: viewModel.list.ownerPhotoURL,
-                isOwnList: viewModel.isOwnList(currentUserId: userSession.currentUserId),
-                onBack: { dismiss() },
-                onShare: { viewModel.shareList() },
-                onCreatorTap: creatorTap
-            )
             ListPlacesScrollView(
                 places: viewModel.places,
                 isLoadingInitial: viewModel.popup.isLoadingPlaces,
@@ -55,17 +55,21 @@ struct ExploreListDetailView: View {
                 hasReservablePlaces: viewModel.hasReservablePlaces == true
             )
         }
-        .toolbar(.hidden, for: .navigationBar)
         .task { await viewModel.load() }
         .onAppear {
+            publishHeader()
             if hasAppeared { viewModel.reframePins() }
             hasAppeared = true
         }
+        .onChange(of: viewModel.countLabel) { _, _ in publishHeader() }
     }
 
-    /// Opens the creator's profile, or nil when the creator is unknown.
-    private var creatorTap: (() -> Void)? {
-        guard let profile = viewModel.ownerProfile else { return nil }
-        return { onOpenProfile(profile) }
+    /// Sends the list's current header to the sheet's strip.
+    private func publishHeader() {
+        onHeader(viewModel.header(
+            currentUserId: userSession.currentUserId,
+            onBack: onBack,
+            onOpenProfile: onOpenProfile
+        ))
     }
 }

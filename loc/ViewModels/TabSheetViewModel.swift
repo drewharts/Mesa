@@ -16,8 +16,18 @@ final class TabSheetViewModel: ObservableObject {
 
     @Published private(set) var detent: TabSheetDetent = .large
 
+    /// Header of the destination pushed on the active tab (nil at the tab's root); the sheet's strip shows it.
+    @Published private(set) var pushedHeader: TabSheetHeader?
+
     /// The height to return to once whatever required the lowered sheet (a pushed list or trip) is gone.
     private var detentBeforeLowering: TabSheetDetent?
+
+    // MARK: - Header
+
+    /// Sets (or with nil clears) the pushed destination's header shown in the sheet's strip.
+    func setPushedHeader(_ header: TabSheetHeader?) {
+        pushedHeader = header
+    }
 
     // MARK: - Detent Changes
 

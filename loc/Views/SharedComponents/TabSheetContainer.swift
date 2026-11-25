@@ -16,6 +16,8 @@ struct TabSheetContainer<Content: View>: View {
     let isPresented: Bool
     /// Compact title shown in the fixed header strip under the grabber.
     let title: String
+    /// When true and a destination is pushed (`viewModel.pushedHeader`), the strip shows that header instead of `title`.
+    var showsPushedHeader: Bool = false
     /// Called when the user drags the sheet down far enough to hide it completely.
     let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
@@ -25,6 +27,7 @@ struct TabSheetContainer<Content: View>: View {
     private let cornerRadius: CGFloat = 24
     private let minimumHeight: CGFloat = 60
     private let headerHeight: CGFloat = 60
+    private let pushedDetailHeaderHeight: CGFloat = 90
 
     var body: some View {
         GeometryReader { proxy in
@@ -58,21 +61,35 @@ struct TabSheetContainer<Content: View>: View {
     }
 
     private func header(containerHeight: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let pushed = showsPushedHeader ? viewModel.pushedHeader : nil
+        return VStack(alignment: .leading, spacing: 0) {
             Capsule()
                 .fill(Color(.systemGray3))
                 .frame(width: 36, height: 5)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 8)
-            Text(title)
-                .font(.title2.weight(.bold))
-                .padding(.horizontal, 16)
-                .accessibilityAddTraits(.isHeader)
+            ZStack(alignment: .topLeading) {
+                if let pushed {
+                    TabSheetHeaderContent(header: pushed)
+                        .id(pushed.id)
+                        .transition(.opacity.combined(with: .offset(x: 12)))
+                } else {
+                    Text(title)
+                        .font(.title2.weight(.bold))
+                        .padding(.horizontal, 16)
+                        .accessibilityAddTraits(.isHeader)
+                        .transition(.opacity)
+                }
+            }
+            .padding(.top, 6)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             Spacer(minLength: 0)
         }
-        .frame(height: headerHeight)
+        .frame(height: pushed?.hasDetailLine == true ? pushedDetailHeaderHeight : headerHeight)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .clipped()
         .contentShape(Rectangle())
+        .animation(.easeInOut(duration: 0.2), value: pushed?.id)
         .gesture(dragGesture(containerHeight: containerHeight))
     }
 
