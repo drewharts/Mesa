@@ -3,7 +3,7 @@
 //  loc
 //
 //  DUMB Component: map layer options and the current-location button, stacked bottom-right
-//  just above the tab bar (Google Maps layout).
+//  above the tab bar (kept clear via `bottomClearance`) (Google Maps layout).
 //
 
 import SwiftUI
@@ -12,6 +12,8 @@ import SwiftUI
 struct MapBottomControls: View {
     @Binding var annotationDisplayMode: AnnotationDisplayMode
     @Binding var isSatelliteMap: Bool
+    /// Distance from the bottom of the container to keep clear (tab bar overlap plus margin).
+    let bottomClearance: CGFloat
     let onRecenterTap: () -> Void
 
     var body: some View {
@@ -25,7 +27,7 @@ struct MapBottomControls: View {
             )
         }
         .padding(.trailing, 16)
-        .padding(.bottom, 16)
+        .padding(.bottom, bottomClearance)
     }
 
     // MARK: - Subviews

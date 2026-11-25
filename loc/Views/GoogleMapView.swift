@@ -47,6 +47,8 @@ struct GoogleMapView: UIViewRepresentable {
     var iconRevision: Int = 0
     /// Bumped when new avatar composites are baked; visible markers update their icon in place.
     var photoRevision: Int = 0
+    /// Screen-space y of the tab bar's top edge (0 if unmeasured); the map's bottom padding keeps the Google logo and camera centering above it.
+    var tabBarTop: CGFloat = 0
 
     // Clustering radius is now footprint-based; see OverlapClusterAlgorithm.
 
@@ -64,9 +66,19 @@ struct GoogleMapView: UIViewRepresentable {
         return mapView
     }
 
+    /// Pads the map's bottom edge by the tab bar's overlap so the Google logo and camera centering sit above the bar.
+    private func applyBottomPadding(to mapView: GMSMapView) {
+        let bottom = mapView.window == nil
+            ? TabBarClearance.fallbackHeight
+            : TabBarClearance.overlap(containerBottom: mapView.convert(mapView.bounds, to: nil).maxY, tabBarTop: tabBarTop)
+        guard mapView.padding.bottom != bottom else { return }
+        mapView.padding = UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
+    }
+
     func updateUIView(_ mapView: GMSMapView, context: Context) {
         context.coordinator.parent = self
         mapView.mapType = isSatelliteMap ? .hybrid : .normal
+        applyBottomPadding(to: mapView)
         context.coordinator.syncAnnotations(annotations, on: mapView)
         context.coordinator.syncTripRoutes(tripRoutes, on: mapView)
         context.coordinator.syncCameraIfNeeded(mapPosition, on: mapView)

@@ -43,6 +43,7 @@ struct MainView: View {
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var annotationDisplayMode: AnnotationDisplayMode = .everyone
     @State private var isSatelliteMap: Bool = false
+    @Environment(\.tabBarTop) private var tabBarTop
 
     /// Convenience accessor for external content view model.
     private var externalContentVM: ProfileExternalContentViewModel { profileViewModel.externalContentViewModel }
@@ -666,18 +667,21 @@ struct MainView: View {
                     )
                     Spacer()
                 }
-                VStack {
-                    Spacer()
-                    HStack {
+                GeometryReader { proxy in
+                    VStack {
                         Spacer()
-                        MapBottomControls(
-                            annotationDisplayMode: $annotationDisplayMode,
-                            isSatelliteMap: $isSatelliteMap,
-                            onRecenterTap: {
-                                Analytics.track(.navTapped, ["item": "recenter", "from": "map"])
-                                recenterMap = true
-                            }
-                        )
+                        HStack {
+                            Spacer()
+                            MapBottomControls(
+                                annotationDisplayMode: $annotationDisplayMode,
+                                isSatelliteMap: $isSatelliteMap,
+                                bottomClearance: TabBarClearance.overlap(containerBottom: proxy.frame(in: .global).maxY, tabBarTop: tabBarTop) + TabBarClearance.margin,
+                                onRecenterTap: {
+                                    Analytics.track(.navTapped, ["item": "recenter", "from": "map"])
+                                    recenterMap = true
+                                }
+                            )
+                        }
                     }
                 }
             }

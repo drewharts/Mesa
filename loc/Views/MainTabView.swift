@@ -99,6 +99,7 @@ struct MainTabView: View {
             )
             .readGlobalTop(into: $tabBarTop)
         }
+        .environment(\.tabBarTop, tabBarTop)
         .tint(.mesaAccent)
     }
 

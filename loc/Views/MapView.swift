@@ -10,6 +10,7 @@ import Combine
 
 struct MapView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.tabBarTop) private var tabBarTop
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
@@ -333,7 +334,8 @@ struct MapView: View {
                     annotationImage(for: item, isSelected: isSelected)
                 },
                 iconRevision: hoursStore.revision,
-                photoRevision: photoRevision
+                photoRevision: photoRevision,
+                tabBarTop: tabBarTop
             )
             .ignoresSafeArea()
             .onReceive(mapViewModel.photoViewModel.$imagesRevision.removeDuplicates()) { photoRevision = $0 }
