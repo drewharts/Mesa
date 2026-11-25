@@ -12,6 +12,8 @@ import SwiftUI
 struct PlacePhotoCollage: View {
     let photoURLs: [String]
     let cellSize: CGSize
+    /// When false, only the first healthy candidate is drawn full-frame, however many candidates exist.
+    var allowsGrid = true
 
     @ObservedObject private var failures = ImageLoadFailureRegistry.shared
 
@@ -19,7 +21,7 @@ struct PlacePhotoCollage: View {
     private let fadeDuration = 0.25
 
     private var visibleURLs: [String] {
-        PlacePhotoCollageLayout.visibleURLs(photoURLs, failed: failures.failedURLs)
+        PlacePhotoCollageLayout.visibleURLs(photoURLs, failed: failures.failedURLs, allowsGrid: allowsGrid)
     }
 
     var body: some View {

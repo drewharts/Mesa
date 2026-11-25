@@ -156,7 +156,7 @@ struct ExploreTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
                         ForEach(viewModel.cities) { city in
-                            ExploreCityCard(city: city, photoURL: viewModel.photoURL(for: city)) { navigation.openCity(city) }
+                            ExploreCityCard(city: city, photoURLs: viewModel.photoURLs(for: city)) { navigation.openCity(city) }
                         }
                     }
                     .padding(.horizontal, 16)

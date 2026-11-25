@@ -11,10 +11,10 @@ import CoreGraphics
 enum PlacePhotoCollageLayout {
     static let gridCount = 4
 
-    /// The photos to draw: the first four candidates that have not failed (a 2x2 grid), else just the first healthy one.
-    static func visibleURLs(_ candidates: [String], failed: Set<String>) -> [String] {
+    /// The photos to draw: the first four candidates that have not failed (a 2x2 grid, unless `allowsGrid` is false), else just the first healthy one.
+    static func visibleURLs(_ candidates: [String], failed: Set<String>, allowsGrid: Bool = true) -> [String] {
         let healthy = candidates.filter { !failed.contains($0) }
-        return healthy.count >= gridCount ? Array(healthy.prefix(gridCount)) : Array(healthy.prefix(1))
+        return allowsGrid && healthy.count >= gridCount ? Array(healthy.prefix(gridCount)) : Array(healthy.prefix(1))
     }
 
     /// The size each drawn photo is decoded at: a quarter of the frame in a grid, the whole frame otherwise.

@@ -38,7 +38,7 @@ final class ExploreTabViewModel: ObservableObject {
     private let poolSize = 1000
     private let popularCount = 12
     private let coverCityLimit = 20
-    private let coverListsPerCity = 2
+    private let coverListsPerCity = 4
     private let relocationThresholdMeters: CLLocationDistance = 5_000
     private let staleAfter: TimeInterval = 60
     private var lastRefreshedAt = Date()
@@ -159,9 +159,12 @@ final class ExploreTabViewModel: ObservableObject {
         coverPhotos[list.id] ?? []
     }
 
-    /// Returns a background photo for a city, taken from its top-ranked lists that have photos.
-    func photoURL(for city: ExploreCity) -> String? {
-        cityCoverListIds[city.key]?.lazy.compactMap { self.coverPhotos[$0]?.first }.first
+    /// Returns background photo candidates for a city: its top-ranked lists' place photos in order, so the
+    /// card can fall through dead or expired links to the next photo.
+    func photoURLs(for city: ExploreCity) -> [String] {
+        let urls = (cityCoverListIds[city.key] ?? []).flatMap { coverPhotos[$0] ?? [] }
+        var seen = Set<String>()
+        return urls.filter { seen.insert($0).inserted }
     }
 
     /// Fetches place photos for the popular lists and for each top city's best lists, both at once.
@@ -183,13 +186,13 @@ final class ExploreTabViewModel: ObservableObject {
     private func loadCovers(for ids: [String], frame: CGSize) async {
         let fetched = await service.fetchCoverPhotos(listIds: ids)
         coverPhotos.merge(fetched) { _, new in new }
-        prefetchImages(for: ids, frame: frame)
+        prefetchImages(for: ids, frame: frame, allowsGrid: frame != ExploreCoverMetrics.city)
     }
 
     /// Warms the image cache for each list's visible collage photos at the given frame size.
-    private func prefetchImages(for ids: [String], frame: CGSize) {
+    private func prefetchImages(for ids: [String], frame: CGSize, allowsGrid: Bool = true) {
         for id in ids {
-            let urls = PlacePhotoCollageLayout.visibleURLs(coverPhotos[id] ?? [], failed: [])
+            let urls = PlacePhotoCollageLayout.visibleURLs(coverPhotos[id] ?? [], failed: [], allowsGrid: allowsGrid)
             let size = PlacePhotoCollageLayout.cellSize(forPhotoCount: urls.count, frame: frame)
             ImageCacheService.shared.prefetch(urls: urls.compactMap { URL(string: $0) }, targetSize: size)
         }
