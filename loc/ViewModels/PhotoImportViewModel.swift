@@ -131,7 +131,7 @@ class PhotoImportViewModel: ObservableObject {
     }
     
     /// Extracts GPS coordinates from EXIF data in a photo. Returns nil if no GPS data found.
-    static func extractGPSCoordinates(from data: Data) -> (latitude: Double, longitude: Double)? {
+    nonisolated static func extractGPSCoordinates(from data: Data) -> (latitude: Double, longitude: Double)? {
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
               let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any],
               let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
