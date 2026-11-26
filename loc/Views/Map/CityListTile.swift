@@ -20,7 +20,7 @@ struct CityListTile: View {
             onTap()
         } label: {
             ZStack(alignment: .bottomLeading) {
-                ListPhotoCollage(places: places, placeColors: $placeColors)
+                ListCoverCollage(previewPhotos: nil, places: places, placeColors: $placeColors, seed: list.list_id, listName: list.name, userImageURL: list.image)
 
                 gradientOverlay
 

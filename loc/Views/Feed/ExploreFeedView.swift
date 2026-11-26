@@ -38,13 +38,10 @@ struct ExploreFeedView: View {
                     videoGrid
                 }
             }
-            .refreshable {
-                await viewModel.loadInitial()
-            }
         }
         .task {
             async let cities: () = viewModel.availableCities.isEmpty ? viewModel.loadCities() : ()
-            async let videos: () = viewModel.videos.isEmpty ? viewModel.loadInitial() : ()
+            async let videos: () = viewModel.loadInitial()
             async let trending: () = viewModel.loadTrending()
             _ = await (cities, videos, trending)
         }

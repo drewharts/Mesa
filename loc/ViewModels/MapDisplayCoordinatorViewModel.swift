@@ -37,6 +37,30 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
     /// Place ID of the currently highlighted trip annotation (drives pin selection + camera).
     @Published var selectedTripAnnotationPlaceId: String?
 
+    // MARK: - Tab Sheet List Pins
+
+    /// A list whose pins the map shows (no map sheet) while that list is pushed inside a tab sheet.
+    struct TabListPins: Equatable {
+        let listId: String
+        let ownerId: String
+        let ownerPhotoUrl: String?
+    }
+
+    /// The list currently pushed in a tab sheet; the map filters to its pins while this is set.
+    @Published private(set) var tabListPins: TabListPins?
+
+    /// Asks the map to show only this list's pins, without presenting a map sheet.
+    func showTabListPins(_ pins: TabListPins) {
+        guard tabListPins != pins else { return }
+        tabListPins = pins
+    }
+
+    /// Asks the map to drop the list pins shown for a tab sheet.
+    func clearTabListPins() {
+        guard tabListPins != nil else { return }
+        tabListPins = nil
+    }
+
     // MARK: - Map Display Triggers
 
     /// Triggers map sheet to show external user's reviews

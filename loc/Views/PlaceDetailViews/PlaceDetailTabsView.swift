@@ -126,6 +126,7 @@ struct PlaceDetailTabsView: View {
                 }
             )
             .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
         }
         // Link Copied Instruction Alert (shown after Instagram share)

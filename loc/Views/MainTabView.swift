@@ -1,0 +1,170 @@
+//
+//  MainTabView.swift
+//  loc
+//
+//  Root container: the map is always the base layer. Explore and Trips are presented as a bottom
+//  sheet over the map (swipe down to hide it and return to the map) with the tab bar staying visible;
+//  Profile is a full page above the map. Each tab keeps its own NavigationStack and state; map sheets
+//  (lists, places) sit above the bar.
+//
+
+import SwiftUI
+
+struct MainTabView: View {
+    @ObservedObject private var router = AppTabRouter.shared
+    @StateObject private var viewModel: MainTabViewModel
+    @StateObject private var profileIconViewModel: ProfileTabIconViewModel
+
+    let selectedPlaceVM: SelectedPlaceViewModel
+    let profileViewModel: ProfileViewModel
+    let userProfileNavigationViewModel: UserProfileNavigationViewModel
+    let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
+    let detailPlaceViewModel: DetailPlaceViewModel
+    let deepLinkViewModel: DeepLinkViewModel
+    let notificationManager: NotificationManager
+    let searchViewModel: SearchViewModel
+    let searchCoordinator: SearchCoordinatorViewModel
+    let deepLinkManager: DeepLinkManager
+    let dataManager: DataManager
+    let serviceContainer: ServiceContainer
+
+    /// Creates the tab container and its coordinating ViewModel.
+    init(
+        selectedPlaceVM: SelectedPlaceViewModel,
+        profileViewModel: ProfileViewModel,
+        userProfileNavigationViewModel: UserProfileNavigationViewModel,
+        mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel,
+        detailPlaceViewModel: DetailPlaceViewModel,
+        deepLinkViewModel: DeepLinkViewModel,
+        notificationManager: NotificationManager,
+        searchViewModel: SearchViewModel,
+        searchCoordinator: SearchCoordinatorViewModel,
+        deepLinkManager: DeepLinkManager,
+        dataManager: DataManager,
+        serviceContainer: ServiceContainer,
+        userSession: UserSession
+    ) {
+        self.selectedPlaceVM = selectedPlaceVM
+        self.profileViewModel = profileViewModel
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
+        self.detailPlaceViewModel = detailPlaceViewModel
+        self.deepLinkViewModel = deepLinkViewModel
+        self.notificationManager = notificationManager
+        self.searchViewModel = searchViewModel
+        self.searchCoordinator = searchCoordinator
+        self.deepLinkManager = deepLinkManager
+        self.dataManager = dataManager
+        self.serviceContainer = serviceContainer
+        self._profileIconViewModel = StateObject(wrappedValue: ProfileTabIconViewModel(profileViewModel: profileViewModel))
+        self._viewModel = StateObject(wrappedValue: MainTabViewModel(
+            profileViewModel: profileViewModel,
+            userProfileNavigationViewModel: userProfileNavigationViewModel,
+            mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
+            deepLinkViewModel: deepLinkViewModel,
+            selectedPlaceViewModel: selectedPlaceVM,
+            userSession: userSession
+        ))
+    }
+
+    /// Screen-space y of the tab bar's top edge; 0 until measured.
+    @State private var tabBarTop: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            mapTab
+            TabSheetContainer(
+                viewModel: viewModel.tabSheet,
+                isPresented: router.selected.isSheet,
+                title: router.selected == .trips ? "Trips" : "Explore",
+                showsPushedHeader: router.selected == .explore,
+                tabBarTop: tabBarTop,
+                onDismiss: { router.select(.map) }
+            ) {
+                tabSheetContent
+            }
+            if router.visitedTabs.contains(.profile) {
+                profileTab
+                    .background(Color(.systemBackground))
+                    .tabLayer(isActive: router.selected == .profile)
+            }
+        }
+        // Inset (not stacked) so the map extends beneath the translucent bar while content still avoids it.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            AppTabBar(
+                selected: router.selected,
+                profileIcon: profileIconViewModel.normalIcon,
+                selectedProfileIcon: profileIconViewModel.selectedIcon,
+                onSelect: { router.select($0) }
+            )
+            .readGlobalTop(into: $tabBarTop)
+        }
+        .environment(\.tabBarTop, tabBarTop)
+        .tint(.mesaAccent)
+    }
+
+    // MARK: - Tabs
+
+    /// Explore and Trips sheet content, created on first visit and kept alive (hidden) afterwards.
+    private var tabSheetContent: some View {
+        ZStack {
+            if router.visitedTabs.contains(.explore) {
+                exploreTab.tabLayer(isActive: router.selected == .explore)
+            }
+            if router.visitedTabs.contains(.trips) {
+                tripsTab.tabLayer(isActive: router.selected == .trips)
+            }
+        }
+    }
+
+    private var mapTab: some View {
+        MainView(
+            selectedPlaceVM: selectedPlaceVM,
+            profileViewModel: profileViewModel,
+            userProfileNavigationViewModel: userProfileNavigationViewModel,
+            mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
+            detailPlaceViewModel: detailPlaceViewModel,
+            deepLinkViewModel: deepLinkViewModel,
+            notificationManager: notificationManager,
+            searchViewModel: searchViewModel,
+            searchCoordinator: searchCoordinator,
+            deepLinkManager: deepLinkManager,
+            dataManager: dataManager,
+            serviceContainer: serviceContainer
+        )
+    }
+
+    private var exploreTab: some View {
+        ExploreTabView(
+            tabSheet: viewModel.tabSheet,
+            onOpenPlaceDetail: { viewModel.openPlaceOnMap($0) },
+            isActive: router.selected == .explore
+        )
+        .modifier(tabEnvironment)
+    }
+
+    private var tripsTab: some View {
+        TripsListView(showsCloseButton: false, isActive: router.selected == .trips)
+            .modifier(tabEnvironment)
+    }
+
+    private var profileTab: some View {
+        ProfileView(showsBackButton: false)
+            .modifier(tabEnvironment)
+    }
+
+    private var tabEnvironment: TabEnvironmentModifier {
+        TabEnvironmentModifier(
+            selectedPlaceViewModel: selectedPlaceVM,
+            detailPlaceViewModel: detailPlaceViewModel,
+            profileViewModel: profileViewModel,
+            userProfileNavigationViewModel: userProfileNavigationViewModel,
+            mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
+            deepLinkViewModel: deepLinkViewModel,
+            deepLinkManager: deepLinkManager,
+            notificationManager: notificationManager,
+            dataManager: dataManager,
+            serviceContainer: serviceContainer
+        )
+    }
+}

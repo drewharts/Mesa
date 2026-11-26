@@ -19,6 +19,20 @@ struct TripsListView: View {
 
     @State private var navigationPath = NavigationPath()
 
+    /// False when the list is the root of the Trips tab (there is nothing to close).
+    private let showsCloseButton: Bool
+
+    /// True while the hosting tab is the visible one; a false-to-true change reloads trips.
+    private let isActive: Bool
+
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Creates the trips list; pass `showsCloseButton: false` when hosted as a tab.
+    init(showsCloseButton: Bool = true, isActive: Bool = true) {
+        self.showsCloseButton = showsCloseButton
+        self.isActive = isActive
+    }
+
     var body: some View { analyticsBody.analyticsScreen("Trips") }
 
     @ViewBuilder private var analyticsBody: some View {
@@ -32,17 +46,12 @@ struct TripsListView: View {
                     tripsList
                 }
             }
-            .navigationTitle("Trips")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle(showsCloseButton ? "Trips" : "")
+            .navigationBarTitleDisplayMode(showsCloseButton ? .large : .inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        viewModel.showCreateTrip = true
-                    } label: {
-                        Image(systemName: "plus")
+                if showsCloseButton {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Close") { dismiss() }
                     }
                 }
             }
@@ -63,6 +72,19 @@ struct TripsListView: View {
                     }
                 }
                 .environmentObject(userSession)
+            }
+            .onReceive(NotificationManager.shared.$pendingTripId.compactMap { $0 }) { tripId in
+                // A trip push tapped while this tab already exists (the .task below only runs once).
+                NotificationManager.shared.pendingTripId = nil
+                navigationPath.append(tripId)
+            }
+            .onChange(of: isActive) { _, active in
+                guard active, let userId = userSession.currentUserId else { return }
+                Task { await viewModel.loadTrips(userId: userId) }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active, isActive, let userId = userSession.currentUserId else { return }
+                Task { await viewModel.loadTrips(userId: userId) }
             }
             .task {
                 if let userId = userSession.currentUserId {
@@ -121,13 +143,7 @@ struct TripsListView: View {
     private var tripsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if viewModel.currentTrips.isEmpty {
-                    Text("No upcoming trips")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                }
+                NewTripTileView { viewModel.showCreateTrip = true }
                 ForEach(viewModel.currentTrips) { trip in
                     tripLink(trip)
                 }
@@ -142,11 +158,6 @@ struct TripsListView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-        }
-        .refreshable {
-            if let userId = userSession.currentUserId {
-                await viewModel.loadTrips(userId: userId)
-            }
         }
     }
 

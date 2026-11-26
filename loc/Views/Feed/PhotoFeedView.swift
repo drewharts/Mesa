@@ -20,6 +20,7 @@ struct PhotoFeedView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: FeedTab = .feed
     @State private var navigationPath = NavigationPath()
 
@@ -44,6 +45,10 @@ struct PhotoFeedView: View {
         }
         .task {
             await viewModel.loadFeed()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await viewModel.refresh() }
         }
     }
 
@@ -169,9 +174,6 @@ struct PhotoFeedView: View {
                     InlineLoadingIndicator()
                 }
             }
-        }
-        .refreshable {
-            await viewModel.refresh()
         }
     }
 

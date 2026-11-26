@@ -38,8 +38,27 @@ class PresentationService: ObservableObject {
     func present(_ sheet: AppSheetType) {
         // Re-assigning the same sheet makes SwiftUI re-run detent/presentation work (visible hitch).
         pendingTransition?.cancel()
+        // Trips live in their own tab now, so the old trips sheet request becomes a tab switch.
+        if sheet == .tripsList {
+            AppTabRouter.shared.select(.trips)
+            return
+        }
         guard activeSheet != sheet else { return }
+        guard AppTabRouter.shared.selected == .map else {
+            presentOnMapTab(sheet)
+            return
+        }
         activeSheet = sheet
+    }
+
+    /// Map sheets are hosted by the Map tab: switch to it first, then present once the tab is on screen.
+    private func presentOnMapTab(_ sheet: AppSheetType) {
+        AppTabRouter.shared.select(.map)
+        pendingTransition = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard let self, !Task.isCancelled, self.activeSheet != sheet else { return }
+            self.activeSheet = sheet
+        }
     }
 
     private var pendingTransition: Task<Void, Never>?
@@ -73,6 +92,10 @@ class PresentationService: ObservableObject {
 
     /// Presents a sheet immediately with minimal animation.
     func presentImmediately(_ sheet: AppSheetType) {
+        guard AppTabRouter.shared.selected == .map else {
+            presentOnMapTab(sheet)
+            return
+        }
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {

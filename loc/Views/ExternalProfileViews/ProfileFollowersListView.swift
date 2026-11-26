@@ -76,17 +76,13 @@ struct ProfileFollowersListView: View {
                     }
                 }
                 .listStyle(PlainListStyle())
-                .refreshable {
-                    // Pull-to-refresh: reload followers data
-                    viewModel.loadExternalFollowers(offset: 0)
-                }
             }
         }
         .navigationTitle("Followers")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            // Only load on initial appearance if list is empty
-            if viewModel.externalUserFollowers.isEmpty && !viewModel.isExternalFollowersLoading {
+            // Reload on every appearance so the list never goes stale (no pull-to-refresh in sheets)
+            if !viewModel.isExternalFollowersLoading {
                 viewModel.loadExternalFollowers(offset: 0)
             }
         }

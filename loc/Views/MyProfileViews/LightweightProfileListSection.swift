@@ -48,8 +48,8 @@ private struct ListCardImage: View {
 
     var body: some View {
         ZStack {
-            if list.preview_photos?.isEmpty == false || !places.isEmpty {
-                ListCoverCollage(previewPhotos: list.preview_photos, places: places, placeColors: $placeColors, seed: list.list_id, listName: list.name)
+            if ListCoverImageResolver.customCoverURL(list.image) != nil || list.preview_photos?.isEmpty == false || !places.isEmpty {
+                ListCoverCollage(previewPhotos: list.preview_photos, places: places, placeColors: $placeColors, seed: list.list_id, listName: list.name, userImageURL: list.image)
             } else {
                 ListCoverPlaceholder(seed: list.list_id, name: list.name)
             }

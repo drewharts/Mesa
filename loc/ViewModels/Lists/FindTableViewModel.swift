@@ -45,7 +45,9 @@ final class FindTableViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published var isFormPresented = false
+    @Published var isFormPresented = false {
+        didSet { if !isFormPresented { hasFormAppeared = false } }
+    }
     @Published private(set) var preset: Preset = .tonight
     @Published var partySize = 2
     @Published private(set) var selection: TableSearchSelection
@@ -66,6 +68,8 @@ final class FindTableViewModel: ObservableObject {
     private var accumulator = TableSearchAccumulator(total: 0, chunkCount: 0)
     private var scope = TableSearchScope(placeIds: [], label: nil)
     private var searchKey: TableSearchKey?
+    /// True once the form's content has actually appeared on screen (SwiftUI can silently drop a presentation).
+    private var hasFormAppeared = false
 
     /// Creates the view model with the defaults for "now": today, next half hour through 10:30 PM.
     init(service: TableAvailabilityFetching = TableAvailabilityService.shared,
@@ -167,6 +171,42 @@ final class FindTableViewModel: ObservableObject {
     /// Opens the search sheet.
     func presentForm() {
         isFormPresented = true
+    }
+
+    /// Called by the form's content when it appears, confirming the presentation was not dropped.
+    func formDidAppear() {
+        hasFormAppeared = true
+    }
+
+    /// Opens the form (Tonight, party of 2) once the host list sheet has settled, and re-presents it if SwiftUI drops
+    /// the presentation while that sheet is still animating in. Returns true when the form is confirmed on screen.
+    func presentFormWhenHostSettled(listId: String) async -> Bool {
+        guard isOffered else {
+            FindTableLog.log("list \(listId): backend does not offer availability (gate closed), form not shown")
+            return false
+        }
+        if state == .idle {
+            selectPreset(.tonight)
+            partySize = 2
+        }
+        for attempt in 1...5 {
+            try? await Task.sleep(nanoseconds: attempt == 1 ? 700_000_000 : 500_000_000)
+            guard !Task.isCancelled else {
+                FindTableLog.log("list \(listId): presenter cancelled on attempt \(attempt)")
+                return false
+            }
+            if hasFormAppeared {
+                FindTableLog.log("list \(listId): form on screen after \(attempt - 1) re-present(s)")
+                return true
+            }
+            FindTableLog.log("list \(listId): presenting form, attempt \(attempt)")
+            isFormPresented = false
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            isFormPresented = true
+        }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        FindTableLog.log("list \(listId): gave up, form on screen = \(hasFormAppeared)")
+        return hasFormAppeared
     }
 
     /// Applies a preset; "Pick" keeps the current day and times so they can be edited.

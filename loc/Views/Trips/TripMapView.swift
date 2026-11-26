@@ -31,6 +31,7 @@ struct TripMapView: View {
         .sheet(isPresented: $showSheet) {
             TripMapItinerarySheetView(viewModel: viewModel)
                 .presentationDetents([.height(180), .medium, .large])
+                .presentationContentInteraction(.resizes)
                 .presentationBackgroundInteraction(.enabled(upThrough: .large))
                 .interactiveDismissDisabled(true)
         }

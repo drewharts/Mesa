@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import UIKit
 import ImageIO
+import os
 
 /// Deduplicates concurrent image download requests for the same URL.
 private actor ImageDownloadCoordinator {
@@ -17,6 +18,33 @@ private actor ImageDownloadCoordinator {
         let result = await task.value
         inFlightTasks.removeValue(forKey: url)
         return result
+    }
+}
+
+/// Counting gate that lets at most `limit` image downloads run at once; the rest wait in FIFO order.
+private actor ImageLoadGate {
+    private let limit: Int
+    private var running = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(limit: Int) { self.limit = limit }
+
+    /// Waits for a free download slot.
+    func acquire() async {
+        if running < limit {
+            running += 1
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    /// Frees a slot, handing it straight to the next waiter when there is one.
+    func release() {
+        if waiters.isEmpty {
+            running -= 1
+        } else {
+            waiters.removeFirst().resume()
+        }
     }
 }
 
@@ -149,28 +177,85 @@ class ImageCacheService {
         // Memory hit is cheap; disk read, decode and download all run off the main thread
         // (callers are SwiftUI .task blocks, which inherit the main actor).
         if let cached = memoryImage(for: url, targetSize: targetSize) { return cached }
+        if isRecentlyFailed(url) { return nil }
+        let maxPixel = targetSize.map { max($0.width, $0.height) * UIScreen.main.scale }
 
         return await downloadCoordinator.fetch(url: Self.coordinatorURL(url, targetSize)) { [self] in
             await Task.detached(priority: .userInitiated) { [self] () -> UIImage? in
-            if let cached = self.getImage(for: url, targetSize: targetSize) { return cached }
-
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                let image: UIImage?
-                if let targetSize = targetSize {
-                    image = Self.downsample(data: data, to: targetSize)
-                } else {
-                    image = UIImage(data: data)
-                }
-                if let image = image {
-                    self.storeImage(image, for: url, targetSize: targetSize)
-                }
+                if let cached = self.getImage(for: url, targetSize: targetSize) { return cached }
+                guard let data = await self.downloadData(for: url, maxPixel: maxPixel) else { return nil }
+                let image = targetSize.flatMap { Self.downsample(data: data, to: $0) } ?? UIImage(data: data)
+                if let image { self.storeImage(image, for: url, targetSize: targetSize) } else { self.markFailed(url) }
                 return image
-            } catch {
-                return nil
-            }
             }.value
         }
+    }
+
+    /// Downloads the right-sized variant of the URL (falling back to the original when a transform is rejected),
+    /// holding one of a few network slots and recording a signpost interval.
+    private func downloadData(for url: URL, maxPixel: CGFloat?) async -> Data? {
+        let sized = maxPixel.map { ImageURLSizer.sizedURL(url, maxPixel: $0) } ?? url
+        await Self.loadGate.acquire()
+        let state = ImagePerf.signposter.beginInterval("imageLoad", id: ImagePerf.signposter.makeSignpostID())
+        var data = await Self.requestData(sized)
+        if data == nil, sized != url, !Task.isCancelled {
+            data = await Self.requestData(url)
+            if data != nil { ImageURLSizer.noteTransformRejected(sized) }
+        }
+        let outcome = data == nil ? "fail" : "ok"
+        let host = url.host ?? ""
+        ImagePerf.signposter.endInterval("imageLoad", state, "\(outcome, privacy: .public) \(host, privacy: .public)")
+        await Self.loadGate.release()
+        if data == nil, !Task.isCancelled { markFailed(url) }
+        return data
+    }
+
+    /// Performs one short-timeout GET through the shared image session; nil on any error or non-2xx status.
+    private static func requestData(_ url: URL) async -> Data? {
+        do {
+            let (data, response) = try await imageSession.data(from: url)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
+            return data
+        } catch {
+            return nil
+        }
+    }
+
+    /// Image session with a raw-bytes URLCache (second cache level) and tight timeouts so dead URLs fail fast.
+    private static let imageSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.urlCache = URLCache(memoryCapacity: 16 * 1024 * 1024, diskCapacity: 200 * 1024 * 1024, directory: nil)
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.timeoutIntervalForRequest = 6
+        config.timeoutIntervalForResource = 15
+        config.httpMaximumConnectionsPerHost = 8
+        return URLSession(configuration: config)
+    }()
+
+    /// Caps concurrent image downloads so a burst of covers never starves visible tiles.
+    private static let loadGate = ImageLoadGate(limit: 6)
+
+    // MARK: - Failure Memo
+
+    private let failureLock = NSLock()
+    private var failedAt: [URL: Date] = [:]
+    private let failureTTL: TimeInterval = 60
+
+    /// Remembers a URL that just failed so repeated requests (scrolling, re-renders) skip it immediately.
+    private func markFailed(_ url: URL) {
+        failureLock.lock()
+        failedAt[url] = Date()
+        failureLock.unlock()
+    }
+
+    /// True when the URL failed within the last minute.
+    private func isRecentlyFailed(_ url: URL) -> Bool {
+        failureLock.lock()
+        defer { failureLock.unlock() }
+        guard let date = failedAt[url] else { return false }
+        if Date().timeIntervalSince(date) < failureTTL { return true }
+        failedAt[url] = nil
+        return false
     }
 
     /// Warms the cache for URLs not yet in memory (downsampled to `targetSize`), without blocking the caller.

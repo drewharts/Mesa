@@ -49,6 +49,12 @@ final class ListMapSheetViewModel: ObservableObject {
         static func == (lhs: ScrollRequest, rhs: ScrollRequest) -> Bool { lhs.id == rhs.id }
     }
 
+    /// A one-shot request (from Explore) to open the "Find a table" form once the list's sheet is showing.
+    struct FindTableRequest: Equatable {
+        let listId: String
+        let requestedAt: Date
+    }
+
     // MARK: - Published State
 
     @Published private(set) var detent: ListSheetDetent = .default
@@ -59,8 +65,12 @@ final class ListMapSheetViewModel: ObservableObject {
     /// The map shows only these pins and the sheet header counts them.
     @Published private(set) var chipScopeIds: Set<String>?
 
+    /// Pending "Find a table" start for a list that is about to open (or is already open).
+    @Published private(set) var findTableRequest: FindTableRequest?
+
     // MARK: - Private State
 
+    private let findTableRequestLifetime: TimeInterval = 45
     private var listId: String?
     private var hasFitMap = false
 
@@ -94,6 +104,41 @@ final class ListMapSheetViewModel: ObservableObject {
         scrollRequest = nil
         chipScopeIds = nil
         detent = .default
+    }
+
+    // MARK: - Find a Table Handoff
+
+    /// Asks the list sheet for `listId` to open its "Find a table" form as soon as it shows.
+    /// The request stays pending until a list view reports it presented the form (see `completeFindTableRequest`).
+    func requestFindTable(listId: String) {
+        FindTableLog.log("request armed for list \(listId.lowercased())")
+        findTableRequest = FindTableRequest(listId: listId.lowercased(), requestedAt: Date())
+    }
+
+    /// Whether a fresh request targets this list; expired requests are dropped. Does not consume the request,
+    /// so a list view that is torn down before presenting the form leaves it for the next one.
+    func hasFindTableRequest(for listId: String) -> Bool {
+        guard let request = findTableRequest else { return false }
+        guard Date().timeIntervalSince(request.requestedAt) < findTableRequestLifetime else {
+            FindTableLog.log("request for \(request.listId) expired before a list view handled it")
+            findTableRequest = nil
+            return false
+        }
+        return request.listId == listId.lowercased()
+    }
+
+    /// Consumes the pending request for `listId` once its form has been shown.
+    func completeFindTableRequest(for listId: String) {
+        guard findTableRequest?.listId == listId.lowercased() else { return }
+        FindTableLog.log("request for \(listId.lowercased()) completed")
+        findTableRequest = nil
+    }
+
+    /// Drops the pending request for `listId` because the list could not be shown.
+    func cancelFindTableRequest(for listId: String) {
+        guard findTableRequest?.listId == listId.lowercased() else { return }
+        FindTableLog.log("request for \(listId.lowercased()) cancelled")
+        findTableRequest = nil
     }
 
     // MARK: - Chip Scope
@@ -205,6 +250,13 @@ final class ListMapSheetViewModel: ObservableObject {
             span: MKCoordinateSpan(latitudeDelta: totalLatSpan, longitudeDelta: min(region.span.longitudeDelta, 350))
         )
         cameraRequest = CameraRequest(target: .region(adjusted))
+    }
+
+    /// Frames all of the list's pins again (e.g. after a place page was popped), dropping any focused place.
+    func refitToPlaces(_ places: [LightweightPlace]) {
+        focusedPlaceId = nil
+        hasFitMap = false
+        fitToPlaces(places)
     }
 
     func fitToPlaces(_ places: [LightweightPlace]) {
