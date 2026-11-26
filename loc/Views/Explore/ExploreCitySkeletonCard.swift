@@ -10,7 +10,7 @@ import SwiftUI
 struct ExploreCitySkeletonCard: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 12)
-            .fill(Color(.systemGray5))
+            .fill(SkeletonStyle.base)
             .frame(width: ExploreCoverMetrics.city.width, height: ExploreCoverMetrics.city.height)
     }
 }

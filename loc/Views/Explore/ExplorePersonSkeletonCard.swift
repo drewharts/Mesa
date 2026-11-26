@@ -14,7 +14,7 @@ struct ExplorePersonSkeletonCard: View {
     var body: some View {
         VStack(spacing: 6) {
             VStack(spacing: 6) {
-                Circle().fill(Color(.systemGray5)).frame(width: avatarSize, height: avatarSize)
+                Circle().fill(SkeletonStyle.base).frame(width: avatarSize, height: avatarSize)
                 Text("Person name").font(.subheadline.weight(.semibold))
                 Text("Suggested for you").font(.caption)
             }
@@ -24,7 +24,7 @@ struct ExplorePersonSkeletonCard: View {
                 .hidden()
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(SkeletonStyle.base, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .padding(.top, 6)
         }
         .padding(.horizontal, 12)

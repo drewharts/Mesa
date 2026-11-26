@@ -14,7 +14,7 @@ struct ExploreListSkeletonCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(.systemGray5))
+                .fill(SkeletonStyle.base)
                 .aspectRatio(3.0 / 4.0, contentMode: .fit)
             VStack(alignment: .leading, spacing: 2) {
                 Text("List name").font(.subheadline).fontWeight(.semibold)
