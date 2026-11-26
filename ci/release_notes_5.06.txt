@@ -1,0 +1,7 @@
+- A new bottom tab bar gives one-tap access to Map, Explore, Trips and Profile.
+- Explore lists, cities, places and people open in a sheet over the map, with a featured list and suggested people.
+- List covers now come automatically from your places' photos.
+- Find a table is a compact button on list pages, and only shows when a place has Resy.
+- Explore loads with shimmering placeholders and caches so it opens faster.
+- The map's search bar floats on top, with Fresh finds beside it.
+- Fixes for share cards overwriting covers and for buttons hidden under the tab bar.
