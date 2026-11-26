@@ -13,7 +13,7 @@ struct PlacePhotoCollage: View {
     let photoURLs: [String]
     let cellSize: CGSize
     /// When false, only one photo is drawn full-frame, however many candidates exist.
-    let allowsGrid
+    let allowsGrid: Bool
 
     @StateObject private var viewModel: PlacePhotoCollageViewModel
 
