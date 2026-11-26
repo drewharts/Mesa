@@ -41,6 +41,9 @@ struct ExploreTabView: View {
                 }
                 .padding(.top, 4)
                 .padding(.bottom, 12)
+                .animation(.easeOut(duration: 0.25), value: isAwaitingLists)
+                .animation(.easeOut(duration: 0.25), value: viewModel.cities.isEmpty)
+                .animation(.easeOut(duration: 0.25), value: viewModel.popularLists.isEmpty)
             }
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
@@ -130,9 +133,17 @@ struct ExploreTabView: View {
         .padding(.horizontal, 16)
     }
 
+    /// True until the first list load finishes with nothing cached to show.
+    private var isAwaitingLists: Bool {
+        !viewModel.hasLoadedLists && viewModel.popularLists.isEmpty && viewModel.cities.isEmpty
+    }
+
     @ViewBuilder
     private var popularSection: some View {
-        if !viewModel.popularLists.isEmpty {
+        if isAwaitingLists {
+            ExploreSkeletonRow(title: "Popular near you", spacing: 14) { ExploreListSkeletonCard() }
+                .transition(.opacity)
+        } else if !viewModel.popularLists.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeaderRow(title: viewModel.popularTitle)
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -150,7 +161,10 @@ struct ExploreTabView: View {
 
     @ViewBuilder
     private var citiesSection: some View {
-        if !viewModel.cities.isEmpty {
+        if isAwaitingLists {
+            ExploreSkeletonRow(title: "Browse by city") { ExploreCitySkeletonCard() }
+                .transition(.opacity)
+        } else if !viewModel.cities.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeaderRow(title: "Browse by city")
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -167,10 +181,19 @@ struct ExploreTabView: View {
 
     @ViewBuilder
     private var statusFooter: some View {
-        if viewModel.isLoadingLists && viewModel.popularLists.isEmpty && viewModel.cities.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-                .padding(.top, 24)
+        if viewModel.loadFailed {
+            VStack(spacing: 8) {
+                Text("Couldn't load lists.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Try again") {
+                    guard let userId = userSession.currentUserId else { return }
+                    Task { await viewModel.refresh(userId: userId, location: locationManager.currentLocation) }
+                }
+                .font(.subheadline.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 24)
         } else if viewModel.hasNoLists {
             Text("No public lists to explore yet.")
                 .font(.subheadline)

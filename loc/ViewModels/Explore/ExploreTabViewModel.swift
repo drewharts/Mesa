@@ -27,6 +27,8 @@ final class ExploreTabViewModel: ObservableObject {
     /// Short message shown over the sheet when a list could not be opened.
     @Published private(set) var toastMessage: String?
     @Published private(set) var hasLoadedLists = false
+    /// True when the last list load failed and there is nothing (not even cached) to show.
+    @Published private(set) var loadFailed = false
 
     // MARK: - Child ViewModels
 
@@ -48,6 +50,7 @@ final class ExploreTabViewModel: ObservableObject {
     private var ownerCache: [String: ExploreListOwner] = [:]
     private var rankedLocation: CLLocation?
     private var cityCoverListIds: [String: [String]] = [:]
+    private let listsCache = ExploreDiskCache<ExploreListsSnapshot>(fileName: "ExploreLists.json")
 
     /// True once lists finished loading and nothing public was found.
     var hasNoLists: Bool { hasLoadedLists && popularLists.isEmpty && cities.isEmpty }
@@ -60,7 +63,10 @@ final class ExploreTabViewModel: ObservableObject {
             group.addTask { await self.primeFromDisk() }
             group.addTask { await self.loadFeatured() }
             group.addTask { await self.loadLists(userId: userId, location: location) }
-            group.addTask { await self.peopleViewModel.load(userId: userId) }
+            group.addTask {
+                await self.peopleViewModel.primeFromCache()
+                await self.peopleViewModel.load(userId: userId)
+            }
         }
     }
 
@@ -73,6 +79,7 @@ final class ExploreTabViewModel: ObservableObject {
     /// Reloads everything, bypassing the "already loaded" guards.
     func refresh(userId: String, location: CLLocation?) async {
         hasLoadedLists = false
+        loadFailed = false
         lastRefreshedAt = Date()
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadLists(userId: userId, location: location) }
@@ -97,7 +104,9 @@ final class ExploreTabViewModel: ObservableObject {
             cities = ExploreListRanker.cities(from: pool)
             applyRanking(location: location)
             await attachOwnersAndLoadCovers()
+            persistLists()
         } catch {
+            loadFailed = popularLists.isEmpty && cities.isEmpty
             print("❌ [ExploreTabVM] Failed to load public lists: \(error)")
         }
     }
@@ -204,8 +213,23 @@ final class ExploreTabViewModel: ObservableObject {
         service.persistCovers(displayOrder: order)
     }
 
-    /// Shows the previous session's covers right away and warms their images before any network call returns.
+    /// Saves the current popular lists and cities so the next launch can show them before the network answers.
+    private func persistLists() {
+        guard !popularLists.isEmpty || !cities.isEmpty else { return }
+        listsCache.save(ExploreListsSnapshot(
+            popularLists: popularLists, popularTitle: popularTitle, cities: cities, cityCoverListIds: cityCoverListIds
+        ))
+    }
+
+    /// Shows the previous session's lists, cities and covers right away, before any network call returns.
     private func primeFromDisk() async {
+        let cachedLists = await Task.detached { [listsCache] in listsCache.load() }.value
+        if let cachedLists, popularLists.isEmpty, cities.isEmpty, !hasLoadedLists {
+            popularLists = cachedLists.popularLists
+            popularTitle = cachedLists.popularTitle
+            cities = cachedLists.cities
+            cityCoverListIds = cachedLists.cityCoverListIds
+        }
         let snapshot = await Task.detached { CoverPhotoStore.shared.load() }.value
         for (id, photos) in snapshot.covers where coverPhotos[id] == nil { coverPhotos[id] = photos }
         let featuredIds = Set(FeaturedLists.all.map(\.listId))

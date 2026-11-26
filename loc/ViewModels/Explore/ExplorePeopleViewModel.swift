@@ -16,18 +16,30 @@ final class ExplorePeopleViewModel: ObservableObject {
     @Published private(set) var people: [ProfileData] = []
     @Published private(set) var followStates: [String: Bool] = [:]
     @Published private(set) var isLoading = false
+    /// True once a load finished (or cached people were shown); false only before the first result.
+    @Published private(set) var hasLoaded = false
 
     // MARK: - Dependencies
 
     private let userService = SupabaseUserService.shared
     private var userId: String?
-    private var hasLoaded = false
+    private var hasFetched = false
+    private let cache = ExploreDiskCache<[ProfileData]>(fileName: "ExploreSuggestedPeople.json")
 
     // MARK: - Loading
 
+    /// Shows the previous session's suggestions right away when nothing is on screen yet.
+    func primeFromCache() async {
+        guard people.isEmpty, !hasLoaded else { return }
+        let cached = await Task.detached { [cache] in cache.load() }.value
+        guard let cached, people.isEmpty, !hasLoaded else { return }
+        people = cached
+        hasLoaded = true
+    }
+
     /// Loads suggested users, excluding the current user and everyone they already follow.
     func load(userId: String, force: Bool = false) async {
-        guard !isLoading, force || !hasLoaded else { return }
+        guard !isLoading, force || !hasFetched else { return }
         self.userId = userId
         isLoading = true
         async let suggested = fetchSuggested(userId: userId)
@@ -35,8 +47,10 @@ final class ExplorePeopleViewModel: ObservableObject {
         let followedIds = await followed
         people = await suggested.filter { $0.id != userId && !followedIds.contains($0.id) }
         followStates = [:]
+        hasFetched = true
         hasLoaded = true
         isLoading = false
+        cache.save(people)
     }
 
     /// Fetches suggested users from the recommendation RPC; failures yield an empty list.

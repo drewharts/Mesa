@@ -13,28 +13,34 @@ struct ExplorePeopleSection: View {
     let onProfileTap: (ProfileData) -> Void
 
     var body: some View {
-        if !viewModel.people.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeaderRow(title: "People to follow")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(viewModel.people) { person in
-                            ExploreSuggestedPersonCard(
-                                profile: person,
-                                isFollowing: viewModel.followStates[person.id] ?? false,
-                                onFollowTap: { Task { await viewModel.toggleFollow(profileId: person.id) } },
-                                onProfileTap: { onProfileTap(person) },
-                                onDismissTap: { viewModel.dismiss(profileId: person.id) }
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                }
+        Group {
+            if !viewModel.people.isEmpty {
+                content.transition(.opacity)
+            } else if !viewModel.hasLoaded {
+                ExploreSkeletonRow(title: "People to follow") { ExplorePersonSkeletonCard() }
+                    .transition(.opacity)
             }
-        } else if viewModel.isLoading {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+        }
+        .animation(.easeOut(duration: 0.25), value: viewModel.people.isEmpty)
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderRow(title: "People to follow")
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(viewModel.people) { person in
+                        ExploreSuggestedPersonCard(
+                            profile: person,
+                            isFollowing: viewModel.followStates[person.id] ?? false,
+                            onFollowTap: { Task { await viewModel.toggleFollow(profileId: person.id) } },
+                            onProfileTap: { onProfileTap(person) },
+                            onDismissTap: { viewModel.dismiss(profileId: person.id) }
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
         }
     }
 }

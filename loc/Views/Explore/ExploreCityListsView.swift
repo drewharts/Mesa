@@ -58,9 +58,12 @@ struct ExploreCityListsView: View {
     private var content: some View {
         if viewModel.lists.isEmpty {
             if viewModel.isLoading || !viewModel.hasLoaded {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(0..<6, id: \.self) { _ in ExploreListSkeletonCard(width: nil) }
+                }
+                .padding(.horizontal, 16)
+                .shimmering()
+                .accessibilityHidden(true)
             } else {
                 Text("No public lists in \(viewModel.city.name) yet.")
                     .font(.subheadline)

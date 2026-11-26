@@ -10,7 +10,7 @@ import Foundation
 import CoreLocation
 
 /// A public list surfaced on the Explore tab.
-struct ExploreList: Identifiable, Hashable {
+struct ExploreList: Identifiable, Hashable, Codable {
     let id: String
     let name: String
     let city: String?
@@ -37,7 +37,7 @@ struct ExploreList: Identifiable, Hashable {
 }
 
 /// A city aggregated from public lists, with how many lists cover it.
-struct ExploreCity: Identifiable, Hashable {
+struct ExploreCity: Identifiable, Hashable, Codable {
     let key: String
     let name: String
     /// Every raw `city` spelling folded into this entry (used to query its lists).
