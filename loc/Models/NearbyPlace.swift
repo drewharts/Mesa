@@ -57,6 +57,8 @@ struct NearbyPlaceProperties: Codable {
     let types: [String]?
     let updatedAt: String?
     let userRatingsTotal: Int?
+    /// Optional weekly hours; absent until the backend includes regularOpeningHours.
+    var regularOpeningHours: PlaceOpeningHours? = nil
     
     // Database specific fields (optional)
     let description: String?
@@ -95,6 +97,7 @@ struct NearbyPlaceProperties: Codable {
         case types
         case updatedAt = "updated_at"
         case userRatingsTotal = "user_ratings_total"
+        case regularOpeningHours = "regular_opening_hours"
         case description
         case id
     }

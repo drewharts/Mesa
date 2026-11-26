@@ -12,6 +12,7 @@ struct PlaceSelectionRowView: View {
     let typeEmoji: String
     let onSelect: () -> Void
     let isLoading: Bool
+    var isTopPick: Bool = false
 
     private let cardBackground = Color(red: 248/255, green: 248/255, blue: 250/255)
 
@@ -26,6 +27,10 @@ struct PlaceSelectionRowView: View {
             .padding(16)
             .background(Color.white)
             .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.green.opacity(isTopPick ? 0.7 : 0), lineWidth: 2)
+            )
             .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(.plain)
@@ -42,6 +47,13 @@ struct PlaceSelectionRowView: View {
 
     private var placeInfo: some View {
         VStack(alignment: .leading, spacing: 4) {
+            if isTopPick {
+                Text("Best match")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.green)
+            }
+
             Text(place.properties.name)
                 .font(.headline)
                 .fontWeight(.semibold)

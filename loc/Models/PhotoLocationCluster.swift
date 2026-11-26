@@ -16,6 +16,10 @@ struct PhotoLocationCluster: Identifiable {
     var isLoadingPlaces: Bool
     var searchRadiusUsed: Int
     var isReviewed: Bool
+    var bestAccuracyMeters: Double? = nil
+    var capturedAt: Date? = nil
+    var utcOffsetSeconds: Int? = nil
+    var hasConfidentPick: Bool = false
 
     /// Human-readable address hint derived from the first nearby place, or a coordinate fallback.
     var addressHint: String {

@@ -215,6 +215,7 @@ struct PhotoClusterOverviewView: View {
         photoImportVM.detectedCoordinates = (latitude: cluster.latitude, longitude: cluster.longitude)
         photoImportVM.nearbyPlaces = cluster.nearbyPlaces
         photoImportVM.searchRadiusUsed = cluster.searchRadiusUsed
+        photoImportVM.hasConfidentPick = cluster.hasConfidentPick
         photoImportVM.photoThumbnail = thumbnailsForCluster(cluster).first
 
         showPlaceSelectionForCluster = true
