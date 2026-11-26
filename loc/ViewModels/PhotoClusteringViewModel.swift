@@ -13,7 +13,6 @@ class PhotoClusteringViewModel: ObservableObject {
     @Published var isProcessing: Bool = false
 
     private let nearbyPlacesService: NearbyPlacesService
-    private let clusterRadiusMeters: Double = 150
 
     /// Initializes with a NearbyPlacesService for fetching places per cluster.
     init(nearbyPlacesService: NearbyPlacesService = NearbyPlacesService()) {
@@ -22,50 +21,28 @@ class PhotoClusteringViewModel: ObservableObject {
 
     // MARK: - Clustering
 
-    /// Clusters photos by GPS proximity using a greedy algorithm (~150m radius).
+    /// Clusters photos into visits by GPS proximity (~60m) and capture time (45 min gap).
     func clusterPhotos(photoDataPairs: [(UIImage, Data)]) {
         isProcessing = true
-        clusters = []
-        unassignedPhotoIndices = []
-
-        var tempClusters: [MutableCluster] = []
-
-        for (index, (_, data)) in photoDataPairs.enumerated() {
-            guard let coords = PhotoImportViewModel.extractGPSCoordinates(from: data) else {
-                unassignedPhotoIndices.append(index)
-                continue
-            }
-
-            let assignedToExisting = assignToExistingCluster(
-                index: index,
-                coords: coords,
-                clusters: &tempClusters
-            )
-
-            if !assignedToExisting {
-                tempClusters.append(MutableCluster(
-                    latitude: coords.latitude,
-                    longitude: coords.longitude,
-                    photoIndices: [index]
-                ))
-            }
-        }
-
-        // Recalculate cluster centers as average of member coordinates and convert
-        clusters = tempClusters.map { mutable in
+        let samples = photoDataPairs.map { PhotoSample.from(imageData: $0.1) }
+        let result = PhotoClusterBuilder.build(samples: samples)
+        unassignedPhotoIndices = result.unassigned
+        clusters = result.clusters.map { draft in
             PhotoLocationCluster(
-                latitude: mutable.latitude,
-                longitude: mutable.longitude,
-                photoIndices: mutable.photoIndices,
+                latitude: draft.latitude,
+                longitude: draft.longitude,
+                photoIndices: draft.photoIndices,
                 nearbyPlaces: [],
                 selectedPlace: nil,
                 resolvedPlace: nil,
                 isLoadingPlaces: false,
-                searchRadiusUsed: 50,
-                isReviewed: false
+                searchRadiusUsed: PlaceCandidateRanker.searchRadii(bestAccuracyMeters: draft.bestAccuracyMeters)[0],
+                isReviewed: false,
+                bestAccuracyMeters: draft.bestAccuracyMeters,
+                capturedAt: draft.firstCapturedAt,
+                utcOffsetSeconds: draft.utcOffsetSeconds
             )
         }
-
         isProcessing = false
     }
 
@@ -78,38 +55,41 @@ class PhotoClusteringViewModel: ObservableObject {
             clusters[i].isLoadingPlaces = true
         }
 
-        await withTaskGroup(of: (Int, [NearbyPlaceFeature], Int).self) { group in
-            for (offset, cluster) in clusters.enumerated() {
-                let lat = cluster.latitude
-                let lng = cluster.longitude
-                let idx = offset
+        let snapshot = clusters
+        await withTaskGroup(of: (UUID, [NearbyPlaceFeature], Int).self) { group in
+            for cluster in snapshot {
                 group.addTask {
-                    let (places, radius) = await self.fetchNearbyPlacesForCoordinate(
-                        latitude: lat, longitude: lng
-                    )
-                    return (idx, places, radius)
+                    let (places, radius) = await self.searchPlaces(for: cluster)
+                    return (cluster.id, places, radius)
                 }
             }
-            for await (index, places, radius) in group {
-                guard index < clusters.count else { continue }
-                clusters[index].nearbyPlaces = places
-                clusters[index].searchRadiusUsed = radius
-                clusters[index].isLoadingPlaces = false
+            for await (clusterId, places, radius) in group {
+                applyResults(places: places, radius: radius, toCluster: clusterId)
             }
         }
     }
 
-    /// Fetches nearby places for a single cluster with expanding radius (50→250→1000m).
+    /// Fetches nearby places for a single cluster with expanding radius (accuracy-aware first step, then 150m, capped at 300m).
     func fetchNearbyPlacesForCluster(_ clusterId: UUID) async {
         guard let index = clusters.firstIndex(where: { $0.id == clusterId }) else { return }
         clusters[index].isLoadingPlaces = true
 
-        let (places, radius) = await fetchNearbyPlacesForCoordinate(
-            latitude: clusters[index].latitude,
-            longitude: clusters[index].longitude
-        )
+        let (places, radius) = await searchPlaces(for: clusters[index])
+        applyResults(places: places, radius: radius, toCluster: clusterId)
+    }
 
-        clusters[index].nearbyPlaces = places
+    /// Ranks fetched places for a cluster and stores them with the radius used.
+    private func applyResults(places: [NearbyPlaceFeature], radius: Int, toCluster clusterId: UUID) {
+        guard let index = clusters.firstIndex(where: { $0.id == clusterId }) else { return }
+        let ranked = PlaceCandidateRanker.rank(
+            places,
+            centerLatitude: clusters[index].latitude,
+            centerLongitude: clusters[index].longitude,
+            capturedAt: clusters[index].capturedAt,
+            utcOffsetSeconds: clusters[index].utcOffsetSeconds
+        )
+        clusters[index].nearbyPlaces = ranked.places
+        clusters[index].hasConfidentPick = ranked.hasConfidentPick
         clusters[index].searchRadiusUsed = radius
         clusters[index].isLoadingPlaces = false
     }
@@ -160,50 +140,6 @@ class PhotoClusteringViewModel: ObservableObject {
 
     // MARK: - Private Helpers
 
-    /// Temporary mutable struct used during clustering algorithm.
-    private struct MutableCluster {
-        var latitude: Double
-        var longitude: Double
-        var photoIndices: [Int]
-        var coordSum: (lat: Double, lng: Double)
-
-        init(latitude: Double, longitude: Double, photoIndices: [Int]) {
-            self.latitude = latitude
-            self.longitude = longitude
-            self.photoIndices = photoIndices
-            self.coordSum = (lat: latitude, lng: longitude)
-        }
-
-        /// Recalculates the cluster center based on a newly added coordinate.
-        mutating func addCoordinate(lat: Double, lng: Double, index: Int) {
-            photoIndices.append(index)
-            coordSum.lat += lat
-            coordSum.lng += lng
-            let count = Double(photoIndices.count)
-            latitude = coordSum.lat / count
-            longitude = coordSum.lng / count
-        }
-    }
-
-    /// Tries to assign a photo to an existing cluster within the proximity radius.
-    private func assignToExistingCluster(
-        index: Int,
-        coords: (latitude: Double, longitude: Double),
-        clusters: inout [MutableCluster]
-    ) -> Bool {
-        for i in clusters.indices {
-            let distance = haversineDistance(
-                lat1: clusters[i].latitude, lon1: clusters[i].longitude,
-                lat2: coords.latitude, lon2: coords.longitude
-            )
-            if distance <= clusterRadiusMeters {
-                clusters[i].addCoordinate(lat: coords.latitude, lng: coords.longitude, index: index)
-                return true
-            }
-        }
-        return false
-    }
-
     /// Removes a photo index from whatever cluster or unassigned pool it currently belongs to.
     private func removePhotoFromCurrentLocation(photoIndex: Int) {
         for i in clusters.indices {
@@ -212,17 +148,14 @@ class PhotoClusteringViewModel: ObservableObject {
         unassignedPhotoIndices.removeAll { $0 == photoIndex }
     }
 
-    /// Fetches nearby places with expanding radius search (50 → 250 → 1000m).
-    private func fetchNearbyPlacesForCoordinate(
-        latitude: Double,
-        longitude: Double
-    ) async -> ([NearbyPlaceFeature], Int) {
-        let radii = [50, 250, 1000]
+    /// Fetches nearby places for a cluster with expanding radius; returns nothing when no place is within the last radius.
+    private func searchPlaces(for cluster: PhotoLocationCluster) async -> ([NearbyPlaceFeature], Int) {
+        let radii = PlaceCandidateRanker.searchRadii(bestAccuracyMeters: cluster.bestAccuracyMeters)
         for radius in radii {
             do {
                 let response = try await nearbyPlacesService.fetchNearbyPlaces(
-                    latitude: latitude,
-                    longitude: longitude,
+                    latitude: cluster.latitude,
+                    longitude: cluster.longitude,
                     radiusMeters: radius
                 )
                 if !response.features.isEmpty {
@@ -232,21 +165,6 @@ class PhotoClusteringViewModel: ObservableObject {
                 print("❌ Failed to fetch nearby places at radius \(radius)m: \(error)")
             }
         }
-        return ([], 1000)
-    }
-
-    /// Calculates the distance in meters between two coordinates using the Haversine formula.
-    private func haversineDistance(
-        lat1: Double, lon1: Double,
-        lat2: Double, lon2: Double
-    ) -> Double {
-        let earthRadius = 6371000.0
-        let dLat = (lat2 - lat1) * .pi / 180
-        let dLon = (lon2 - lon1) * .pi / 180
-        let a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
-                sin(dLon / 2) * sin(dLon / 2)
-        let c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return earthRadius * c
+        return ([], radii.last ?? 300)
     }
 }

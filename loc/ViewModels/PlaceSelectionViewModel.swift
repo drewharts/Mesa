@@ -65,6 +65,21 @@ class PlaceSelectionViewModel: ObservableObject {
         photoImportVM.nearbyPlaces.count
     }
 
+    /// Whether the ranker found a clear winner worth highlighting.
+    var hasConfidentPick: Bool {
+        photoImportVM.hasConfidentPick
+    }
+
+    /// Whether the given place is the highlighted top pick.
+    func isTopPick(_ place: NearbyPlaceFeature) -> Bool {
+        hasConfidentPick && photoImportVM.nearbyPlaces.first?.id == place.id
+    }
+
+    /// Prompt shown above the list when no candidate clearly wins.
+    var ambiguityPrompt: String? {
+        hasConfidentPick || filteredPlaces.count < 2 ? nil : "Which place was this?"
+    }
+
     // MARK: - Subscriptions
 
     /// Subscribes to nearby places changes and recomputes filters and filtered list.
