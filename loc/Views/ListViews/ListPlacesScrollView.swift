@@ -32,6 +32,8 @@ struct ListPlacesScrollView: View {
     var onLoadAll: (() async -> Void)? = nil
     /// Whether any place in the list can be reserved; "Find a table" stays hidden when false.
     var hasReservablePlaces: Bool = true
+    /// When set, the "Find a table" button is hosted by the caller's header: receives its action while it should show, nil otherwise.
+    var onHeaderFindTable: (((() -> Void)?) -> Void)? = nil
 
     @StateObject private var filterVM = ListTypeFilterViewModel()
     @StateObject private var findTableVM = FindTableViewModel()
@@ -54,10 +56,13 @@ struct ListPlacesScrollView: View {
     /// Whether "Find a table" applies here: a full list (not "Places here") and the backend offers it.
     private var showsFindTable: Bool { showsTypeFilter && listId != nil && hasReservablePlaces && findTableVM.isOffered }
 
-    /// The prominent filled button, shown until a search is running (then the status bar and chip take over).
+    /// Whether the entry button should show: until a search is running (then the status bar and chip take over).
+    private var showsFindTableButton: Bool { showsFindTable && !findTableVM.isActive }
+
+    /// The filled button inline above the chips; hidden when the caller's header hosts it.
     @ViewBuilder
     private var findTableButton: some View {
-        if showsFindTable && !findTableVM.isActive {
+        if showsFindTableButton && onHeaderFindTable == nil {
             FindTableButton(onTap: { findTableVM.presentForm() })
         }
     }
@@ -192,6 +197,9 @@ struct ListPlacesScrollView: View {
                 Task { await onLoadAll?() }
             }
             .onChange(of: listId) { _, _ in findTableVM.exit() }
+            .onChange(of: showsFindTableButton, initial: true) { _, shows in
+                onHeaderFindTable?(shows ? { findTableVM.presentForm() } : nil)
+            }
             // Opened from Explore's "Find a table": show the form (Tonight, party of 2 by default) once this list is up.
             // Keyed on the request so it also fires for a list that is already open; cancelled with the view.
             .task(id: "\(String(describing: sheetVM.findTableRequest))-\(showsFindTable)") { await openFindTableIfRequested() }

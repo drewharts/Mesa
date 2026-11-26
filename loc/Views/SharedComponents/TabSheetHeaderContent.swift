@@ -54,6 +54,22 @@ struct TabSheetHeaderContent: View {
 
     private var detailRow: some View {
         HStack(spacing: 6) {
+            leadingDetail
+                .layoutPriority(0)
+            Spacer(minLength: 8)
+            if let onFindTable = header.onFindTable {
+                FindTableButton(onTap: onFindTable)
+                    .fixedSize()
+                    .layoutPriority(1)
+            }
+        }
+        .padding(.leading, 38)
+        .padding(.trailing, 8)
+    }
+
+    /// The creator chip and "· N places" text, which truncate before the button does.
+    private var leadingDetail: some View {
+        HStack(spacing: 6) {
             if let creator = header.creator {
                 ListCreatorChip(name: creator.name, photoURL: creator.photoURL, onTap: creator.onTap)
             }
@@ -64,6 +80,5 @@ struct TabSheetHeaderContent: View {
                     .lineLimit(1)
             }
         }
-        .padding(.leading, 38)
     }
 }

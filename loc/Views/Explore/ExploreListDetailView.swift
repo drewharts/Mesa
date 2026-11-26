@@ -52,7 +52,8 @@ struct ExploreListDetailView: View {
                 onRemove: nil,
                 showsTypeFilter: true,
                 listId: viewModel.list.id,
-                hasReservablePlaces: viewModel.hasReservablePlaces == true
+                hasReservablePlaces: viewModel.hasReservablePlaces == true,
+                onHeaderFindTable: { viewModel.setFindTableAction($0) }
             )
         }
         .task { await viewModel.load() }
@@ -62,6 +63,7 @@ struct ExploreListDetailView: View {
             hasAppeared = true
         }
         .onChange(of: viewModel.countLabel) { _, _ in publishHeader() }
+        .onChange(of: viewModel.showsFindTable) { _, _ in publishHeader() }
     }
 
     /// Sends the list's current header to the sheet's strip.

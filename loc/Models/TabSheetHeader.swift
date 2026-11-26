@@ -26,7 +26,9 @@ struct TabSheetHeader {
     let onBack: () -> Void
     /// Share action; nil hides the share button.
     let onShare: (() -> Void)?
+    /// "Find a table" action; non-nil shows the compact button trailing the detail line.
+    var onFindTable: (() -> Void)? = nil
 
     /// True when there is a second line (creator chip and/or detail text).
-    var hasDetailLine: Bool { creator != nil || detail != nil }
+    var hasDetailLine: Bool { creator != nil || detail != nil || onFindTable != nil }
 }

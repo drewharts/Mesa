@@ -22,6 +22,9 @@ final class ExploreListDetailViewModel: ObservableObject {
     /// True/false once known whether any place has a Resy venue; nil while the lookup is pending.
     @Published private(set) var hasReservablePlaces: Bool?
 
+    /// Opens "Find a table" for this list; nil while the button shouldn't show in the header.
+    private var findTableAction: (() -> Void)?
+
     private var cancellables = Set<AnyCancellable>()
     private var hasLoaded = false
 
@@ -95,6 +98,15 @@ final class ExploreListDetailViewModel: ObservableObject {
         hasReservablePlaces = await reservable ?? true
     }
 
+    /// Whether the header shows the "Find a table" button.
+    var showsFindTable: Bool { findTableAction != nil }
+
+    /// Stores the action the list view offers for "Find a table" (nil hides the header button).
+    func setFindTableAction(_ action: (() -> Void)?) {
+        findTableAction = action
+        objectWillChange.send()
+    }
+
     /// Builds the header the sheet's strip shows for this list: title, creator chip (tappable unless it's the user's own list), count, share.
     func header(
         currentUserId: String?,
@@ -107,7 +119,8 @@ final class ExploreListDetailViewModel: ObservableObject {
             creator: creator(currentUserId: currentUserId, onOpenProfile: onOpenProfile),
             detail: countLabel,
             onBack: onBack,
-            onShare: { [weak self] in self?.shareList() }
+            onShare: { [weak self] in self?.shareList() },
+            onFindTable: findTableAction
         )
     }
 
