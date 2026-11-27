@@ -92,8 +92,8 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             DEVELOPMENT_TEAM=585YK2F2H6 \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MESA_API_BASE_URL=https://mesa-backend-staging.up.railway.app 2>&1 | tee /tmp/mesa-ci/archive.log | tail -n 5 \
-            || { echo "=== compiler errors ==="; grep -aE "error:" /tmp/mesa-ci/archive.log | sort -u | head -40; exit 1; }
+            MESA_API_BASE_URL=https://mesa-backend-staging.up.railway.app > /tmp/mesa-ci/archive.log 2>&1 \
+            || { echo "=== compiler errors ==="; grep -aE "\.swift:[0-9]+:[0-9]+: error|: error:|error: " /tmp/mesa-ci/archive.log | sort -u | head -40; tail -n 5 /tmp/mesa-ci/archive.log; exit 1; }
 
       - name: Export and upload to TestFlight
         run: |
