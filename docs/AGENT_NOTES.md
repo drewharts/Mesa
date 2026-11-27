@@ -101,9 +101,11 @@ Simulator is chosen dynamically (newest iOS runtime, first iPhone). Secrets.xcco
 
 ### UI smoke
 Tests: `locUITests/MesaSmokeTests.swift` (signed-out sign-in screen), `MesaSignedInFlowTests.swift` (skips unless
-`TEST_ACCOUNT_EMAIL`/`TEST_ACCOUNT_PASSWORD`, fed from secret `TEST_ACCOUNT` = `email:password`, and the sign-in screen
-has `auth.email`/`auth.password`/`auth.signIn` — the shipping app only has Apple/Google sign-in, so these skip; no auth
-bypass exists or should be added). Identifiers live in `locUITests/A11yID.swift`, naming `area.element`.
+`TEST_ACCOUNT_EMAIL`/`TEST_ACCOUNT_PASSWORD` are set). Signed-in login does NOT type into fields (flaky keyboard focus):
+CI passes secrets `TEST_ACCOUNT_EMAIL`/`TEST_ACCOUNT_PASSWORD` as `TEST_RUNNER_TEST_ACCOUNT_*` env vars; the test copies them
+into `app.launchEnvironment` as `UITEST_EMAIL`/`UITEST_PASSWORD`, and a `#if DEBUG` hook in `LoginView.onAppear` calls
+`LoginViewModel.signInFromLaunchEnvironmentForUITests`. Release builds contain none of it; the testflight.yml guard step fails
+the archive if `MesaUITestEmailLogin` or `UITEST_PASSWORD` strings appear in the binary. Identifiers live in `locUITests/A11yID.swift`, naming `area.element`.
 Screenshots: `XCTAttachment` with `.keepAlways`, exported with `xcresulttool export attachments`.
 
 ### Not done / rejected

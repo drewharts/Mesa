@@ -5,7 +5,7 @@ After any change that affects what a user sees or does (UI, navigation, map beha
 
 ## Background
 - The agent box has no Xcode or simulator. Verification happens in GitHub Actions on a macOS runner: `.github/workflows/checks.yml` runs lint, duplicate-type check, version check, unit tests (`locTests`), and a **ui-smoke** job (XCUITest in `locUITests/`, using `A11yID` constants for accessibility identifiers) on an iOS simulator. UI smoke is non-blocking for now; unit tests gate TestFlight.
-- Signed-in flows (map, Explore, Trips, Profile) need an account. They are **skipped until a `TEST_ACCOUNT` secret exists**. Drew has not approved creating a test account, and there is no auth bypass in release builds. Do not add one. Today the smoke tests cover launch and the signed-out screens (login/onboarding entry).
+- Signed-in flows (Explore, Profile, lists) run in `ui-smoke` using the CI test account. Secret names: `TEST_ACCOUNT_EMAIL`, `TEST_ACCOUNT_PASSWORD` (forwarded as `TEST_RUNNER_TEST_ACCOUNT_*`). The test passes them to the app as launch environment `UITEST_EMAIL`/`UITEST_PASSWORD`; a DEBUG-only hook in `LoginView` signs in programmatically (no typing). Never add an auth bypass to Release builds; the testflight.yml guard step enforces this. Without the secrets the signed-in tests skip.
 - Never run `xcodebuild` expecting it to work locally. (CLAUDE.md's "don't run xcodebuild" applies to Drew's machine; for agents CI is the way.)
 
 ## Steps

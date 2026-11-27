@@ -148,6 +148,14 @@ class LoginViewModel: ObservableObject {
             }
         }
     }
+
+    /// Signs in at launch from UITEST_EMAIL / UITEST_PASSWORD launch environment values, if both are set (compiled out of Release).
+    func signInFromLaunchEnvironmentForUITests(userSession: UserSession) {
+        let env = ProcessInfo.processInfo.environment
+        guard let email = env["UITEST_EMAIL"], !email.isEmpty,
+              let password = env["UITEST_PASSWORD"], !password.isEmpty else { return }
+        signInWithEmailForUITests(email: email, password: password, userSession: userSession)
+    }
     #endif
 
     private func handleUserMigration(

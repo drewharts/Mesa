@@ -14,10 +14,6 @@ enum A11yID {
         static let title = "auth.title"
         static let signInApple = "auth.signInApple"
         static let signInGoogle = "auth.signInGoogle"
-        /// DEBUG-only email/password form, shown with launch argument -MesaUITestEmailLogin.
-        static let email = "auth.email"
-        static let password = "auth.password"
-        static let signIn = "auth.signIn"
     }
 
     enum Tab {

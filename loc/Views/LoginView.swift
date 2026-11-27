@@ -42,25 +42,14 @@ struct LoginView: View {
             }
             .ignoresSafeArea(edges: .bottom)
 
-            #if DEBUG
-            // UI-test-only email form (launch arg -MesaUITestEmailLogin), pinned to the top so the keyboard never covers it.
-            if DebugEmailLoginForm.isEnabled {
-                VStack {
-                    DebugEmailLoginForm { email, password in
-                        viewModel.signInWithEmailForUITests(email: email, password: password, userSession: userSession)
-                    }
-                    .padding(.horizontal, 28)
-                    .padding(.top, 90)
-                    .background(Color.white.opacity(0.85))
-                    Spacer()
-                }
-            }
-            #endif
         }
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3)) {
                 showSheet = true
             }
+            #if DEBUG
+            viewModel.signInFromLaunchEnvironmentForUITests(userSession: userSession)
+            #endif
         }
     }
     

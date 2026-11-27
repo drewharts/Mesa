@@ -4,8 +4,8 @@
 //
 //  Signed-in, read-only flows against the dedicated CI test account. They XCTSkip unless
 //  TEST_ACCOUNT_EMAIL / TEST_ACCOUNT_PASSWORD are in the environment (CI passes them as
-//  TEST_RUNNER_TEST_ACCOUNT_EMAIL/PASSWORD from GitHub secrets). Sign-in uses the DEBUG-only email form
-//  shown by the launch argument -MesaUITestEmailLogin (compiled out of Release). Never saves or deletes data.
+//  TEST_RUNNER_TEST_ACCOUNT_EMAIL/PASSWORD from GitHub secrets). Sign-in is programmatic: the credentials are passed as
+//  launch environment (UITEST_EMAIL / UITEST_PASSWORD) and the DEBUG-only LoginView hook signs in without typing. Never saves or deletes data.
 //
 
 import XCTest
@@ -25,9 +25,9 @@ final class MesaSignedInFlowTests: XCTestCase {
         }
         addSystemAlertMonitor()
         app = XCUIApplication()
-        app.launchArguments += ["-MesaUITestEmailLogin"]
+        app.launchEnvironment["UITEST_EMAIL"] = email
+        app.launchEnvironment["UITEST_PASSWORD"] = password
         app.launch()
-        signInIfNeeded(email: email, password: password)
         waitForMainUI()
     }
 
@@ -100,21 +100,6 @@ final class MesaSignedInFlowTests: XCTestCase {
             }
             return false
         }
-    }
-
-    /// Types credentials into the DEBUG email form if the app is signed out (a persisted session skips this).
-    private func signInIfNeeded(email: String, password: String) {
-        let emailField = app.textFields[A11yID.Auth.email]
-        let tabBar = app.descendants(matching: .any).matching(identifier: A11yID.Tab.explore).firstMatch
-        let deadline = Date().addingTimeInterval(timeout)
-        while !emailField.exists && !tabBar.exists && Date() < deadline { app.tap(); sleep(1) }
-        guard emailField.exists else { return }
-        emailField.tap()
-        emailField.typeText(email)
-        let passwordField = app.secureTextFields[A11yID.Auth.password]
-        passwordField.tap()
-        passwordField.typeText(password)
-        app.buttons[A11yID.Auth.signIn].tap()
     }
 
     /// Waits for the tab bar, dismissing post-login popups that cover it.

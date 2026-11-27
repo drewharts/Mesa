@@ -114,8 +114,8 @@ jobs:
           FILES=("$BIN")
           while IFS= read -r f; do FILES+=("$f"); done < <(find "$APP" -name '*.debug.dylib' 2>/dev/null)
           for f in "${FILES[@]}"; do
-            if strings -a "$f" | grep -q MesaUITestEmailLogin; then
-              echo "::error::MesaUITestEmailLogin found in $(basename "$f"): test-only login leaked into Release"
+            if strings -a "$f" | grep -qE 'MesaUITestEmailLogin|UITEST_PASSWORD'; then
+              echo "::error::UI-test login marker found in $(basename "$f"): test-only login leaked into Release"
               exit 1
             fi
           done
