@@ -80,9 +80,14 @@ final class MesaSignedInFlowTests: XCTestCase {
         add.tap()
         let importButton = app.descendants(matching: .any).matching(identifier: A11yID.Import.googleMaps).firstMatch
         XCTAssertTrue(importButton.waitForExistence(timeout: timeout), "Import from Google Maps action missing")
-        importButton.tap()
         let url = app.descendants(matching: .any).matching(identifier: A11yID.Import.googleMapsURL).firstMatch
-        XCTAssertTrue(url.waitForExistence(timeout: timeout), "import.googleMaps.url field missing")
+        for _ in 0..<3 where !url.exists {
+            // Menu items can swallow a tap while the popover is still animating; retry until the sheet opens.
+            _ = importButton.waitForExistence(timeout: 5)
+            if importButton.exists { importButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+            _ = url.waitForExistence(timeout: 8)
+        }
+        XCTAssertTrue(url.exists, "import.googleMaps.url field missing")
         attachScreenshot("import-sheet")
         let cancel = app.descendants(matching: .any).matching(identifier: A11yID.Import.cancel).firstMatch
         if cancel.exists { cancel.tap() }
