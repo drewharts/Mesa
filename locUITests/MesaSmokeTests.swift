@@ -14,6 +14,13 @@ final class MesaSmokeTests: XCTestCase {
     /// Stops at the first failure so the screenshot reflects the broken state.
     override func setUpWithError() throws {
         continueAfterFailure = false
+        addUIInterruptionMonitor(withDescription: "System permission alerts") { alert in
+            for label in ["Allow While Using App", "Allow", "OK", "Don\u{2019}t Allow"] where alert.buttons[label].exists {
+                alert.buttons[label].tap()
+                return true
+            }
+            return false
+        }
     }
 
     /// Launches the app signed-out and asserts the sign-in screen renders.
@@ -27,6 +34,7 @@ final class MesaSmokeTests: XCTestCase {
         let title = app.staticTexts[A11yID.Label.signedOutTitle]
         let appeared = signInButtons.firstMatch.waitForExistence(timeout: launchTimeout)
             || title.waitForExistence(timeout: 5)
+        app.tap() // lets the interruption monitor dismiss any pending permission alert
         attachScreenshot(of: app, named: "02-sign-in-screen")
         XCTAssertTrue(appeared, "Sign-in screen (Get Started / Continue with Google) did not render within \(launchTimeout)s")
     }
