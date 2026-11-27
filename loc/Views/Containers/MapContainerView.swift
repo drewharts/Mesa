@@ -196,9 +196,6 @@ struct MapContainerView: View {
                     }
                 }
             }
-            .onChange(of: mapDisplayCoordinatorViewModel.activeTripId) { old, new in
-                handleTripModeChange(from: old, to: new)
-            }
             .onChange(of: mapDisplayCoordinatorViewModel.selectedTripAnnotationPlaceId) { _, placeId in
                 guard let placeId,
                       let annotation = mapDisplayCoordinatorViewModel.activeTripAnnotations.first(where: { $0.placeId == placeId }) else { return }
@@ -212,7 +209,8 @@ struct MapContainerView: View {
                     mapPosition = .region(MKCoordinateRegion(center: center, span: span))
                 }
             }
-            .onChange(of: mapDisplayCoordinatorViewModel.activeTripAnnotations) { _, annotations in
+            .onChange(of: mapDisplayCoordinatorViewModel.activeTripAnnotations) { old, annotations in
+                handleTripModeChange(wasActive: !old.isEmpty, isActive: !annotations.isEmpty)
                 guard !annotations.isEmpty else { return }
                 let coords = annotations.map(\.coordinate)
 
@@ -282,10 +280,10 @@ struct MapContainerView: View {
     }
 
     /// Saves the camera when trip mode starts and animates back to it when trip mode ends.
-    private func handleTripModeChange(from old: String?, to new: String?) {
-        if old == nil, new != nil {
+    private func handleTripModeChange(wasActive: Bool, isActive: Bool) {
+        if !wasActive, isActive {
             preTripRegion = appCoordinator.currentMapRegion
-        } else if new == nil, let region = preTripRegion {
+        } else if wasActive, !isActive, let region = preTripRegion {
             preTripRegion = nil
             withAnimation(.easeInOut(duration: 0.5)) {
                 mapPosition = .region(region)
