@@ -104,6 +104,23 @@ jobs:
             MESA_API_BASE_URL=https://mesa-backend-staging.up.railway.app > /tmp/mesa-ci/archive.log 2>&1 \
             || { echo "=== compiler errors ==="; grep -aE "\.swift:[0-9]+:[0-9]+: error|: error:|error: " /tmp/mesa-ci/archive.log | sort -u | head -40; tail -n 5 /tmp/mesa-ci/archive.log; exit 1; }
 
+      - name: Guard - no UI-test email login in the Release binary
+        # The DEBUG-only email sign-in is keyed on this launch argument; it must never ship.
+        run: |
+          APP=$(ls -d "$ARCHIVE_PATH"/Products/Applications/*.app | head -1)
+          [ -n "$APP" ] || { echo "::error::no .app found in archive"; exit 1; }
+          BIN="$APP/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")"
+          [ -f "$BIN" ] || { echo "::error::app binary not found"; exit 1; }
+          FILES=("$BIN")
+          while IFS= read -r f; do FILES+=("$f"); done < <(find "$APP" -name '*.debug.dylib' 2>/dev/null)
+          for f in "${FILES[@]}"; do
+            if strings -a "$f" | grep -q MesaUITestEmailLogin; then
+              echo "::error::MesaUITestEmailLogin found in $(basename "$f"): test-only login leaked into Release"
+              exit 1
+            fi
+          done
+          echo "OK: MesaUITestEmailLogin not present in ${#FILES[@]} binary file(s)"
+
       - name: Export and upload to TestFlight
         run: |
           xcodebuild -exportArchive \

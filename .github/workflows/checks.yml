@@ -147,14 +147,14 @@ jobs:
           xcrun simctl bootstatus "${{ steps.setup.outputs.simulator-id }}" -b
       - name: Run UI smoke tests
         env:
-          TEST_ACCOUNT: ${{ secrets.TEST_ACCOUNT }}
+          # TEST_RUNNER_-prefixed variables are forwarded (prefix stripped) into the XCUITest runner.
+          # Passed via the environment only (never as build settings) so the xcodebuild log cannot echo them.
+          TEST_RUNNER_TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
+          TEST_RUNNER_TEST_ACCOUNT_PASSWORD: ${{ secrets.TEST_ACCOUNT_PASSWORD }}
         run: |
           set -o pipefail
-          # TEST_RUNNER_-prefixed variables are forwarded (prefix stripped) into the XCUITest runner.
-          if [ -n "$TEST_ACCOUNT" ]; then
-            export TEST_RUNNER_TEST_ACCOUNT_EMAIL="${TEST_ACCOUNT%%:*}"
-            export TEST_RUNNER_TEST_ACCOUNT_PASSWORD="${TEST_ACCOUNT#*:}"
-            echo "::add-mask::${TEST_ACCOUNT#*:}"
+          if [ -n "$TEST_RUNNER_TEST_ACCOUNT_PASSWORD" ]; then
+            echo "::add-mask::$TEST_RUNNER_TEST_ACCOUNT_PASSWORD"
           fi
           xcodebuild test \
             -project loc.xcodeproj -scheme loc -configuration Debug \

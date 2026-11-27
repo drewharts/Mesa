@@ -61,6 +61,14 @@ struct LoginView: View {
             // Sign in buttons
             buttonsSection
             
+            #if DEBUG
+            if DebugEmailLoginForm.isEnabled {
+                DebugEmailLoginForm { email, password in
+                    viewModel.signInWithEmailForUITests(email: email, password: password, userSession: userSession)
+                }
+            }
+            #endif
+
             // Error message
             errorSection
         }

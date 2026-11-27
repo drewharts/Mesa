@@ -132,6 +132,24 @@ class LoginViewModel: ObservableObject {
         }
     }
 
+    #if DEBUG
+    /// Signs in with email/password for UI tests, then runs the same migration/session path as Google sign-in (compiled out of Release).
+    func signInWithEmailForUITests(email: String, password: String, userSession: UserSession) {
+        Task { @MainActor in
+            do {
+                let session = try await authService.signIn(email: email, password: password)
+                await handleUserMigration(
+                    email: session.user.email ?? email,
+                    supabaseUserId: session.user.id.uuidString,
+                    userSession: userSession
+                )
+            } catch {
+                errorMessage = "Email sign-in failed: \(error.localizedDescription)"
+            }
+        }
+    }
+    #endif
+
     private func handleUserMigration(
         email: String?,
         supabaseUserId: String,

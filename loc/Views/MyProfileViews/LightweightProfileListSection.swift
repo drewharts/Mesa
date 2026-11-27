@@ -35,6 +35,7 @@ struct LightweightProfileListSection: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityIdentifier("profile.lists.row")
     }
 }
 

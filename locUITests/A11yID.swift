@@ -14,7 +14,7 @@ enum A11yID {
         static let title = "auth.title"
         static let signInApple = "auth.signInApple"
         static let signInGoogle = "auth.signInGoogle"
-        /// Optional email/password fields; the shipping app has none, so signed-in tests skip without them.
+        /// DEBUG-only email/password form, shown with launch argument -MesaUITestEmailLogin.
         static let email = "auth.email"
         static let password = "auth.password"
         static let signIn = "auth.signIn"
@@ -25,16 +25,27 @@ enum A11yID {
         static let profile = "tab.profile"
     }
 
+    enum Explore {
+        static let city = "explore.city"
+        static let list = "explore.list"
+        static let featured = "explore.featured"
+    }
+
     enum List {
         static let findTable = "list.findTable"
+        static let findTableSearch = "list.findTable.search"
     }
 
     enum Profile {
         static let addList = "profile.lists.add"
+        static let listRow = "profile.lists.row"
+        static let name = "profile.name"
     }
 
     enum Import {
         static let googleMaps = "import.googleMaps"
+        static let googleMapsURL = "import.googleMaps.url"
+        static let cancel = "import.cancel"
     }
 
     /// Visible-label fallbacks for elements whose identifiers may not be in the app yet.
