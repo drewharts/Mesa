@@ -96,6 +96,7 @@ struct LoginView: View {
             Text("Get Started")
                 .font(.system(size: 28, weight: .bold, design: .default))
                 .foregroundColor(mesaCharcoal)
+                .accessibilityIdentifier("auth.title")
             
             Text("Discover and save the best places,\nshared by people you trust.")
                 .font(.system(size: 16, weight: .regular))
@@ -116,6 +117,7 @@ struct LoginView: View {
             .signInWithAppleButtonStyle(.black)
             .frame(height: 56)
             .clipShape(Capsule())
+            .accessibilityIdentifier("auth.signInApple")
             
             // Google Sign In Button
             Button(action: {
@@ -141,6 +143,7 @@ struct LoginView: View {
                         .stroke(subtleGray.opacity(0.5), lineWidth: 1)
                 )
             }
+            .accessibilityIdentifier("auth.signInGoogle")
         }
     }
     

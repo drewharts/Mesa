@@ -1,0 +1,55 @@
+name: iOS CI setup
+description: Select Xcode 26, write Secrets.xcconfig, restore the SPM cache and pick an available iPhone simulator.
+inputs:
+  gms-api-key:
+    description: Google Maps key (dummy value is fine for unit tests)
+    default: DUMMY_GMS_API_KEY
+  posthog-api-key:
+    description: PostHog key (empty disables analytics)
+    default: ""
+outputs:
+  simulator-id:
+    description: UDID of the chosen iPhone simulator
+    value: ${{ steps.sim.outputs.udid }}
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode 26
+      shell: bash
+      run: |
+        XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+        sudo xcode-select -s "$XCODE"
+        xcodebuild -version
+
+    - name: Write Secrets.xcconfig
+      shell: bash
+      env:
+        GMS_API_KEY: ${{ inputs.gms-api-key }}
+        POSTHOG_API_KEY: ${{ inputs.posthog-api-key }}
+      run: printf 'GMS_API_KEY = %s\nPOSTHOG_API_KEY = %s\n' "$GMS_API_KEY" "$POSTHOG_API_KEY" > Secrets.xcconfig
+
+    - name: Cache SwiftPM packages
+      uses: actions/cache@v4
+      with:
+        path: .spm
+        key: spm-${{ runner.os }}-${{ hashFiles('loc.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+        restore-keys: spm-${{ runner.os }}-
+
+    - name: Pick an available iPhone simulator
+      id: sim
+      shell: bash
+      run: |
+        # Chosen dynamically (newest iOS runtime, first iPhone) so runner image updates don't break us.
+        UDID=$(xcrun simctl list devices available -j | python3 -c '
+        import json, sys
+        d = json.load(sys.stdin)["devices"]
+        def ver(k):
+            return tuple(int(x) for x in k.split("iOS-")[-1].split("-") if x.isdigit()) if "iOS" in k else ()
+        for k in sorted((k for k in d if "iOS" in k), key=ver, reverse=True):
+            phones = [x for x in d[k] if x["name"].startswith("iPhone") and x["isAvailable"]]
+            if phones:
+                print(phones[0]["udid"]); break
+        ')
+        if [ -z "$UDID" ]; then echo "::error::no available iPhone simulator"; xcrun simctl list devices available; exit 1; fi
+        xcrun simctl list devices available | grep "$UDID"
+        echo "udid=$UDID" >> "$GITHUB_OUTPUT"

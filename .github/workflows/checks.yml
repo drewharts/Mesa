@@ -1,0 +1,179 @@
+name: Checks
+
+# Hard CI checks against recurring coding-agent failures (see docs/AGENT_NOTES.md "CI hard checks"):
+#   lint        SwiftLint (+ custom rules) with a baseline -> only NEW violations fail
+#   structure   duplicate top-level type names per module (e.g. a second ShimmerModifier)
+#   version     MARKETING_VERSION must be ahead of the latest version Apple approved
+#   unit-tests  xcodebuild test -only-testing:locTests (compiles app + tests: catches isolation,
+#               wrong-type methods, missing annotations)
+#   ui-smoke    XCUITest smoke + screenshots; NON-BLOCKING (continue-on-error)
+on:
+  push:
+    branches: [testflight, "feature/**"]
+  workflow_dispatch:
+    inputs:
+      include_ui_smoke:
+        description: Run the (non-blocking) UI smoke job
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      include_ui_smoke:
+        description: Run the (non-blocking) UI smoke job
+        type: boolean
+        default: true
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/testflight' }}
+
+jobs:
+  lint:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      SWIFTLINT_VERSION: 0.65.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint ${{ env.SWIFTLINT_VERSION }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/swiftlint"
+          curl -fsSL -o "$RUNNER_TEMP/swiftlint.zip" \
+            "https://github.com/realm/SwiftLint/releases/download/$SWIFTLINT_VERSION/portable_swiftlint.zip"
+          unzip -oq "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
+          "$RUNNER_TEMP/swiftlint/swiftlint" --version
+      - name: Write a fresh baseline (artifact only)
+        # Lets us regenerate ci/swiftlint-baseline.json from CI (the baseline must come from the same
+        # SwiftLint build/SourceKit that checks it). Download the artifact and commit it deliberately.
+        run: |
+          "$RUNNER_TEMP/swiftlint/swiftlint" lint --quiet --write-baseline "$RUNNER_TEMP/fresh-baseline.json" || true
+          cp "$RUNNER_TEMP/fresh-baseline.json" swiftlint-baseline-fresh.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swiftlint-baseline-fresh
+          path: swiftlint-baseline-fresh.json
+      - name: SwiftLint (new violations only)
+        run: |
+          test -f ci/swiftlint-baseline.json || { echo "::error::ci/swiftlint-baseline.json missing; commit the swiftlint-baseline-fresh artifact"; exit 1; }
+          "$RUNNER_TEMP/swiftlint/swiftlint" lint --baseline ci/swiftlint-baseline.json --reporter github-actions-logging --strict
+
+  structure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Duplicate top-level types
+        run: python3 ci/check_duplicate_types.py
+
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PyJWT
+        run: python3 -m pip install -q --break-system-packages pyjwt cryptography 2>/dev/null || python3 -m pip install -q pyjwt cryptography
+      - name: MARKETING_VERSION is ahead of the latest approved version
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: python3 ci/check_marketing_version.py
+
+  unit-tests:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ios-ci-setup
+        id: setup
+      - name: Run locTests
+        run: |
+          set -o pipefail
+          SKIPS=()
+          while IFS= read -r line; do
+            id=$(echo "${line%%#*}" | xargs)
+            [ -n "$id" ] && SKIPS+=("-skip-testing:$id")
+          done < ci/quarantined_tests.txt
+          echo "quarantined: ${SKIPS[*]:-none}"
+          xcodebuild test \
+            -project loc.xcodeproj -scheme loc -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.setup.outputs.simulator-id }}" \
+            -clonedSourcePackagesDirPath .spm \
+            -skipPackagePluginValidation -skipMacroValidation \
+            -parallel-testing-enabled NO \
+            -only-testing:locTests ${SKIPS[@]+"${SKIPS[@]}"} \
+            -resultBundlePath "$RUNNER_TEMP/unit.xcresult" \
+            CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/unit.log" 2>&1 \
+            || { echo "=== compiler errors ==="; grep -aE "\.swift:[0-9]+:[0-9]+: error|error: " "$RUNNER_TEMP/unit.log" | sort -u | head -60; echo "=== log tail ==="; tail -n 30 "$RUNNER_TEMP/unit.log"; exit 1; }
+          tail -n 15 "$RUNNER_TEMP/unit.log"
+      - name: Failing tests
+        if: failure()
+        run: python3 ci/print_xcresult_failures.py "$RUNNER_TEMP/unit.xcresult"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-tests-xcresult
+          path: ${{ runner.temp }}/unit.xcresult
+          if-no-files-found: ignore
+      - name: Clean up
+        if: always()
+        run: rm -f Secrets.xcconfig
+
+  ui-smoke:
+    if: ${{ inputs.include_ui_smoke != false }}
+    runs-on: macos-26
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ios-ci-setup
+        id: setup
+        with:
+          gms-api-key: ${{ secrets.GMS_API_KEY || 'DUMMY_GMS_API_KEY' }}
+          posthog-api-key: ""
+      - name: Run UI smoke tests
+        env:
+          TEST_ACCOUNT: ${{ secrets.TEST_ACCOUNT }}
+        run: |
+          set -o pipefail
+          # TEST_RUNNER_-prefixed variables are forwarded (prefix stripped) into the XCUITest runner.
+          if [ -n "$TEST_ACCOUNT" ]; then
+            export TEST_RUNNER_TEST_ACCOUNT_EMAIL="${TEST_ACCOUNT%%:*}"
+            export TEST_RUNNER_TEST_ACCOUNT_PASSWORD="${TEST_ACCOUNT#*:}"
+            echo "::add-mask::${TEST_ACCOUNT#*:}"
+          fi
+          xcodebuild test \
+            -project loc.xcodeproj -scheme loc -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.setup.outputs.simulator-id }}" \
+            -clonedSourcePackagesDirPath .spm \
+            -skipPackagePluginValidation -skipMacroValidation \
+            -only-testing:locUITests/MesaSmokeTests \
+            -only-testing:locUITests/MesaSignedInFlowTests \
+            -resultBundlePath "$RUNNER_TEMP/ui.xcresult" \
+            CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/ui.log" 2>&1 \
+            || { echo "=== compiler errors ==="; grep -aE "\.swift:[0-9]+:[0-9]+: error|error: " "$RUNNER_TEMP/ui.log" | sort -u | head -60; echo "=== log tail ==="; tail -n 30 "$RUNNER_TEMP/ui.log"; exit 1; }
+          tail -n 15 "$RUNNER_TEMP/ui.log"
+      - name: Failing tests
+        if: failure()
+        run: python3 ci/print_xcresult_failures.py "$RUNNER_TEMP/ui.xcresult"
+      - name: Export screenshots
+        if: always()
+        run: |
+          mkdir -p screenshots
+          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/ui.xcresult" --output-path screenshots/ || true
+          ls -R screenshots | head -40
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-screenshots
+          path: screenshots
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-smoke-xcresult
+          path: ${{ runner.temp }}/ui.xcresult
+          if-no-files-found: ignore
+      - name: Clean up
+        if: always()
+        run: rm -f Secrets.xcconfig

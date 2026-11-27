@@ -56,3 +56,5 @@ firebase-functions/node_modules/
 # AdminConfig.swift used to hard-code one; it was unused and has been removed.
 loc/Services/AdminConfig.swift
 *.secret.xcconfig
+__pycache__/
+swiftlint-baseline-fresh.json
