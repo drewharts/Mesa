@@ -12,7 +12,7 @@ import XCTest
 
 final class MesaSignedInFlowTests: XCTestCase {
     private var app = XCUIApplication()
-    private let timeout: TimeInterval = 45
+    private let timeout: TimeInterval = 30
     private let listName = "CI Test List"
 
     /// Skips unless credentials exist, then launches the app and signs in through the real UI.
@@ -120,7 +120,7 @@ final class MesaSignedInFlowTests: XCTestCase {
     /// Waits for the tab bar, dismissing post-login popups that cover it.
     private func waitForMainUI() {
         let tab = app.descendants(matching: .any).matching(identifier: A11yID.Tab.profile).firstMatch
-        let deadline = Date().addingTimeInterval(90)
+        let deadline = Date().addingTimeInterval(60)
         while Date() < deadline {
             if tab.exists && tab.isHittable { return }
             dismissPopups()
