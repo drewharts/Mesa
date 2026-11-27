@@ -132,6 +132,11 @@ jobs:
         with:
           gms-api-key: ${{ secrets.GMS_API_KEY || 'DUMMY_GMS_API_KEY' }}
           posthog-api-key: ""
+      - name: Boot simulator
+        # UI tests time out launching on a cold simulator; boot it and wait for SpringBoard first.
+        run: |
+          xcrun simctl boot "${{ steps.setup.outputs.simulator-id }}" || true
+          xcrun simctl bootstatus "${{ steps.setup.outputs.simulator-id }}" -b
       - name: Run UI smoke tests
         env:
           TEST_ACCOUNT: ${{ secrets.TEST_ACCOUNT }}
@@ -151,7 +156,7 @@ jobs:
             -only-testing:locUITests/MesaSmokeTests \
             -only-testing:locUITests/MesaSignedInFlowTests \
             -resultBundlePath "$RUNNER_TEMP/ui.xcresult" \
-            CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/ui.log" 2>&1 \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGNING_REQUIRED=NO > "$RUNNER_TEMP/ui.log" 2>&1 \
             || { echo "=== compiler errors ==="; grep -aE "\.swift:[0-9]+:[0-9]+: error|error: " "$RUNNER_TEMP/ui.log" | sort -u | head -60; echo "=== log tail ==="; tail -n 30 "$RUNNER_TEMP/ui.log"; exit 1; }
           tail -n 15 "$RUNNER_TEMP/ui.log"
       - name: Failing tests
