@@ -51,9 +51,11 @@ struct GoogleMapsImportView: View {
             }
             .navigationTitle("Import from Google Maps")
             .navigationBarTitleDisplayMode(.inline)
+            .onDisappear { viewModel.cancelImport() }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(cancelLabel) {
+                        viewModel.cancelImport()
                         if let onCancel {
                             onCancel()
                         } else {
@@ -98,7 +100,7 @@ struct GoogleMapsImportView: View {
 
             // Extract button
             Button {
-                Task { await viewModel.extractPlaces() }
+                viewModel.startExtraction()
             } label: {
                 Text("Extract Places")
                     .fontWeight(.semibold)
