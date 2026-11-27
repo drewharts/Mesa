@@ -206,8 +206,17 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
         }
     }
 
-    /// Sets trip annotations to display on the main map.
+    /// Trips the user has left; late async loads for these ids must not re-add overlays.
+    private var exitedTripIds: Set<String> = []
+
+    /// Marks a trip as being viewed again so it may show on the map (e.g. its tab became visible).
+    func beginTripSession(tripId: String) {
+        exitedTripIds.remove(tripId)
+    }
+
+    /// Sets trip annotations to display on the main map, ignoring trips the user has already left.
     func showTripOnMap(annotations: [TripMapAnnotation], tripId: String) {
+        guard !exitedTripIds.contains(tripId) else { return }
         activeTripAnnotations = annotations
         activeTripId = tripId
         refreshTripRoutes()
@@ -226,6 +235,13 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
                 self.activeTripRoutes = service.segments(for: annotations)
             }
         }
+    }
+
+    /// Exits trip mode for a trip: removes its pins and routes and blocks late loads from re-adding them.
+    func clearTripFromMap(tripId: String) {
+        exitedTripIds.insert(tripId)
+        guard activeTripId == tripId || activeTripId == nil else { return }
+        clearTripAnnotations()
     }
 
     /// Clears trip annotations from the main map.

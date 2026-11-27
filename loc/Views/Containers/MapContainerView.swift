@@ -16,6 +16,8 @@ struct MapContainerView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var appCoordinator: AppCoordinator
 
+    @State private var preTripRegion: MKCoordinateRegion?
+
     @Binding var mapPosition: MapCameraPosition
     @Binding var recenterMap: Bool
     @Binding var isCreatePlacePopupActive: Bool
@@ -194,6 +196,9 @@ struct MapContainerView: View {
                     }
                 }
             }
+            .onChange(of: mapDisplayCoordinatorViewModel.activeTripId) { old, new in
+                handleTripModeChange(from: old, to: new)
+            }
             .onChange(of: mapDisplayCoordinatorViewModel.selectedTripAnnotationPlaceId) { _, placeId in
                 guard let placeId,
                       let annotation = mapDisplayCoordinatorViewModel.activeTripAnnotations.first(where: { $0.placeId == placeId }) else { return }
@@ -272,6 +277,18 @@ struct MapContainerView: View {
                         await mapViewModel.onMapCameraSettled(region, userId: userId)
                     }
                 }
+            }
+        }
+    }
+
+    /// Saves the camera when trip mode starts and animates back to it when trip mode ends.
+    private func handleTripModeChange(from old: String?, to new: String?) {
+        if old == nil, new != nil {
+            preTripRegion = appCoordinator.currentMapRegion
+        } else if new == nil, let region = preTripRegion {
+            preTripRegion = nil
+            withAnimation(.easeInOut(duration: 0.5)) {
+                mapPosition = .region(region)
             }
         }
     }

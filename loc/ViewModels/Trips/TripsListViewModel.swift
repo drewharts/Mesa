@@ -119,4 +119,16 @@ enum TripTimeline {
         result.past.sort { ($0.parsedEndDate ?? $0.startDate) > ($1.parsedEndDate ?? $1.startDate) }
         return result
     }
+
+    // MARK: - Map Trip Exit
+
+    /// Clears from the map every trip that was popped off the navigation stack.
+    func clearTripsRemoved(from old: [String], to new: [String], on coordinator: MapDisplayCoordinatorViewModel) {
+        clearTrips(old.filter { !new.contains($0) }, on: coordinator)
+    }
+
+    /// Clears the given trips' pins and routes from the map.
+    func clearTrips(_ tripIds: [String], on coordinator: MapDisplayCoordinatorViewModel) {
+        tripIds.forEach { coordinator.clearTripFromMap(tripId: $0) }
+    }
 }

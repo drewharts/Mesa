@@ -49,6 +49,7 @@ class TripDetailViewModel: ObservableObject {
     /// Sets the map display coordinator reference for annotation management.
     func setMapCoordinator(_ coordinator: MapDisplayCoordinatorViewModel) {
         self.mapCoordinator = coordinator
+        coordinator.beginTripSession(tripId: tripId)
     }
 
     // MARK: - Computed
@@ -557,9 +558,16 @@ class TripDetailViewModel: ObservableObject {
         }
     }
 
-    /// Clears trip annotations from the map.
+    /// Clears this trip's annotations and routes from the map and blocks late loads from re-adding them.
     func clearMapAnnotations() {
-        mapCoordinator?.clearTripAnnotations()
+        mapCoordinator?.clearTripFromMap(tripId: tripId)
+    }
+
+    /// Re-shows this trip on the map after its tab becomes visible again.
+    func restoreMapAnnotations() {
+        mapCoordinator?.beginTripSession(tripId: tripId)
+        guard hasPlacesWithCoordinates else { return }
+        mapCoordinator?.showTripOnMap(annotations: buildTripAnnotations(forDay: selectedDayForDetail), tripId: tripId)
     }
 
     /// Highlights a trip annotation on the map by setting the selected place ID.

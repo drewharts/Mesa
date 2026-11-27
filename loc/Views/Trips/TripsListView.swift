@@ -17,7 +17,7 @@ struct TripsListView: View {
 
     private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
 
-    @State private var navigationPath = NavigationPath()
+    @State private var navigationPath: [String] = []
 
     /// False when the list is the root of the Trips tab (there is nothing to close).
     private let showsCloseButton: Bool
@@ -56,7 +56,7 @@ struct TripsListView: View {
                 }
             }
             .navigationDestination(for: String.self) { tripId in
-                TripDetailView(tripId: tripId)
+                TripDetailView(tripId: tripId, isTabActive: isActive)
                     .environmentObject(userSession)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(mapDisplayCoordinatorVM)
@@ -78,8 +78,16 @@ struct TripsListView: View {
                 NotificationManager.shared.pendingTripId = nil
                 navigationPath.append(tripId)
             }
+            .onChange(of: navigationPath) { old, new in
+                viewModel.clearTripsRemoved(from: old, to: new, on: mapDisplayCoordinatorVM)
+            }
             .onChange(of: isActive) { _, active in
-                guard active, let userId = userSession.currentUserId else { return }
+                guard active else {
+                    viewModel.clearTrips(navigationPath, on: mapDisplayCoordinatorVM)
+                    return
+                }
+                navigationPath.last.map { mapDisplayCoordinatorVM.beginTripSession(tripId: $0) }
+                guard let userId = userSession.currentUserId else { return }
                 Task { await viewModel.loadTrips(userId: userId) }
             }
             .onChange(of: scenePhase) { _, phase in

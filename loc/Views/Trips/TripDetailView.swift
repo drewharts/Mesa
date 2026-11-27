@@ -14,7 +14,10 @@ struct TripDetailView: View {
     @StateObject private var viewModel: TripDetailViewModel
     @Environment(\.dismiss) private var dismiss
 
-    init(tripId: String) {
+    private let isTabActive: Bool
+
+    init(tripId: String, isTabActive: Bool = true) {
+        self.isTabActive = isTabActive
         _viewModel = StateObject(wrappedValue: TripDetailViewModel(tripId: tripId))
     }
 
@@ -74,6 +77,9 @@ struct TripDetailView: View {
             await viewModel.loadTripAndShowAnnotations()
             Analytics.track(.tripOpened, ["trip_id": viewModel.tripId])
             Analytics.screen("Trip Detail")
+        }
+        .onChange(of: isTabActive) { _, active in
+            if active { viewModel.restoreMapAnnotations() }
         }
         .onDisappear {
             guard viewModel.selectedDayForDetail == nil
