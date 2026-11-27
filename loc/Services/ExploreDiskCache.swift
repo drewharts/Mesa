@@ -9,6 +9,22 @@
 
 import Foundation
 
+/// Version of the cached Explore covers; bump to discard every persisted cover/Explore snapshot once.
+enum ExploreCacheVersion {
+    static let coverCacheVersion = 2
+    private static let defaultsKey = "exploreCoverCacheVersion"
+    private static let fileNames = ["ExploreCoverPhotos.json", "ExploreLists.json", "ExploreSuggestedPeople.json"]
+
+    /// Deletes the persisted Explore cache files the first time a newer cache version runs; evaluated once per process.
+    static let migrated: Bool = {
+        guard UserDefaults.standard.integer(forKey: defaultsKey) < coverCacheVersion else { return true }
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        fileNames.forEach { try? FileManager.default.removeItem(at: caches.appendingPathComponent($0)) }
+        UserDefaults.standard.set(coverCacheVersion, forKey: defaultsKey)
+        return true
+    }()
+}
+
 struct ExploreListsSnapshot: Codable {
     var popularLists: [ExploreList]
     var popularTitle: String
@@ -21,6 +37,7 @@ struct ExploreDiskCache<Value: Codable> {
 
     /// Creates a cache backed by `Caches/<fileName>`.
     init(fileName: String) {
+        _ = ExploreCacheVersion.migrated
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         fileURL = caches.appendingPathComponent(fileName)
     }

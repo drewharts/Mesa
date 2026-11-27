@@ -21,6 +21,7 @@ final class CoverPhotoStore {
     private let fileURL: URL
     private let maxEntries = 300
     private init() {
+        _ = ExploreCacheVersion.migrated
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         fileURL = caches.appendingPathComponent("ExploreCoverPhotos.json")
     }
