@@ -19,7 +19,7 @@ class TripsListViewModel: ObservableObject {
 
     /// Past-trips section expanded state; persists for the app session only.
     private static var sessionPastExpanded = false
-    @Published var isPastExpanded: Bool = TripsListViewModel.sessionPastExpanded {
+    @Published var isPastExpanded: Bool = TripsListViewModel.sessionPastExpanded || ScreenshotPrivacy.isActive {
         didSet { Self.sessionPastExpanded = isPastExpanded }
     }
 

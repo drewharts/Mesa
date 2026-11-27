@@ -39,3 +39,113 @@ final class locUITests: XCTestCase {
         }
     }
 }
+
+/// App Store screenshot capture. Driven by .github/workflows/screenshots.yml.
+/// Each scene relaunches the app in DEBUG screenshot mode; the app signs in the demo account
+/// (env from CI secrets), opens the scene itself and reports loading state through the hidden
+/// `screenshot.ready` element. Screenshots are kept as XCTAttachments named "NN_scene" and
+/// exported from the .xcresult by the workflow. Read-only: it never writes app data.
+final class ScreenshotTests: XCTestCase {
+    private struct Scene {
+        let name: String
+        let launch: String
+        /// Accessibility identifiers or labels (any one) that prove the scene's real content is on screen.
+        let markers: [String]
+    }
+
+    private let listId = "389894C6-3EE7-49D1-8D10-86DCAE238B7D"
+    private let placeId = "62880881-793E-4D42-8094-F9E1C7EFD353"
+    private let tripId = "441B0184-F0BE-4DFB-8F23-C5B70CD5A385"
+
+    private var scenes: [Scene] {
+        let only = ProcessInfo.processInfo.environment["SCREENSHOT_ONLY"] ?? ""
+        let all = [
+            Scene(name: "01_map", launch: "map", markers: []),
+            Scene(name: "02_explore", launch: "explore", markers: ["explore.city", "explore.list"]),
+            Scene(name: "03_list", launch: "list:\(listId)", markers: ["list.findTable"]),
+            Scene(name: "04_place", launch: "place:\(placeId):Genki Omakase", markers: ["Genki Omakase"]),
+            Scene(name: "05_trips", launch: "trips:\(tripId)", markers: ["Summer nyc 2026"]),
+            Scene(name: "06_profile", launch: "profile", markers: ["profile.name"]),
+            Scene(name: "07_tonight", launch: "tonight", markers: [])
+        ]
+        guard !only.isEmpty else { return all }
+        return all.filter { only.contains($0.name.prefix(2)) }
+    }
+
+    override func setUpWithError() throws {
+        continueAfterFailure = true
+        addUIInterruptionMonitor(withDescription: "System alerts") { alert in
+            for label in ["Allow While Using App", "Allow", "OK", "Don\u{2019}t Allow", "Not Now"]
+            where alert.buttons[label].exists {
+                alert.buttons[label].tap()
+                return true
+            }
+            return false
+        }
+    }
+
+    func testCaptureAppStoreScreenshots() throws {
+        let env = ProcessInfo.processInfo.environment
+        for scene in scenes {
+            let app = XCUIApplication()
+            app.launchArguments += ["-MesaScreenshotMode", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            app.launchEnvironment["MESA_SCREENSHOT_SCENE"] = scene.launch
+            app.launchEnvironment["MESA_DEMO_EMAIL"] = env["MESA_DEMO_EMAIL"] ?? ""
+            app.launchEnvironment["MESA_DEMO_PASSWORD"] = env["MESA_DEMO_PASSWORD"] ?? ""
+            app.launch()
+            let summary = waitForScene(scene, in: app)
+            sleep(UInt32(env["SCREENSHOT_SETTLE_SECONDS"] ?? "5") ?? 5)
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = scene.name
+            shot.lifetime = .keepAlways
+            add(shot)
+            let diag = XCTAttachment(string: "\(scene.name) \(readiness(in: app) ?? summary)")
+            diag.name = "diag_\(scene.name)"
+            diag.lifetime = .keepAlways
+            add(diag)
+            app.terminate()
+        }
+    }
+
+    /// Reads the app's hidden readiness value ("scene=..;shimmer=..;pfp=..;note=..").
+    private func readiness(in app: XCUIApplication) -> String? {
+        let probe = app.descendants(matching: .any).matching(identifier: "screenshot.ready").firstMatch
+        return probe.exists ? probe.value as? String : nil
+    }
+
+    /// Waits until the app opened the scene, its content is visible, placeholders are gone and the profile photo loaded.
+    private func waitForScene(_ scene: Scene, in app: XCUIApplication) -> String {
+        let deadline = Date().addingTimeInterval(150)
+        var last = "no readiness probe"
+        var recentered = false
+        while Date() < deadline {
+            if scene.name.hasSuffix("map"), !recentered {
+                let recenter = app.buttons["map.recenter"]
+                if recenter.exists && recenter.isHittable { recenter.tap(); recentered = true }
+            }
+            if let value = readiness(in: app) {
+                last = value
+                let opened = value.contains("scene=\(scene.launch.split(separator: ":").first ?? "")")
+                if opened && value.contains("shimmer=0") && value.contains("pfp=1") && hasContent(scene, in: app) && !isLoading(app) {
+                    return last
+                }
+            }
+            sleep(2)
+        }
+        return last
+    }
+
+    /// True when one of the scene's marker identifiers or labels exists (always true when the scene has none).
+    private func hasContent(_ scene: Scene, in app: XCUIApplication) -> Bool {
+        if scene.markers.isEmpty { return true }
+        return scene.markers.contains { marker in
+            app.descendants(matching: .any).matching(identifier: marker).firstMatch.exists
+                || app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", marker)).firstMatch.exists
+        }
+    }
+
+    /// True while any visible text starts with "Loading".
+    private func isLoading(_ app: XCUIApplication) -> Bool {
+        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH[c] 'Loading'")).count > 0
+    }
+}

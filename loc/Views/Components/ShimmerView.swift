@@ -59,6 +59,9 @@ struct ShimmerModifier: ViewModifier {
                         phase = 1
                     }
                 }
+                #if DEBUG
+                .modifier(ScreenshotShimmerTracker())
+                #endif
         }
     }
 }
