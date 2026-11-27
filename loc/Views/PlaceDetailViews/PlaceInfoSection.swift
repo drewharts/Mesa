@@ -18,6 +18,8 @@ struct PlaceInfoSection: View {
     /// Reservation link (Resy/OpenTable/...) when available; the button is hidden otherwise.
     var reservation: ReservationLink? = nil
     var onReserveTapped: (() -> Void)? = nil
+    /// damnlines.com wait-time data for tracked NYC venues; the row is hidden when nil.
+    var waitInfo: DamnlinesWaitInfo? = nil
 
     @Environment(\.openURL) private var openURL
 
@@ -170,6 +172,10 @@ struct PlaceInfoSection: View {
                     }
                 }
                 .padding(.bottom, 12)
+            }
+
+            if let waitInfo {
+                DamnlinesWaitRow(info: waitInfo)
             }
         }
     }

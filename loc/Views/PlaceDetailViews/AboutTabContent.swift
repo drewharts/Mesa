@@ -35,6 +35,7 @@ struct AboutTabContent: View {
     @State private var showingNoteSheet = false
     @StateObject private var insightsViewModel = PlaceInsightsViewModel()
     @StateObject private var reservationViewModel = ReservationViewModel()
+    @StateObject private var damnlinesWaitViewModel = DamnlinesWaitViewModel()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -49,7 +50,8 @@ struct AboutTabContent: View {
                     onAddPost: onAddPost,
                     takeText: insightsViewModel.take,
                     reservation: reservationViewModel.link,
-                    onReserveTapped: { reservationViewModel.trackTap() }
+                    onReserveTapped: { reservationViewModel.trackTap() },
+                    waitInfo: damnlinesWaitViewModel.info
                 )
             }
 
@@ -90,6 +92,9 @@ struct AboutTabContent: View {
         }
         .task(id: viewModel.placeId) {
             await reservationViewModel.load(placeId: viewModel.placeId, place: viewModel.place)
+        }
+        .task(id: viewModel.placeId) {
+            await damnlinesWaitViewModel.load(placeId: viewModel.placeId)
         }
         .onReceive(insightsViewModel.$priorityPhotoURLs) { urls in
             viewModel.placePhotosViewModel.priorityPhotoURLs = urls

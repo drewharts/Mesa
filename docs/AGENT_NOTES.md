@@ -113,3 +113,9 @@ Screenshots: `XCTAttachment` with `.keepAlways`, exported with `xcresulttool exp
   enum from instance methods on the wrong type; the compiler catches it once `unit-tests` builds.
 - Type-annotation failures (#4) and isolation errors (#2) are caught by the compiler in `unit-tests`; the lint rules above
   only block the escape hatches.
+
+### damnlines wait times (place page)
+- Row under the action buttons in `PlaceInfoSection` (`DamnlinesWaitRow`, id `place.detail.damnlinesWait`), loaded by `DamnlinesWaitViewModel` from `AboutTabContent`. Hidden for unmapped places and on any fetch/parse failure.
+- Data is damnlines.com, CC BY 4.0; the "damnlines" link to the venue page is the required attribution. Do not remove it.
+- Backend is not involved: iOS fetches the public `https://damnlines.com/data/line-index` directly (`DamnlinesWaitService`, 1 hour memory + UserDefaults cache).
+- Mapping is static in `loc/Models/DamnlinesPlaceMap.swift` (5 places: L'industrie West Village, Banh Anh Em, Halal Guys Midtown, Golden Diner, John's of Bleecker). Unmatched damnlines venues (Caffe Panna Gramercy, Salt Hank's, Breakfast by Salt's Cure, Lucinda's) and look-alike Mesa places (Brooklyn Caffe Panna, L'industrie Williamsburg, Halal Guys 14th St) are listed in comments there; add them if they appear in Mesa.
