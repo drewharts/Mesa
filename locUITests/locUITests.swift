@@ -116,7 +116,10 @@ final class ScreenshotTests: XCTestCase {
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.80))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
         start.press(forDuration: 0.1, thenDragTo: end)
-        sleep(10)
+        // Slide the city row so the first card (the slowest cover to resolve) is out of frame.
+        let rowStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.83))
+        rowStart.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.83)))
+        sleep(12)
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "02b_explore_cities"
         shot.lifetime = .keepAlways
