@@ -33,7 +33,7 @@ GUIDANCE = ("Bump MARKETING_VERSION for the `loc` and `MesaShare` targets in {pb
 
 def vtuple(v):
     """Parse '5.07' -> (5, 7) using Apple's integer-component semantics."""
-    return tuple(int(x) for x in v.strip().split("."))
+    return tuple(int(x) for x in v.strip().split(".") if x.strip().isdigit())
 
 
 def app_marketing_versions(root):
@@ -82,7 +82,8 @@ def asc_latest_approved():
         a = v["attributes"]
         state = a.get("appVersionState") or a.get("appStoreState")
         states = {a.get("appStoreState"), a.get("appVersionState")}
-        if a.get("platform") == "IOS" and states & APPROVED:
+        print(f"  ASC version {a.get('versionString')!r} {a.get('platform')} {sorted(x for x in states if x)}")
+        if a.get("platform") == "IOS" and states & APPROVED and vtuple(a.get("versionString") or ""):
             found.append((vtuple(a["versionString"]), a["versionString"], state))
     if not found:
         return None, "ASC has no approved iOS version"
