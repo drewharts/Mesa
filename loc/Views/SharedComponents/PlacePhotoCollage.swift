@@ -31,7 +31,7 @@ struct PlacePhotoCollage: View {
         ZStack {
             if let urls = viewModel.resolved {
                 layout(urls).transition(.opacity)
-            } else if !photoURLs.isEmpty {
+            } else if !photoURLs.isEmpty && !(ScreenshotPrivacy.isActive && viewModel.unresolvable) {
                 ShimmerView().transition(.opacity)
             }
         }

@@ -60,7 +60,7 @@ final class ScreenshotTests: XCTestCase {
     private var scenes: [Scene] {
         let only = ProcessInfo.processInfo.environment["SCREENSHOT_ONLY"] ?? ""
         let all = [
-            Scene(name: "01_map", launch: "listpeek:\(listId)", markers: ["list.findTable"]),
+            Scene(name: "01_map", launch: "list:\(listId)", markers: ["list.findTable"]),
             Scene(name: "02_explore", launch: "explore", markers: ["explore.city", "explore.list"]),
             Scene(name: "03_list", launch: "list:\(listId)", markers: ["list.findTable"]),
             Scene(name: "04_place", launch: "place:\(placeId):Genki Omakase", markers: ["Genki Omakase"]),
@@ -96,6 +96,7 @@ final class ScreenshotTests: XCTestCase {
             let summary = waitForScene(scene, in: app)
             sleep(UInt32(env["SCREENSHOT_SETTLE_SECONDS"] ?? "5") ?? 5)
             if scene.name == "01_map" || scene.name == "03_list" { sleep(12) } // pins load after the list's places
+            if scene.name == "01_map" { zoomMap(in: app) }
             if scene.name == "02_explore" { captureExploreCities(in: app, summary: summary) }
             if scene.name == "04_place" { dragSheetUp(in: app) }
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -123,6 +124,15 @@ final class ScreenshotTests: XCTestCase {
         let back = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
         back.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)))
         sleep(3)
+    }
+
+    /// Double-taps the visible map twice (Midtown/Union Square area) so individual pins show instead of wide clusters.
+    private func zoomMap(in app: XCUIApplication) {
+        let spot = app.coordinate(withNormalizedOffset: CGVector(dx: 0.38, dy: 0.22))
+        spot.doubleTap()
+        sleep(3)
+        spot.doubleTap()
+        sleep(8)
     }
 
     /// Drags the place sheet up from its handle so the place photos are visible.
