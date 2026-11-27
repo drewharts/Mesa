@@ -13,7 +13,7 @@ After any change that affects what a user sees or does (UI, navigation, map beha
 2. Run cheap local checks: `python3 ci/check_duplicate_types.py`, `git diff --stat`, re-read braces around every edit (see `wrong-type-placement.md`).
 3. Commit to a feature branch and push it (never `main`; only push when Drew's instructions allow pushing). Pushing to `testflight` triggers a TestFlight upload, so do **not** use it for verification.
 4. Find the run: `gh run list --branch <branch> --limit 3`, then `gh run watch <id>`.
-5. Download artifacts: `gh run download <id> -n smoke-screenshots -D /tmp/run-<id>/shots` and the xcresult (`gh run download <id> -n test-results -D /tmp/run-<id>/xcresult`; exact artifact names are in checks.yml).
+5. Download artifacts: `gh run download <id> -n smoke-screenshots -D /tmp/run-<id>/shots` and the xcresult (list artifacts with `gh run view <id>`; exact artifact names are defined in checks.yml, use `gh run download <id> -n <name> -D /tmp/run-<id>/<dir>`).
 6. Look at the screenshots with the Read tool (it renders PNGs). Check: right screen, no blank map, no spinner stuck, identifiers present.
 7. Read logs: `gh run view <id> --log-failed`; for xcresult details on a Mac `xcrun xcresulttool get test-results summary --path <x>.xcresult`; on Linux grep the uploaded `.log` files for `error:` and `Test Case .* failed`.
 8. If a flow is missing, add one (below), push again, repeat.

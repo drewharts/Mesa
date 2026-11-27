@@ -11,7 +11,7 @@ Commit 32dd3a6 "TripsListViewModel: move map-exit methods into the view model cl
 2. Find the target type's closing brace: the first line that is exactly `}` (column 0) after the type's declaration line. Insert **above** it, not "at the end of the file".
 3. Prefer an `extension` when the file is big or has several types: add `extension TripsListViewModel { ... }` explicitly named, with a `// MARK:`. It can't silently land in a neighboring type, and it can live in its own file (`TripsListViewModel+MapExit.swift`; one type/extension per file, named after it).
 4. Check scope after the edit: view ~10 lines above and below the insertion; confirm indentation matches the intended type (members are indented 4 spaces; a method at 4 spaces after `}` at column 0 belongs to the *next* declaration above).
-5. Count braces for the file: `python3 - <<'PY'` is overkill; quick check `grep -o "{" f | wc -l` vs `grep -o "}" f | wc -l` (ignores strings/comments, but a mismatch of 1 is the classic failure - see commit 4b5b98c "Fix brace mismatch in ListPlacesScrollView").
+5. Count braces for the file: quick check: `grep -o "{" f | wc -l` vs `grep -o "}" f | wc -l` (ignores strings/comments, but a mismatch of 1 is the classic failure - see commit 4b5b98c "Fix brace mismatch in ListPlacesScrollView").
 6. Grep the callers: `grep -rn "clearTrips(" loc` and confirm each receiver is the type that now owns the method.
 
 ## Checks
