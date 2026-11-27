@@ -127,6 +127,11 @@ enum TripTimeline {
         clearTrips(old.filter { !new.contains($0) }, on: coordinator)
     }
 
+    /// Allows the given trip (if any) to show on the map again after its tab returns.
+    func beginTripSession(_ tripId: String?, on coordinator: MapDisplayCoordinatorViewModel) {
+        tripId.map { coordinator.beginTripSession(tripId: $0) }
+    }
+
     /// Clears the given trips' pins and routes from the map.
     func clearTrips(_ tripIds: [String], on coordinator: MapDisplayCoordinatorViewModel) {
         tripIds.forEach { coordinator.clearTripFromMap(tripId: $0) }

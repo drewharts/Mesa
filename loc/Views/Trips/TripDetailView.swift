@@ -78,9 +78,9 @@ struct TripDetailView: View {
             Analytics.track(.tripOpened, ["trip_id": viewModel.tripId])
             Analytics.screen("Trip Detail")
         }
-        .onChange(of: isTabActive) { _, active in
-            if active { viewModel.restoreMapAnnotations() }
-        }
+        .modifier(TripTabActivationModifier(isActive: isTabActive) {
+            viewModel.restoreMapAnnotations()
+        })
         .onDisappear {
             guard viewModel.selectedDayForDetail == nil
                   && viewModel.selectedPlaceIdForDetail == nil else { return }

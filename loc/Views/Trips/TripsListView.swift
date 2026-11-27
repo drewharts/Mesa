@@ -36,6 +36,15 @@ struct TripsListView: View {
     var body: some View { analyticsBody.analyticsScreen("Trips") }
 
     @ViewBuilder private var analyticsBody: some View {
+        stack.modifier(TripMapExitModifier(
+            path: navigationPath,
+            isActive: isActive,
+            coordinator: mapDisplayCoordinatorVM,
+            viewModel: viewModel
+        ))
+    }
+
+    private var stack: some View {
         NavigationStack(path: $navigationPath) {
             Group {
                 if viewModel.isLoading && viewModel.trips.isEmpty {
@@ -78,16 +87,8 @@ struct TripsListView: View {
                 NotificationManager.shared.pendingTripId = nil
                 navigationPath.append(tripId)
             }
-            .onChange(of: navigationPath) { old, new in
-                viewModel.clearTripsRemoved(from: old, to: new, on: mapDisplayCoordinatorVM)
-            }
             .onChange(of: isActive) { _, active in
-                guard active else {
-                    viewModel.clearTrips(navigationPath, on: mapDisplayCoordinatorVM)
-                    return
-                }
-                navigationPath.last.map { mapDisplayCoordinatorVM.beginTripSession(tripId: $0) }
-                guard let userId = userSession.currentUserId else { return }
+                guard active, let userId = userSession.currentUserId else { return }
                 Task { await viewModel.loadTrips(userId: userId) }
             }
             .onChange(of: scenePhase) { _, phase in
