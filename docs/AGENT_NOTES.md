@@ -2,6 +2,19 @@
 
 Newest entries first. Skimmable on purpose: decisions, how to use, open items.
 
+## 2026-11-27 - App Store screenshot pipeline (feature/appstore-shots)
+
+`.github/workflows/screenshots.yml` builds Debug for two simulators (iPhone 17 Pro Max "6.9", iPhone 11 Pro Max "6.5"; the 11 Pro Max
+renders 1242x2688, `ci/screenshots/frame.py` resizes to ASC sizes), runs `locUITests/ScreenshotTests`, and uploads artifacts
+`screenshots-<size>` (PNG + `diag_*.txt`) and `shots-xcresult-<size>`. Triggers: push to `feature/appstore-shots` or manual dispatch.
+Secrets: `MESA_DEMO_EMAIL`, `MESA_DEMO_PASSWORD` (forwarded as `TEST_RUNNER_MESA_DEMO_*`), `GMS_API_KEY`. Read-only: it signs in and views.
+App side is `#if DEBUG` + launch arg `-MesaScreenshotMode`: `loc/Services/Debug/ScreenshotMode.swift` (read-only sign-in, scene opener via
+AppTabRouter/PresentationService/deep link, profile-photo load with retries), `ScreenshotPrivacy` (neutral names, no other people's faces),
+`ScreenshotReadiness` + `ScreenshotReadinessProbe` (hidden `screenshot.ready` element: shimmer count, pfp loaded). It does NOT use the
+UITEST_* login hook because that path (handleUserMigration) can write the users row. Download: `gh run download <id> -n screenshots-6.9`.
+Known gaps: some Explore city covers have no photos (gradient fallback; `PlacePhotoCollage` shimmers forever when no candidate loads -
+product bug, only masked in screenshot mode); Tonight (07) shows placeholder thumbnails for places without photos.
+
 ## 2026-11-27 - TestFlight release gate
 
 `.github/workflows/testflight.yml` now has a `checks` job (`uses: ./.github/workflows/checks.yml`, `secrets: inherit`,
