@@ -62,6 +62,7 @@ struct GoogleMapsImportView: View {
                             dismiss()
                         }
                     }
+                    .accessibilityIdentifier("import.cancel")
                 }
             }
         }
@@ -95,6 +96,7 @@ struct GoogleMapsImportView: View {
                         RoundedRectangle(cornerRadius: cornerRadius)
                             .stroke(Color(.systemGray4), lineWidth: 1)
                     )
+                    .accessibilityIdentifier("import.googleMaps.url")
             }
             .padding(.horizontal)
 
@@ -109,6 +111,7 @@ struct GoogleMapsImportView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(viewModel.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .accessibilityIdentifier("import.googleMaps.submit")
             .padding(.horizontal)
 
             Text("Works with shared list links.")
@@ -254,6 +257,7 @@ struct GoogleMapsImportView: View {
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .stroke(Color(.systemGray4), lineWidth: 1)
                 )
+                .accessibilityIdentifier("import.googleMaps.listName")
         }
     }
 
@@ -466,6 +470,7 @@ struct GoogleMapsImportView: View {
         .buttonStyle(.plain)
         .disabled(actionButtonDisabled)
         .opacity(actionButtonDisabled ? 0.3 : 1.0)
+        .accessibilityIdentifier("import.googleMaps.create")
         .padding(.horizontal)
         .padding(.vertical, 12)
     }
@@ -536,6 +541,7 @@ struct GoogleMapsImportView: View {
                     .padding(.vertical, 12)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("import.googleMaps.done")
             .padding(.horizontal)
 
             Spacer()
@@ -573,6 +579,7 @@ struct GoogleMapsImportView: View {
                     .padding(.vertical, 12)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("import.googleMaps.retry")
             .padding(.horizontal)
 
             Spacer()

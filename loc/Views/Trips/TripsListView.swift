@@ -61,6 +61,7 @@ struct TripsListView: View {
                 if showsCloseButton {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close") { dismiss() }
+                            .accessibilityIdentifier("trip.close")
                     }
                 }
             }
@@ -142,6 +143,7 @@ struct TripsListView: View {
                     .foregroundStyle(.white)
                     .clipShape(Capsule())
             }
+            .accessibilityIdentifier("trips.create")
             .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -175,6 +177,7 @@ struct TripsListView: View {
             TripCardView(trip: trip)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("trips.row")
     }
 
     private var pastTripsHeader: some View {

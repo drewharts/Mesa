@@ -294,12 +294,14 @@ struct LightweightListPopupView: View {
                                 } label: {
                                     Label("Add Place", systemImage: "mappin.and.ellipse")
                                 }
+                                .accessibilityIdentifier("list.menu.addPlace")
 
                                 Button {
                                     showCollaboratorsSheet = true
                                 } label: {
                                     Label("Add Collaborator", systemImage: "person.badge.plus")
                                 }
+                                .accessibilityIdentifier("list.menu.addCollaborator")
 
                                 Divider()
 
@@ -308,12 +310,14 @@ struct LightweightListPopupView: View {
                                 } label: {
                                     Label("Share Link", systemImage: "link")
                                 }
+                                .accessibilityIdentifier("list.menu.shareLink")
 
                                 Button {
                                     prepareAndShowPhotoSelector()
                                 } label: {
                                     Label("Create Story Card", systemImage: "camera.fill")
                                 }
+                                .accessibilityIdentifier("list.menu.storyCard")
 
                                 if currentList.user_role == "owner" || !currentList.isSharedWithMe {
                                     Divider()
@@ -323,18 +327,21 @@ struct LightweightListPopupView: View {
                                     } label: {
                                         Label("Edit List", systemImage: "pencil")
                                     }
+                                    .accessibilityIdentifier("list.menu.edit")
 
                                     Button {
                                         showSettingsSheet = true
                                     } label: {
                                         Label("List Settings", systemImage: "gearshape")
                                     }
+                                    .accessibilityIdentifier("list.menu.settings")
 
                                     Button(role: .destructive) {
                                         showDeleteConfirmation = true
                                     } label: {
                                         Label("Delete List", systemImage: "trash")
                                     }
+                                    .accessibilityIdentifier("list.menu.delete")
                                 }
                             } label: {
                                 ZStack {
@@ -351,6 +358,7 @@ struct LightweightListPopupView: View {
                                 .contentShape(Rectangle())
                             }
                             .disabled(storyViewModel.isGenerating)
+                            .accessibilityIdentifier("list.menu")
                         }
                     }
                 }

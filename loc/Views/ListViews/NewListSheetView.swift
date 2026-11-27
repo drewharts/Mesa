@@ -43,6 +43,7 @@ struct NewListSheetView: View {
                         )
                         .disabled(isSaving)
                         .focused($isTextFieldFocused)
+                        .accessibilityIdentifier("list.new.name")
                 }
                 .padding(.horizontal)
                 .padding(.top, 8)
@@ -70,6 +71,7 @@ struct NewListSheetView: View {
                         dismiss()
                     }
                     .disabled(isSaving)
+                    .accessibilityIdentifier("list.new.cancel")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
@@ -79,6 +81,7 @@ struct NewListSheetView: View {
                     }
                     .fontWeight(.semibold)
                     .disabled(listName.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                    .accessibilityIdentifier("list.new.save")
                 }
             }
         }

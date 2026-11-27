@@ -180,6 +180,7 @@ struct ProfilePhotoOnboardingView: View {
                 )
                 .overlay(Capsule().stroke(subtleGray.opacity(0.5), lineWidth: 1))
         }
+        .accessibilityIdentifier("onboarding.photo.choose")
     }
 
     private var continueButton: some View {
@@ -203,6 +204,7 @@ struct ProfilePhotoOnboardingView: View {
             )
         }
         .disabled(!viewModel.canContinue || viewModel.isUploading)
+        .accessibilityIdentifier("onboarding.continue")
     }
 
     // MARK: - Error Section

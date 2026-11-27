@@ -191,6 +191,7 @@ struct ExploreTabView: View {
                     Task { await viewModel.refresh(userId: userId, location: locationManager.currentLocation) }
                 }
                 .font(.subheadline.weight(.semibold))
+                .accessibilityIdentifier("explore.retry")
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 24)

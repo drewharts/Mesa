@@ -30,6 +30,7 @@ struct ExploreCityCard: View {
             .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("explore.city")
     }
 
     // MARK: - Subviews

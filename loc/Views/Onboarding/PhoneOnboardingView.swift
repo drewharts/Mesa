@@ -163,6 +163,7 @@ struct PhoneOnboardingView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(subtleGray.opacity(0.5), lineWidth: 1)
             )
+            .accessibilityIdentifier("onboarding.phone")
     }
 
     // MARK: - Buttons Section
@@ -194,6 +195,7 @@ struct PhoneOnboardingView: View {
             )
         }
         .disabled(!viewModel.isValidNumber || viewModel.isSubmitting)
+        .accessibilityIdentifier("onboarding.continue")
     }
 
     // MARK: - Error Section

@@ -116,6 +116,7 @@ struct LoginView: View {
             .signInWithAppleButtonStyle(.black)
             .frame(height: 56)
             .clipShape(Capsule())
+            .accessibilityIdentifier("auth.apple")
             
             // Google Sign In Button
             Button(action: {
@@ -141,6 +142,7 @@ struct LoginView: View {
                         .stroke(subtleGray.opacity(0.5), lineWidth: 1)
                 )
             }
+            .accessibilityIdentifier("auth.google")
         }
     }
     

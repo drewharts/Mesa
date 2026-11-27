@@ -45,6 +45,7 @@ struct PhotoClusterOverviewView: View {
                         photoImportVM.clearSelection()
                         dismiss()
                     }
+                    .accessibilityIdentifier("import.photos.cancel")
                 }
             }
             .sheet(isPresented: $showPlaceSelectionForCluster) {

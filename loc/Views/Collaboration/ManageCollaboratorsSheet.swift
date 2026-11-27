@@ -53,6 +53,7 @@ struct ManageCollaboratorsSheet: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .focused($isSearchFocused)
+                .accessibilityIdentifier("list.collaborators.search")
             
             if viewModel.isSearching {
                 ProgressView()

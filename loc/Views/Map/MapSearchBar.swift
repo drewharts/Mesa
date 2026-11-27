@@ -32,5 +32,6 @@ struct MapSearchBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Search")
+        .accessibilityIdentifier("map.searchBar")
     }
 }

@@ -127,6 +127,7 @@ struct EditProfileView: View {
             TextField("First Name", text: $viewModel.firstName)
                 .textContentType(.givenName)
                 .autocorrectionDisabled()
+                .accessibilityIdentifier("editProfile.firstName")
             TextField("Last Name", text: $viewModel.lastName)
                 .textContentType(.familyName)
                 .autocorrectionDisabled()
@@ -181,6 +182,7 @@ struct EditProfileView: View {
                     }
                 }
                 .disabled(!viewModel.hasChanges)
+                .accessibilityIdentifier("editProfile.save")
             }
         }
     }

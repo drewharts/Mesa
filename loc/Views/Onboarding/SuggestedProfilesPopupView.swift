@@ -34,6 +34,7 @@ struct SuggestedProfilesPopupView: View {
                         isPresented = false
                     }
                     .fontWeight(.semibold)
+                    .accessibilityIdentifier("onboarding.suggested.done")
                 }
             }
             .navigationDestination(for: ProfileData.self) { profile in

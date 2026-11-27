@@ -42,5 +42,6 @@ struct ExploreShortcutCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("explore.shortcut")
     }
 }

@@ -22,6 +22,7 @@ struct MapTopBar: View {
                 accessibilityLabel: "Fresh finds",
                 action: onFreshFindsTap
             )
+            .accessibilityIdentifier("map.freshFinds")
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)

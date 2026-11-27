@@ -103,6 +103,7 @@ struct PlaceInfoSection: View {
             // Prominent, always-visible review CTA (not buried in the scrollable row below)
             if let onAddPost {
                 GlassComposerButton(icon: "square.and.pencil", text: "Write a Review", action: onAddPost)
+                    .accessibilityIdentifier("place.detail.writeReview")
                     .padding(.bottom, hasActionButtons ? 10 : 12)
             }
 
@@ -119,6 +120,7 @@ struct PlaceInfoSection: View {
                                 ReserveActionLabel(link: reservation)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("place.detail.reserve")
                         }
 
                         // Menu button
@@ -163,6 +165,7 @@ struct PlaceInfoSection: View {
                                 actionButtonLabel(icon: "phone.fill", text: "Call")
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("place.detail.call")
                         }
                     }
                 }

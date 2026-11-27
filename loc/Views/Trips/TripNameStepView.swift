@@ -35,6 +35,7 @@ struct TripNameStepView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 32)
                 .focused($isNameFocused)
+                .accessibilityIdentifier("trip.create.name")
                 .submitLabel(.next)
                 .onSubmit {
                     if viewModel.canProceed {
@@ -57,6 +58,7 @@ struct TripNameStepView: View {
                     )
             }
             .disabled(!viewModel.canProceed)
+            .accessibilityIdentifier("trip.create.next")
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }

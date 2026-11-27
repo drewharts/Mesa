@@ -347,6 +347,7 @@ struct ImportProgressView: View {
                     .background(Color.accentColor)
                     .foregroundColor(.white)
                     .cornerRadius(12)
+                    .accessibilityIdentifier("import.progress.done")
             } else if viewModel.isFinished && !viewModel.savedPlaces.isEmpty, let listViewModel {
                 ImportSaveButton(
                     listViewModel: listViewModel,
@@ -370,6 +371,7 @@ struct ImportProgressView: View {
             } else {
                 Button("Hide") { viewModel.dismiss() }
                     .font(.subheadline)
+                    .accessibilityIdentifier("import.progress.hide")
             }
         }
         .padding(.horizontal)

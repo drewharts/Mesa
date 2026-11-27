@@ -71,6 +71,7 @@ struct CreatePostView: View {
                         dismiss()
                     }
                     .disabled(viewModel.isLoading)
+                    .accessibilityIdentifier("post.create.cancel")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.isLoading {
@@ -81,6 +82,7 @@ struct CreatePostView: View {
                         }
                         .fontWeight(.semibold)
                         .disabled(!viewModel.canSubmit)
+                        .accessibilityIdentifier("post.create.share")
                     }
                 }
             }
@@ -350,6 +352,7 @@ private struct PostCaptionSection: View {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $viewModel.postText)
                     .font(.body)
+                    .accessibilityIdentifier("post.create.text")
                     .frame(minHeight: 80)
                     .scrollContentBackground(.hidden)
                     .padding(12)
