@@ -9,7 +9,7 @@
 //  Launch argument: -MesaScreenshotMode
 //  Environment:
 //    MESA_DEMO_EMAIL / MESA_DEMO_PASSWORD  demo account (from CI secrets; never committed)
-//    MESA_SCREENSHOT_SCENE                 map | explore | list:<id> | place:<id>:<name> | trips:<id>
+//    MESA_SCREENSHOT_SCENE                 map | explore | list:<id> | listpeek:<id> | place:<id>:<name> | trips:<id>
 //                                          | profile | tonight
 //
 
@@ -136,6 +136,9 @@ enum ScreenshotMode {
         case "profile": AppTabRouter.shared.select(.profile)
         case "tonight": await present(.tonight)
         case "list": await present(.list(listId: arg))
+        case "listpeek":
+            await present(.list(listId: arg))
+            ListMapSheetViewModel.shared.requestDetent(.peek, trigger: "screenshot")
         case "trips": await openTrip(id: arg)
         case "place":
             let name = parts.count > 2 ? parts[2] : "Place"

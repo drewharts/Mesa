@@ -60,7 +60,7 @@ final class ScreenshotTests: XCTestCase {
     private var scenes: [Scene] {
         let only = ProcessInfo.processInfo.environment["SCREENSHOT_ONLY"] ?? ""
         let all = [
-            Scene(name: "01_map", launch: "map", markers: []),
+            Scene(name: "01_map", launch: "listpeek:\(listId)", markers: ["list.findTable"]),
             Scene(name: "02_explore", launch: "explore", markers: ["explore.city", "explore.list"]),
             Scene(name: "03_list", launch: "list:\(listId)", markers: ["list.findTable"]),
             Scene(name: "04_place", launch: "place:\(placeId):Genki Omakase", markers: ["Genki Omakase"]),
@@ -95,6 +95,9 @@ final class ScreenshotTests: XCTestCase {
             app.launch()
             let summary = waitForScene(scene, in: app)
             sleep(UInt32(env["SCREENSHOT_SETTLE_SECONDS"] ?? "5") ?? 5)
+            if scene.name == "01_map" || scene.name == "03_list" { sleep(12) } // pins load after the list's places
+            if scene.name == "02_explore" { captureExploreCities(in: app, summary: summary) }
+            if scene.name == "04_place" { dragSheetUp(in: app) }
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = scene.name
             shot.lifetime = .keepAlways
@@ -105,6 +108,28 @@ final class ScreenshotTests: XCTestCase {
             add(diag)
             app.terminate()
         }
+    }
+
+    /// Scrolls Explore so the city covers show, waits for them, and attaches an extra "02b" screenshot; scrolls back up.
+    private func captureExploreCities(in app: XCUIApplication, summary: String) {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.80))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        sleep(10)
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "02b_explore_cities"
+        shot.lifetime = .keepAlways
+        add(shot)
+        let back = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
+        back.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)))
+        sleep(3)
+    }
+
+    /// Drags the place sheet up from its handle so the place photos are visible.
+    private func dragSheetUp(in app: XCUIApplication) {
+        let handle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.715))
+        handle.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
+        sleep(8)
     }
 
     /// Reads the app's hidden readiness value ("scene=..;shimmer=..;pfp=..;note=..").
@@ -118,6 +143,7 @@ final class ScreenshotTests: XCTestCase {
         let deadline = Date().addingTimeInterval(150)
         var last = "no readiness probe"
         var recentered = false
+        var idlePolls = 0
         while Date() < deadline {
             if scene.name.hasSuffix("map"), !recentered {
                 let recenter = app.buttons["map.recenter"]
@@ -126,9 +152,9 @@ final class ScreenshotTests: XCTestCase {
             if let value = readiness(in: app) {
                 last = value
                 let opened = value.contains("scene=\(scene.launch.split(separator: ":").first ?? "")")
-                if opened && value.contains("shimmer=0") && value.contains("pfp=1") && hasContent(scene, in: app) && !isLoading(app) {
-                    return last
-                }
+                let ready = opened && value.contains("shimmer=0") && value.contains("pfp=1") && hasContent(scene, in: app) && !isLoading(app)
+                idlePolls = ready ? idlePolls + 1 : 0
+                if idlePolls >= 3 { return last }
             }
             sleep(2)
         }
