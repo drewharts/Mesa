@@ -48,6 +48,7 @@ struct ListSettingsSheet: View {
                         Task { await save() }
                     }
                     .disabled(isSaving)
+                    .accessibilityIdentifier("list.settings.save")
                 }
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
@@ -77,6 +78,7 @@ struct ListSettingsSheet: View {
                 }
             ))
             .disabled(isSaving)
+            .accessibilityIdentifier("list.settings.private")
         } footer: {
             Text("Private lists only show places on the map for you and collaborators.")
         }

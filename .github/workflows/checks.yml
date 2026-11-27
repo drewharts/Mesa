@@ -7,9 +7,10 @@ name: Checks
 #   unit-tests  xcodebuild test -only-testing:locTests (compiles app + tests: catches isolation,
 #               wrong-type methods, missing annotations)
 #   ui-smoke    XCUITest smoke + screenshots; NON-BLOCKING (continue-on-error)
+# testflight.yml calls this workflow (workflow_call) and gates the upload on the four blocking jobs.
 on:
   push:
-    branches: [testflight, "feature/**"]
+    branches: ["feature/**"]  # testflight runs these checks via testflight.yml (workflow_call)
   workflow_dispatch:
     inputs:
       include_ui_smoke:

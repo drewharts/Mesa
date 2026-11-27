@@ -45,6 +45,7 @@ struct FindTableSheet: View {
                     .background(Capsule().fill(Color.mesaAccent.opacity(viewModel.canSearch ? 1 : 0.4)))
             }
             .disabled(!viewModel.canSearch)
+            .accessibilityIdentifier("list.findTable.search")
         }
         .padding(20)
         .presentationDetents([.height(viewModel.preset == .pick ? 420 : 320)])

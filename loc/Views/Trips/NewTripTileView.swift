@@ -25,5 +25,6 @@ struct NewTripTileView: View {
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("New trip")
+        .accessibilityIdentifier("trips.new")
     }
 }

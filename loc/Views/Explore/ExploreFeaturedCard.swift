@@ -52,6 +52,7 @@ struct ExploreFeaturedCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(config.title)
+        .accessibilityIdentifier("explore.featured")
     }
 
     private var copy: some View {
@@ -98,5 +99,6 @@ struct ExploreFeaturedCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens the list and checks which places have tables")
+        .accessibilityIdentifier("explore.featured.findTable")
     }
 }

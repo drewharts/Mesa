@@ -35,10 +35,12 @@ struct ContactsConsentCard: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .accessibilityIdentifier("onboarding.contacts.allow")
 
             Button("Not Now", action: onDecline)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .accessibilityIdentifier("onboarding.contacts.decline")
         }
         .padding(16)
         .background(Color(.systemGray6))

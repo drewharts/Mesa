@@ -10,7 +10,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Release gate: lint, structure, version and unit-tests (checks.yml) must pass before upload.
+  # ui-smoke is non-blocking and skipped here; it still runs on feature/** pushes.
+  checks:
+    uses: ./.github/workflows/checks.yml
+    secrets: inherit
+    with:
+      include_ui_smoke: false
+
   upload:
+    needs: checks
     runs-on: macos-26
     timeout-minutes: 60
     env:

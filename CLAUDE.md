@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Start here:** read `AGENTS.md` (conventions and rules), `FEATURE_MAP.md` (user-visible features -> files -> accessibility IDs), `docs/AGENT_NOTES.md` (decisions and open items), and `docs/skills/` (playbooks for recurring failures) before making changes.
+
 ## Project Overview
 
 Mesa (Loc) is a social iOS app for sharing and discovering places. Built with SwiftUI and Supabase, it allows users to create lists of restaurants, cafes, and other locations, share them with friends, and discover new places through their social network.
@@ -37,13 +39,14 @@ Mesa (Loc) is a social iOS app for sharing and discovering places. Built with Sw
 ### Build and Run
 ```bash
 # Open in Xcode
-open Loc.xcodeproj
+open loc.xcodeproj
 
-# IMPORTANT: DO NOT run xcodebuild commands via CLI
-# User prefers to build and run from Xcode interface only
-# xcodebuild -project Loc.xcodeproj -scheme Loc -configuration Debug build
-# xcodebuild test -project Loc.xcodeproj -scheme Loc -destination 'platform=iOS Simulator,name=iPhone 15'
+# Drew's local machine: build and run from the Xcode interface only; do NOT run xcodebuild via CLI.
+# xcodebuild -project loc.xcodeproj -scheme loc -configuration Debug build
+# xcodebuild test -project loc.xcodeproj -scheme loc -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
+
+**Agents:** the "no xcodebuild" rule above is about Drew's local machine. Agent environments have no Xcode, so agents verify via CI: push a feature branch and read `.github/workflows/checks.yml` (lint, duplicate-type check, version check, unit tests, UI smoke), following `docs/skills/verify-mesa.md`. The project is `loc.xcodeproj`, scheme `loc` (lowercase; paths are case-sensitive on Linux).
 
 ### Testing Deep Links
 ```bash
@@ -135,7 +138,7 @@ func validateForm() -> [ValidationError] { ... }
 
 ### Deep Linking
 URL scheme: `loc://`
-- Handled in `Loc/AppDelegate.swift` and `Loc/LocApp.swift`
+- Handled in `loc/locApp.swift` (the `AppDelegate` class lives in the same file) and `DeepLinkManager`
 - Routes: `/profile/{userId}`, `/place/{placeId}`, `/list/{listId}`
 
 ## Testing
@@ -153,7 +156,7 @@ locTests/
 The `locTests` target uses `PBXFileSystemSynchronizedRootGroup` — new `.swift` files added anywhere under `locTests/` are automatically discovered by Xcode. No manual pbxproj edits needed.
 
 ### Running Tests
-Run tests from **Xcode** (Cmd+U or Product → Test). Do not run xcodebuild test from CLI.
+Run tests from **Xcode** (Cmd+U or Product → Test); do not run xcodebuild test from the CLI on Drew's machine. Agents rely on the CI `checks.yml` unit-test job.
 
 ### Writing Tests
 - **One test file per source file** — name it `{SourceFile}Tests.swift` in the matching subdirectory

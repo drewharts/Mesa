@@ -110,6 +110,7 @@ struct TripDetailView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
+        .accessibilityIdentifier("trip.menu")
     }
 
     // MARK: - Error Content

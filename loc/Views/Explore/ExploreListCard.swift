@@ -24,6 +24,7 @@ struct ExploreListCard: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("explore.list")
     }
 
     // MARK: - Subviews

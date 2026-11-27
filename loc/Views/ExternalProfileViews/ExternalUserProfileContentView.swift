@@ -82,6 +82,7 @@ struct ExternalUserProfileContentView: View {
                                     .fill(viewModel.isFollowing ? Color(.systemGray5) : Color.blue)
                             )
                     }
+                    .accessibilityIdentifier("profile.external.follow")
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
