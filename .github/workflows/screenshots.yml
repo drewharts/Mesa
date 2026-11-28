@@ -7,7 +7,7 @@ name: App Store screenshots
 on:
   # workflow_dispatch only works once this file is on the default branch; until then push to this branch.
   push:
-    branches: [feature/appstore-shots]
+    branches: [feature/pdc-shots-before, feature/pdc-shots-after]
   workflow_dispatch:
     inputs:
       only:
@@ -25,8 +25,6 @@ jobs:
         include:
           - size: "6.9"
             device: "iPhone 17 Pro Max"
-          - size: "6.5"
-            device: "iPhone 11 Pro Max"
     steps:
       - uses: actions/checkout@v4
 
@@ -73,7 +71,7 @@ jobs:
         run: |
           if [ -z "$TEST_RUNNER_MESA_DEMO_EMAIL" ]; then echo "::warning::MESA_DEMO_EMAIL secret not set; only signed-out screens will be captured"; fi
           xcodebuild test-without-building -project loc.xcodeproj -scheme loc -destination "id=$UDID" \
-            -derivedDataPath /tmp/dd -only-testing:locUITests/ScreenshotTests \
+            -derivedDataPath /tmp/dd -only-testing:locUITests/PlaceDetailShotTests \
             -parallel-testing-enabled NO \
             -resultBundlePath /tmp/shots.xcresult | tail -n 30 || true
 

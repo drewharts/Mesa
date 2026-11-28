@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		B0C1C1000000000000000006 /* MesaSignedInFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C1C1000000000000000005 /* MesaSignedInFlowTests.swift */; };
 		B0C1C1000000000000000104 /* PreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C1C1000000000000000103 /* PreviewTests.swift */; };
+		B0C1C1000000000000000204 /* PlaceDetailShotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C1C1000000000000000203 /* PlaceDetailShotTests.swift */; };
 		B0C1C1000000000000000004 /* MesaSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C1C1000000000000000003 /* MesaSmokeTests.swift */; };
 		B0C1C1000000000000000002 /* A11yID.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C1C1000000000000000001 /* A11yID.swift */; };
 		4A20061228EBC1D43FBB8E9E /* GoogleMapsUtils in Frameworks */ = {isa = PBXBuildFile; productRef = 48F55626743DD9488E979652 /* GoogleMapsUtils */; };
@@ -83,6 +84,7 @@
 /* Begin PBXFileReference section */
 		B0C1C1000000000000000005 /* MesaSignedInFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesaSignedInFlowTests.swift; sourceTree = "<group>"; };
 		B0C1C1000000000000000103 /* PreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewTests.swift; sourceTree = "<group>"; };
+		B0C1C1000000000000000203 /* PlaceDetailShotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDetailShotTests.swift; sourceTree = "<group>"; };
 		B0C1C1000000000000000003 /* MesaSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesaSmokeTests.swift; sourceTree = "<group>"; };
 		B0C1C1000000000000000001 /* A11yID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A11yID.swift; sourceTree = "<group>"; };
 		B021AF4B2CED816500642586 /* loc copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "loc copy-Info.plist"; path = "/Users/drewhartsfield/Desktop/loc/loc copy-Info.plist"; sourceTree = "<absolute>"; };
@@ -234,6 +236,7 @@
 			children = (
 				B054DC7B2C42F5DB00C98088 /* locUITests.swift */,
 				B0C1C1000000000000000103 /* PreviewTests.swift */,
+				B0C1C1000000000000000203 /* PlaceDetailShotTests.swift */,
 				B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */,
 				B0C1C1000000000000000005 /* MesaSignedInFlowTests.swift */,
 				B0C1C1000000000000000003 /* MesaSmokeTests.swift */,
@@ -469,6 +472,7 @@
 			files = (
 				B054DC7C2C42F5DB00C98088 /* locUITests.swift in Sources */,
 				B0C1C1000000000000000104 /* PreviewTests.swift in Sources */,
+				B0C1C1000000000000000204 /* PlaceDetailShotTests.swift in Sources */,
 				B054DC7E2C42F5DB00C98088 /* locUITestsLaunchTests.swift in Sources */,
 				B0C1C1000000000000000006 /* MesaSignedInFlowTests.swift in Sources */,
 				B0C1C1000000000000000004 /* MesaSmokeTests.swift in Sources */,
