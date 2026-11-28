@@ -49,15 +49,15 @@ struct PlaceDetailTabsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 topBlock
                 mediaStrip
                 mainContent
                     .padding(.horizontal, 16)
                     .transaction { $0.animation = nil }
             }
-            .padding(.top, 12)
-            .padding(.bottom, 16)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -150,15 +150,17 @@ struct PlaceDetailTabsView: View {
     // MARK: - Header Row (Extracted for compiler performance)
     
     private var headerRow: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 4) {
             Button(action: {
                 viewModel.openGoogleMaps()
             }) {
                 Text(viewModel.placeName)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .truncationMode(.tail)
             }
             .buttonStyle(.plain)
 
@@ -179,9 +181,9 @@ struct PlaceDetailTabsView: View {
             } else {
                 Button(action: handleBookmarkTap) {
                     Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
-                        .font(.title3)
+                        .font(.system(size: 17))
                         .foregroundColor(.gray)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                 }
                 .accessibilityIdentifier("place.detail.save")
 
@@ -194,7 +196,7 @@ struct PlaceDetailTabsView: View {
 
     /// Title row, save banner and meta/status block.
     private var topBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             headerRow
             if let message = saveBanner.message {
                 quickSaveBannerView(message)
@@ -216,7 +218,7 @@ struct PlaceDetailTabsView: View {
 
     /// About content, reviews and the compact help-improve row, with no empty gaps between them.
     private var mainContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             AboutTabContent(
                 viewModel: viewModel.aboutTabViewModel,
                 onAddPost: onAddReview,
@@ -303,25 +305,21 @@ struct PlaceDetailTabsView: View {
     /// Shared share icon used by both simple button and menu.
     private var shareIcon: some View {
         Image(systemName: "square.and.arrow.up")
-            .font(.title3)
+            .font(.system(size: 17))
             .foregroundColor(.gray)
-            .frame(width: 32, height: 32)
+            .frame(width: 28, height: 28)
     }
 
     // MARK: - Info Row (Extracted for compiler performance)
     
-    /// Meta (category, travel time, savers) with the open/closed pill inline when it fits, wrapped below otherwise.
+    /// One meta line: category, travel time and open status separated by dots, savers capsule at the end.
     private var infoRow: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                metaItems
-                openStatusBadge
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 10) { metaItems }
-                openStatusBadge
-            }
+        HStack(spacing: 6) {
+            metaItems
+            Spacer(minLength: 0)
+            saversIndicator
         }
+        .frame(height: 18)
     }
 
     @ViewBuilder
@@ -332,6 +330,18 @@ struct PlaceDetailTabsView: View {
                 onTap: { showingHoursSheet = true },
                 detailText: viewModel.openStatusChangeText
             )
+        }
+    }
+
+    @ViewBuilder
+    private var saversIndicator: some View {
+        if viewModel.showSaversIndicator {
+            SavedByIndicator(
+                savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
+                totalCount: viewModel.placeSaversViewModel.totalSaverCount,
+                onTap: { showingSaversSheet = true }
+            )
+            .fixedSize()
         }
     }
 
@@ -352,7 +362,7 @@ struct PlaceDetailTabsView: View {
                 showingCategoryCorrectionSheet = true
             } label: {
                 Text(restaurantType)
-                    .font(.subheadline)
+                    .font(.system(size: 13))
                     .foregroundColor(.gray)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -360,17 +370,23 @@ struct PlaceDetailTabsView: View {
             .layoutPriority(-1)
         }
 
+        if viewModel.isCustomPlace || viewModel.restaurantType != nil {
+            metaDot
+        }
         TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
             .fixedSize()
 
-        if viewModel.showSaversIndicator {
-            SavedByIndicator(
-                savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
-                additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
-                onTap: { showingSaversSheet = true }
-            )
-            .fixedSize()
+        if viewModel.openStatus.shouldDisplay {
+            metaDot
+            openStatusBadge
         }
+    }
+
+    /// Dot separator between meta items.
+    private var metaDot: some View {
+        Text("·")
+            .font(.system(size: 13))
+            .foregroundColor(.gray)
     }
 
     // MARK: - Dynamic Sheet Height
@@ -463,64 +479,61 @@ struct PlaceDetailTabsView: View {
 private struct SavedByIndicator: View {
     // MARK: - Pure Data Parameters (No ViewModel!)
     let savers: [ProfileData]
-    let additionalCount: Int
+    let totalCount: Int
     let onTap: () -> Void
+
+    private let avatarSize: CGFloat = 20
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
-                // Profile circles for savers (followed first, then unfollowed)
-                HStack(spacing: -8) {
+                HStack(spacing: -7) {
                     ForEach(savers, id: \.id) { saver in
-                        if let photoURL = saver.profilePhotoURL {
-                            AsyncImage(url: photoURL) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 24, height: 24)
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(Color.white, lineWidth: 2)
-                                        )
-                                case .failure, .empty:
-                                    placeholderCircle(for: saver)
-                                @unknown default:
-                                    placeholderCircle(for: saver)
-                                }
-                            }
-                            .frame(width: 24, height: 24)
-                        } else {
-                            placeholderCircle(for: saver)
-                        }
+                        avatar(for: saver)
                     }
                 }
-
-                // +X indicator for additional savers beyond the circles
-                if additionalCount > 0 {
-                    Text("+\(additionalCount)")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.gray)
-                }
+                Text("\(totalCount) saved")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.gray)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color(.systemGray6)))
             }
         }
         .buttonStyle(.plain)
     }
 
+    /// Profile photo circle, falling back to the initial while loading or when missing.
+    @ViewBuilder
+    private func avatar(for saver: ProfileData) -> some View {
+        if let photoURL = saver.profilePhotoURL {
+            AsyncImage(url: photoURL) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFill()
+                        .frame(width: avatarSize, height: avatarSize)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
+                } else {
+                    placeholderCircle(for: saver)
+                }
+            }
+            .frame(width: avatarSize, height: avatarSize)
+        } else {
+            placeholderCircle(for: saver)
+        }
+    }
+
+    /// Gray circle showing the saver's first initial.
     private func placeholderCircle(for saver: ProfileData) -> some View {
         Circle()
             .fill(Color(.systemGray4))
-            .frame(width: 24, height: 24)
+            .frame(width: avatarSize, height: avatarSize)
             .overlay(
                 Text(saver.fullName.prefix(1))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.white)
             )
-            .overlay(
-                Circle().stroke(Color.white, lineWidth: 2)
-            )
+            .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
     }
 }
 

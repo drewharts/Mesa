@@ -19,11 +19,11 @@ struct PlaceMediaStripView: View {
     @State private var fullscreenVideoURL: URL?
     @State private var photoToDelete: PlaceMediaStripItem?
 
-    private let tileHeight: CGFloat = 132
-    private let photoWidth: CGFloat = 132
-    private let videoWidth: CGFloat = 100
-    private let tileSpacing: CGFloat = 8
-    private let cornerRadius: CGFloat = 8
+    private let tileHeight: CGFloat = 112
+    private let photoWidth: CGFloat = 116
+    private let videoWidth: CGFloat = 84
+    private let tileSpacing: CGFloat = 6
+    private let cornerRadius: CGFloat = 10
 
     var body: some View {
         let content = viewModel.content
@@ -34,6 +34,7 @@ struct PlaceMediaStripView: View {
                 loadingStrip
             }
         }
+        .padding(.top, 2)
         .onAppear { viewModel.loadInitialMedia() }
         .fullScreenCover(item: $fullscreenVideoURL) { url in
             FullscreenVideoPlayerView(url: url)
@@ -122,7 +123,7 @@ struct PlaceMediaStripView: View {
             }
         }
         .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: tileHeight, alignment: .leading)
         .accessibilityHidden(true)
     }
 

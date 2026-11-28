@@ -15,7 +15,7 @@ struct PlaceNoteDisplayView: View {
     var body: some View {
         // Only show if user has a note
         if viewModel.hasExistingNote {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 // Header
                 HStack {
                     Image(systemName: "note.text")
@@ -57,14 +57,13 @@ struct PlaceNoteDisplayView: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(10)
             .background(Color.blue.opacity(0.05))
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(Color.blue.opacity(0.2), lineWidth: 1)
             )
-            .padding(.top, 12)
         }
     }
 }

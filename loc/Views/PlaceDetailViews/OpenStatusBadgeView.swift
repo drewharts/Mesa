@@ -15,7 +15,7 @@ struct OpenStatusBadgeView: View {
     
     let status: OpenStatus
     var onTap: (() -> Void)? = nil
-    /// Optional secondary text shown inside the pill, e.g. "Closes 11 PM".
+    /// Optional secondary text shown after the status, e.g. "Closes 11 PM".
     var detailText: String? = nil
 
     private var label: String {
@@ -25,66 +25,39 @@ struct OpenStatusBadgeView: View {
     }
     
     // MARK: - Body
-    
+
     var body: some View {
         if status.shouldDisplay {
             Button(action: { onTap?() }) {
                 HStack(spacing: 4) {
+                    Circle()
+                        .fill(dotColor)
+                        .frame(width: 6, height: 6)
                     Text(label)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(textColor)
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
                         .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                    
-                    // Show chevron if tappable
-                    if onTap != nil {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundColor(textColor.opacity(0.8))
-                    }
+                        .truncationMode(.tail)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(backgroundColor)
-                .cornerRadius(6)
-                .fixedSize()
             }
             .buttonStyle(.plain)
         }
     }
-    
+
     // MARK: - Computed Properties
     
-    private var textColor: Color {
+    private var dotColor: Color {
         switch status {
         case .open, .alwaysOpen:
-            return .white
+            return .green
         case .closingSoon:
-            return .white
+            return .orange
         case .openingSoon:
-            return .white
+            return .blue
         case .closed:
-            return .white
+            return .red
         case .temporarilyClosed, .permanentlyClosed:
-            return .white
-        case .unknown:
-            return .clear
-        }
-    }
-    
-    private var backgroundColor: Color {
-        switch status {
-        case .open, .alwaysOpen:
-            return Color.green
-        case .closingSoon:
-            return Color.orange
-        case .openingSoon:
-            return Color.blue
-        case .closed:
-            return Color.red.opacity(0.8)
-        case .temporarilyClosed, .permanentlyClosed:
-            return Color.gray
+            return .gray
         case .unknown:
             return .clear
         }

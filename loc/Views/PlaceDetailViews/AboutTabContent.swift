@@ -31,7 +31,7 @@ struct AboutTabContent: View {
     @StateObject private var damnlinesWaitViewModel = DamnlinesWaitViewModel()
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             // 1. DUMB COMPONENT: rating, summary and the action row
             if let place = viewModel.place {
                 PlaceInfoSection(
@@ -50,7 +50,6 @@ struct AboutTabContent: View {
             // 2. Friends first + "People order" from TikTok mentions
             if insightsViewModel.hasContent {
                 PlaceInsightsSection(viewModel: insightsViewModel)
-                    .padding(.top, 12)
             }
 
             // 3. User's private note (only shown if note exists)
@@ -62,7 +61,6 @@ struct AboutTabContent: View {
             // 4. Would Go Back scale (only shown if reviews have sentiment data)
             if viewModel.wouldReturnStats.hasData {
                 WouldReturnScaleView(stats: viewModel.wouldReturnStats)
-                    .padding(.top, 12)
             }
         }
         .task(id: viewModel.placeId) {

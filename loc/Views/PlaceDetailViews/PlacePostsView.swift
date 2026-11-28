@@ -18,9 +18,9 @@ struct PlacePostsView: View {
     var body: some View {
         ScrollViewReader { scrollProxy in
             if viewModel.hasPosts {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Reviews")
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                     PlacePostsListView(
                         viewModel: viewModel,
                         scrollProxy: scrollProxy
