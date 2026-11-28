@@ -1,0 +1,5 @@
+- Photo import is smarter: photos are grouped by time and place, GPS accuracy is weighted, and close calls show ranked choices.
+- Google Maps import is faster and can be cancelled.
+- Place pages show wait times for five NYC venues (data from damnlines.com, CC BY 4.0).
+- Trips: leaving a trip now restores the map as you left it.
+- Explore covers load once with a shimmer instead of flipping layouts.
