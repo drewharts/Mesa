@@ -114,7 +114,6 @@ final class MesaSignedInFlowTests: XCTestCase {
         while Date() < deadline {
             if tab.exists && tab.isHittable { return }
             dismissPopups()
-            app.tap() // lets the interruption monitor act on any pending system alert
             sleep(2)
         }
         attachScreenshot("main-ui-not-reached")

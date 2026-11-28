@@ -1,0 +1,27 @@
+{
+  "configurations" : [
+    {
+      "id" : "5B0C8E57-3F5D-4C2E-9A57-0D6A4E1B7C01",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "preferredScreenCaptureFormat" : "screenshot",
+    "systemAttachmentLifetime" : "deleteOnSuccess",
+    "userAttachmentLifetime" : "keepAlways",
+    "uiTestingScreenshotsLifetime" : "deleteOnSuccess"
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:loc.xcodeproj",
+        "identifier" : "B054DC762C42F5DB00C98088",
+        "name" : "locUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

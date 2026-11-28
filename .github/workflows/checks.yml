@@ -131,7 +131,7 @@ jobs:
     # inputs is empty on push events (empty string == false numerically), so compare the JSON form.
     if: ${{ toJSON(inputs.include_ui_smoke) != 'false' }}
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 60
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -141,40 +141,43 @@ jobs:
           gms-api-key: ${{ secrets.GMS_API_KEY || 'DUMMY_GMS_API_KEY' }}
           posthog-api-key: ""
       - name: Boot simulator
-        # UI tests time out launching on a cold simulator; boot it and wait for SpringBoard first.
+        # UI tests time out on a cold simulator; boot it, wait for SpringBoard/data migration, then warm it up.
         run: |
-          xcrun simctl boot "${{ steps.setup.outputs.simulator-id }}" || true
-          xcrun simctl bootstatus "${{ steps.setup.outputs.simulator-id }}" -b
-      - name: Run UI smoke tests
+          SIM="${{ steps.setup.outputs.simulator-id }}"
+          xcrun simctl boot "$SIM" || true
+          xcrun simctl bootstatus "$SIM" -b
+          xcrun simctl launch "$SIM" com.apple.Preferences || true
+          sleep 10
+          xcrun simctl terminate "$SIM" com.apple.Preferences || true
+          xcrun simctl io "$SIM" screenshot "$RUNNER_TEMP/warmup.png" || true
+      - name: Run signed-out UI smoke tests
+        id: signed_out
+        env:
+          TEST_RUNNER_TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
+          TEST_RUNNER_TEST_ACCOUNT_PASSWORD: ${{ secrets.TEST_ACCOUNT_PASSWORD }}
+        run: bash ci/run_ui_tests.sh MesaSmokeTests signed-out "${{ steps.setup.outputs.simulator-id }}"
+      - name: Run signed-in UI smoke tests
+        id: signed_in
+        if: always()
         env:
           # TEST_RUNNER_-prefixed variables are forwarded (prefix stripped) into the XCUITest runner.
           # Passed via the environment only (never as build settings) so the xcodebuild log cannot echo them.
           TEST_RUNNER_TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
           TEST_RUNNER_TEST_ACCOUNT_PASSWORD: ${{ secrets.TEST_ACCOUNT_PASSWORD }}
-        run: |
-          set -o pipefail
-          if [ -n "$TEST_RUNNER_TEST_ACCOUNT_PASSWORD" ]; then
-            echo "::add-mask::$TEST_RUNNER_TEST_ACCOUNT_PASSWORD"
-          fi
-          xcodebuild test \
-            -project loc.xcodeproj -scheme loc -configuration Debug \
-            -destination "platform=iOS Simulator,id=${{ steps.setup.outputs.simulator-id }}" \
-            -clonedSourcePackagesDirPath .spm \
-            -skipPackagePluginValidation -skipMacroValidation \
-            -only-testing:locUITests/MesaSmokeTests \
-            -only-testing:locUITests/MesaSignedInFlowTests \
-            -resultBundlePath "$RUNNER_TEMP/ui.xcresult" \
-            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGNING_REQUIRED=NO > "$RUNNER_TEMP/ui.log" 2>&1 \
-            || { echo "=== compiler errors ==="; grep -aE "\.swift:[0-9]+:[0-9]+: error|error: " "$RUNNER_TEMP/ui.log" | sort -u | head -60; echo "=== log tail ==="; tail -n 30 "$RUNNER_TEMP/ui.log"; exit 1; }
-          tail -n 15 "$RUNNER_TEMP/ui.log"
+        run: bash ci/run_ui_tests.sh MesaSignedInFlowTests signed-in "${{ steps.setup.outputs.simulator-id }}"
       - name: Failing tests
         if: failure()
-        run: python3 ci/print_xcresult_failures.py "$RUNNER_TEMP/ui.xcresult"
+        run: |
+          for b in signed-out signed-in; do
+            [ -d "$RUNNER_TEMP/ui-$b.xcresult" ] && python3 ci/print_xcresult_failures.py "$RUNNER_TEMP/ui-$b.xcresult" || true
+          done
       - name: Export screenshots
         if: always()
         run: |
           mkdir -p screenshots
-          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/ui.xcresult" --output-path screenshots/ || true
+          for b in signed-out signed-in; do
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/ui-$b.xcresult" --output-path "screenshots/$b" || true
+          done
           ls -R screenshots | head -40
       - uses: actions/upload-artifact@v4
         if: always()
@@ -186,7 +189,9 @@ jobs:
         if: always()
         with:
           name: ui-smoke-xcresult
-          path: ${{ runner.temp }}/ui.xcresult
+          path: |
+            ${{ runner.temp }}/ui-signed-out.xcresult
+            ${{ runner.temp }}/ui-signed-in.xcresult
           if-no-files-found: ignore
       - name: Clean up
         if: always()
