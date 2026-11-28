@@ -13,17 +13,11 @@ struct AboutTabContent: View {
     // MARK: - Primary ViewModel (Coordinator)
     @ObservedObject var viewModel: AboutTabViewModel
     
-    // MARK: - Still needed for child components (temporary)
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var userSession: UserSession
-    
-    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
-
-    /// Callback when user taps the "Share something..." button to create a post
+    /// Callback when the user taps the Review action
     let onAddPost: () -> Void
 
-    /// Callback when user changes a video's place association - parent should navigate to new place
-    var onPlaceChanged: ((DetailPlace) -> Void)?
+    /// Callback to open the private note editor (action row pill and note card Edit button)
+    let onEditNote: () -> Void
 
     /// Whether a manual refresh is currently in progress
     var isRefreshing: Bool = false
@@ -32,22 +26,20 @@ struct AboutTabContent: View {
     var onRefresh: (() -> Void)? = nil
 
     // MARK: - View-Owned Presentation State
-    @State private var showingNoteSheet = false
     @StateObject private var insightsViewModel = PlaceInsightsViewModel()
     @StateObject private var reservationViewModel = ReservationViewModel()
     @StateObject private var damnlinesWaitViewModel = DamnlinesWaitViewModel()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // NOTE: CustomPlaceCreatorView moved to PlaceDetailTabsView type row
-
-            // 1. DUMB COMPONENT: Pure display of place info
+            // 1. DUMB COMPONENT: rating, summary and the action row
             if let place = viewModel.place {
                 PlaceInfoSection(
                     place: place,
                     isRefreshing: isRefreshing,
                     onRefresh: onRefresh,
                     onAddPost: onAddPost,
+                    onNoteTapped: onEditNote,
                     takeText: insightsViewModel.take,
                     reservation: reservationViewModel.link,
                     onReserveTapped: { reservationViewModel.trackTap() },
@@ -55,37 +47,23 @@ struct AboutTabContent: View {
                 )
             }
 
-            // 1b. Friends first + "People order" from TikTok mentions
-            PlaceInsightsSection(viewModel: insightsViewModel)
-                .padding(.bottom, 12)
-            
-            // 2. User's private note (only shown if note exists)
-            PlaceNoteDisplayView(
-                viewModel: viewModel.notesViewModel,
-                onEditTapped: { showingNoteSheet = true }
-            )
-            
-            // 3. Would Go Back scale (only shown if reviews have sentiment data)
-            if viewModel.wouldReturnStats.hasData {
-                WouldReturnScaleView(stats: viewModel.wouldReturnStats)
+            // 2. Friends first + "People order" from TikTok mentions
+            if insightsViewModel.hasContent {
+                PlaceInsightsSection(viewModel: insightsViewModel)
+                    .padding(.top, 12)
             }
 
-            // 4. SMART COMPONENT: External videos with their own ViewModel
-            ExternalVideosSection(
-                viewModel: viewModel.externalVideosViewModel,
-                placeId: viewModel.placeId,
-                selectedPlace: viewModel.place,
-                onPlaceChanged: onPlaceChanged
+            // 3. User's private note (only shown if note exists)
+            PlaceNoteDisplayView(
+                viewModel: viewModel.notesViewModel,
+                onEditTapped: onEditNote
             )
-            .environmentObject(profile)
-            .environmentObject(userSession)
 
-            // 5. SMART COMPONENT: Photos with its own ViewModel
-            PlacePhotosView(
-                viewModel: viewModel.placePhotosViewModel,
-                onPhotoTapped: onPhotoTapped
-            )
-            .padding(.top, 20)
+            // 4. Would Go Back scale (only shown if reviews have sentiment data)
+            if viewModel.wouldReturnStats.hasData {
+                WouldReturnScaleView(stats: viewModel.wouldReturnStats)
+                    .padding(.top, 12)
+            }
         }
         .task(id: viewModel.placeId) {
             await insightsViewModel.load(placeId: viewModel.placeId)
@@ -98,11 +76,6 @@ struct AboutTabContent: View {
         }
         .onReceive(insightsViewModel.$priorityPhotoURLs) { urls in
             viewModel.placePhotosViewModel.priorityPhotoURLs = urls
-        }
-        .sheet(isPresented: $showingNoteSheet) {
-            PlaceNoteSheetView(viewModel: viewModel.notesViewModel)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
         }
     }
 }
@@ -173,10 +146,8 @@ struct AboutTabContent: View {
 
     return AboutTabContent(
         viewModel: aboutVM,
-        onPhotoTapped: { photos, index in
-            print("Tapped photo at index: \(index)")
-        },
-        onAddPost: { print("Add post tapped") }
+        onAddPost: { print("Add post tapped") },
+        onEditNote: { print("Edit note tapped") }
     )
     .environmentObject(profileVM)
     .environmentObject(userSession)

@@ -9,80 +9,35 @@ import SwiftUI
 
 struct PlacePostsView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onAddPost: () -> Void
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
 
+    /// Posts/reviews section; collapses entirely when there are no posts
+    /// (the Review action in the info section is the call to add the first one).
     var body: some View {
         ScrollViewReader { scrollProxy in
-            VStack(spacing: 24) {
-                // Action Buttons Row
-                postActionButtons
-                
-                switch viewModel.loadingState {
-                case .loading:
-                    ProgressView()
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                    
-                case .loaded:
-                    if viewModel.hasPosts {
-                        PlacePostsListView(
-                            viewModel: viewModel,
-                            scrollProxy: scrollProxy
-                        )
-                    } else {
-                        emptyStateView
-                    }
-                    
-                case .error(let error):
-                    Text("Failed to load posts: \(error.localizedDescription)")
-                        .font(.subheadline)
-                        .foregroundColor(.red)
-                        .padding()
-                    
-                case .idle:
-                    Text("Posts not yet loaded")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .padding()
+            if viewModel.hasPosts {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Reviews")
+                        .font(.headline)
+                    PlacePostsListView(
+                        viewModel: viewModel,
+                        scrollProxy: scrollProxy
+                    )
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .onChange(of: viewModel.highlightedPostId) { _, postId in
-                if let postId = postId {
-                    scrollToPost(postId, proxy: scrollProxy)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("place.detail.posts")
+                .onChange(of: viewModel.highlightedPostId) { _, postId in
+                    if let postId = postId {
+                        scrollToPost(postId, proxy: scrollProxy)
+                    }
                 }
             }
         }
         .onAppear {
             viewModel.checkLikeStatuses()
         }
-    }
-    
-    // MARK: - Action Buttons
-    
-    private var postActionButtons: some View {
-        GlassComposerButton(icon: "plus", text: "Share something...", action: onAddPost)
-            .padding(.top, 8)
-    }
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.largeTitle)
-                .foregroundColor(.gray.opacity(0.5))
-            
-            Text("No posts yet")
-                .font(.headline)
-                .foregroundColor(.gray)
-            
-            Text("Be the first to share your experience!")
-                .font(.subheadline)
-                .foregroundColor(.gray.opacity(0.7))
-        }
-        .padding(40)
     }
     
     /// Scrolls to the highlighted post and triggers auto-open comments after the animation settles.

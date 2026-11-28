@@ -28,7 +28,6 @@ struct DamnlinesWaitRow: View {
             .font(.caption)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 12)
         .accessibilityIdentifier("place.detail.damnlinesWait")
     }
 }

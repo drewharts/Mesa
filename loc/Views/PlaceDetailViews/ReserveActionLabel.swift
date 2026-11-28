@@ -16,11 +16,11 @@ struct ReserveActionLabel: View {
         HStack(spacing: 6) {
             icon
             Text(link.buttonLabelText)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
         }
         .foregroundColor(.primary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(.systemGray6))

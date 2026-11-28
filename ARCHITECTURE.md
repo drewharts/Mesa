@@ -153,7 +153,7 @@ Ask this question: **"Does this component have BEHAVIOR?"**
 
 **SMART:**
 - `TikTokVideosSection` - Fetches and manages TikTok videos
-- `PlacePhotosView` - Loads and displays photo gallery
+- `PlaceMediaStripView` - Merges and displays the place photo + video strip
 - Any component that fetches data or manages state
 
 ---
@@ -178,7 +178,7 @@ loc/
 │   │   ├── AboutTabContent.swift           (Coordinator View)
 │   │   ├── PlaceInfoSection.swift          (Dumb Component)
 │   │   ├── TikTokVideosSection.swift       (Smart Component)
-│   │   └── PlacePhotosView.swift           (Smart Component)
+│   │   └── PlaceMediaStripView.swift       (Smart Component)
 │   └── ...
 │
 └── Services/                  # Data layer

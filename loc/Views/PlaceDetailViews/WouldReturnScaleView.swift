@@ -29,7 +29,6 @@ struct WouldReturnScaleView: View {
                 .foregroundColor(.primary)
                 .monospacedDigit()
         }
-        .padding(.bottom, 12)
     }
 
     // MARK: - Percentage Bar
