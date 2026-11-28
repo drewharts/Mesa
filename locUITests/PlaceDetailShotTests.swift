@@ -34,13 +34,14 @@ final class PlaceDetailShotTests: XCTestCase {
         waitForScene(in: app)
         sleep(6)
         waitForImages(in: app)
-        attach("01_medium", app: app)
+        attach("01_initial", app: app)
 
         let handle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.715))
-        handle.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)))
+        handle.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
         sleep(3)
         waitForImages(in: app)
-        attach("02_large", app: app)
+        attach("02_expanded", app: app)
+        sleep(2)
 
         let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.80))
         from.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
