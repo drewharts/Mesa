@@ -37,15 +37,15 @@ final class PreviewTests: XCTestCase {
         if recenter.exists && recenter.isHittable { recenter.tap(); sleep(2) }
         zoomMap(in: app)
         mark("start", "map")
-        pause(2)
+        pause(1.5)
         drag(app, from: (0.5, 0.80), to: (0.5, 0.45)) // pull the list sheet up
-        pause(2)
+        pause(1.5)
         drag(app, from: (0.5, 0.75), to: (0.5, 0.55))
-        pause(2)
+        pause(1.5)
         openPlace(in: app, preferred: ["Minetta Tavern", "Genki Omakase"])
         pause(3)
         drag(app, from: (0.5, 0.715), to: (0.5, 0.25)) // show the place photos
-        pause(4)
+        pause(3.5)
         finish("map")
     }
 

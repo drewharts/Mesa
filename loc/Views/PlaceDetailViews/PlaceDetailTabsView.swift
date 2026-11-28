@@ -491,7 +491,7 @@ private struct SavedByIndicator: View {
                 // Profile circles for savers (followed first, then unfollowed)
                 HStack(spacing: -8) {
                     ForEach(savers, id: \.id) { saver in
-                        if let photoURL = saver.profilePhotoURL {
+                        if !ScreenshotPrivacy.isActive, let photoURL = saver.profilePhotoURL {
                             AsyncImage(url: photoURL) { phase in
                                 switch phase {
                                 case .success(let image):
@@ -533,7 +533,7 @@ private struct SavedByIndicator: View {
             .fill(Color(.systemGray4))
             .frame(width: 24, height: 24)
             .overlay(
-                Text(saver.fullName.prefix(1))
+                Text(ScreenshotPrivacy.isActive ? "" : String(saver.fullName.prefix(1)))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white)
             )
