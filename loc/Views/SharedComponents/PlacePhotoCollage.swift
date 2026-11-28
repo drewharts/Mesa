@@ -31,10 +31,12 @@ struct PlacePhotoCollage: View {
         ZStack {
             if let urls = viewModel.resolved {
                 layout(urls).transition(.opacity)
-            } else if !photoURLs.isEmpty {
+            } else if !photoURLs.isEmpty && !(ScreenshotPrivacy.isActive && viewModel.unresolvable) {
                 ShimmerView().transition(.opacity)
             }
         }
+        .screenshotImagePending(viewModel.resolved == nil && !photoURLs.isEmpty && !viewModel.unresolvable)
+        .screenshotTileEmpty(viewModel.resolved == nil && (photoURLs.isEmpty || viewModel.unresolvable))
         .task(id: photoURLs) { await viewModel.update(candidates: photoURLs) }
     }
 

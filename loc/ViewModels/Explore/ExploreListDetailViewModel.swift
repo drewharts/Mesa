@@ -132,7 +132,11 @@ final class ExploreListDetailViewModel: ObservableObject {
         guard let name = list.ownerName, !name.isEmpty else { return nil }
         var onTap: (() -> Void)?
         if let profile = ownerProfile { onTap = { onOpenProfile(profile) } }
-        return .init(name: name, photoURL: list.ownerPhotoURL, onTap: onTap)
+        return .init(
+            name: ScreenshotPrivacy.name(name, userId: list.ownerId),
+            photoURL: ScreenshotPrivacy.photoURL(list.ownerPhotoURL, userId: list.ownerId),
+            onTap: onTap
+        )
     }
 
     /// Opens the system share sheet for the list.

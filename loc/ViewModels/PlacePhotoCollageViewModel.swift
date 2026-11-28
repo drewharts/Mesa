@@ -12,6 +12,8 @@ import SwiftUI
 final class PlacePhotoCollageViewModel: ObservableObject {
     /// The photos to draw (four = grid, one = single); nil while the layout is still being decided.
     @Published private(set) var resolved: [String]?
+    /// True once validation finished and no candidate could be loaded (the cover keeps its generated placeholder).
+    @Published private(set) var unresolvable = false
 
     private let allowsGrid: Bool
     private let frame: CGSize
@@ -32,6 +34,7 @@ final class PlacePhotoCollageViewModel: ObservableObject {
         let layout = await resolveLayout(unique)
         guard !Task.isCancelled else { resolvingKey = nil; return }
         guard resolvingKey == unique else { return }
+        unresolvable = layout.isEmpty
         publish(layout)
     }
 

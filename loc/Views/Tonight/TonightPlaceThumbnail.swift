@@ -20,12 +20,20 @@ struct TonightPlaceThumbnail: View {
 
     private var placeKey: String { place.id.uuidString }
 
-    private var storedPhotoURL: URL? {
-        // Only a stored photo here; Google links are tried later by the shared pipeline.
+    private var storedPhotoURL: URL? { Self.storedPhotoURL(for: place) }
+
+    /// Returns the place's first stored (non-Google) photo; Google links are tried later by the shared pipeline.
+    static func storedPhotoURL(for place: DetailPlace) -> URL? {
         let candidate = DetailPlaceViewModel.rankedPhotoURLs(place.photoUrls ?? []).first { url in
             !url.contains("googleapis.com") && !url.contains("googleusercontent.com")
         }
         return candidate.flatMap(URL.init(string:))
+    }
+
+    /// Pixel size the thumbnail requests its stored photo at, so a warm-up hits the same cache entry.
+    static func requestSize(_ size: CGFloat) -> CGSize {
+        let pixel = size * UIScreen.main.scale
+        return CGSize(width: pixel, height: pixel)
     }
 
     /// Image already loaded by the shared pipeline (empty UIImage = "none available").
@@ -51,6 +59,7 @@ struct TonightPlaceThumbnail: View {
             }
         }
         .frame(width: size, height: size)
+        .screenshotTileEmpty(image == nil && sharedImage == nil)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .animation(.easeOut(duration: 0.2), value: image != nil || sharedImage != nil)
         .task(id: placeKey) { await load() }
@@ -58,9 +67,8 @@ struct TonightPlaceThumbnail: View {
 
     private func load() async {
         if image != nil || sharedImage != nil { return }
-        let pixel = size * UIScreen.main.scale
         if let url = storedPhotoURL,
-           let img = await ImageCacheService.shared.fetchImage(for: url, targetSize: CGSize(width: pixel, height: pixel)) {
+           let img = await ImageCacheService.shared.fetchImage(for: url, targetSize: Self.requestSize(size)) {
             image = img
             return
         }

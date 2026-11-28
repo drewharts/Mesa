@@ -165,6 +165,7 @@ struct ListPlaceThumbnail: View {
             }
         }
         .frame(width: size, height: size)
+        .screenshotTileEmpty(imageURL == nil)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

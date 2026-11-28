@@ -49,6 +49,7 @@ final class NotificationPermissionService {
     /// notifications on success. Returns whether notifications are allowed afterwards.
     @discardableResult
     func requestIfNeeded(context: String) async -> Bool {
+        if ScreenshotPrivacy.isActive { return false }
         switch await authorizationStatus() {
         case .authorized, .provisional, .ephemeral:
             UIApplication.shared.registerForRemoteNotifications()

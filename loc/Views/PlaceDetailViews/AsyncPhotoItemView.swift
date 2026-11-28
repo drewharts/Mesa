@@ -104,6 +104,10 @@ struct AsyncPhotoItemView: View {
     // MARK: - Failed View
 
     private var failedView: some View {
+        failedContent.screenshotTileEmpty(true)
+    }
+
+    private var failedContent: some View {
         VStack(spacing: 8) {
             Image(systemName: "photo")
                 .font(.title2)

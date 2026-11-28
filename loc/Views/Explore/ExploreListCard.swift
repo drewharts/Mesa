@@ -59,6 +59,6 @@ struct ExploreListCard: View {
 
     private var caption: String {
         guard let owner = list.ownerName, !owner.isEmpty else { return list.placeCountLabel }
-        return "\(list.placeCountLabel) · \(owner)"
+        return "\(list.placeCountLabel) · \(ScreenshotPrivacy.name(owner, userId: list.ownerId))"
     }
 }

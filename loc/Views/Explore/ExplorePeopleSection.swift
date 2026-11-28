@@ -14,7 +14,9 @@ struct ExplorePeopleSection: View {
 
     var body: some View {
         Group {
-            if !viewModel.people.isEmpty {
+            if ScreenshotPrivacy.isActive {
+                EmptyView()  // Suggested people are other users' faces; never shown in App Store screenshots.
+            } else if !viewModel.people.isEmpty {
                 content.transition(.opacity)
             } else if !viewModel.hasLoaded {
                 ExploreSkeletonRow(title: "People to follow") { ExplorePersonSkeletonCard() }

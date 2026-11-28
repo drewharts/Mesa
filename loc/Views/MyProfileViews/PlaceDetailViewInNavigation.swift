@@ -167,6 +167,7 @@ struct PlaceDetailViewContent: View {
             VStack(spacing: 16) {
                 if selectedPlaceVM.selectedPlace == nil {
                     ProgressView("Loading Place Details...")
+                        .screenshotImagePending(true)
                 } else if let tabsViewModel = tabsViewModel {
                     PlaceDetailTabsView(
                         viewModel: tabsViewModel,

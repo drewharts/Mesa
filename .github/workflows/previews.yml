@@ -1,0 +1,85 @@
+name: App Store previews
+
+# Records App Store preview videos (6.9" only) by running locUITests/PreviewTests under
+# `simctl io recordVideo`. Runs on pushes to feature/appstore-shots whose head commit message contains
+# "[previews]", or manually. Read-only against production (demo account via secrets
+# MESA_DEMO_EMAIL / MESA_DEMO_PASSWORD). Raw .mov + marker files are uploaded; trimming is done offline.
+on:
+  push:
+    branches: [feature/appstore-shots]
+  workflow_dispatch:
+
+jobs:
+  record:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[previews]') }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/ios-ci-setup
+        with:
+          gms-api-key: ${{ secrets.GMS_API_KEY || 'DUMMY_GMS_API_KEY' }}
+          posthog-api-key: ""
+
+      - name: Create and boot simulator
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "import json,sys;r=[x for x in json.load(sys.stdin)['runtimes'] if x['platform']=='iOS' and x['isAvailable']];print(sorted(r,key=lambda x:x['version'])[-1]['identifier'])")
+          TYPE=$(xcrun simctl list devicetypes -j | python3 -c "import json,sys;d=[x for x in json.load(sys.stdin)['devicetypes'] if x['name']=='iPhone 17 Pro Max'];print(d[0]['identifier'] if d else '')")
+          if [ -z "$TYPE" ]; then echo "Device type unavailable"; exit 1; fi
+          UDID=$(xcrun simctl create "Previews 6.9" "$TYPE" "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl location "$UDID" set 40.7359,-73.9911
+          xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          xcrun simctl ui "$UDID" appearance light
+
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing -project loc.xcodeproj -scheme loc -configuration Debug \
+            -destination "id=$UDID" -derivedDataPath /tmp/dd -clonedSourcePackagesDirPath .spm -skipPackagePluginValidation -skipMacroValidation CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= PROVISIONING_PROFILE= | tail -n 40
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Install app and pre-grant permissions
+        run: |
+          APP=$(ls -d /tmp/dd/Build/Products/Debug-iphonesimulator/loc.app)
+          BID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl privacy "$UDID" grant location "$BID"
+          xcrun simctl privacy "$UDID" grant location-always "$BID" || true
+          xcrun simctl privacy "$UDID" grant photos "$BID" || true
+
+      - name: Record previews
+        env:
+          TEST_RUNNER_MESA_DEMO_EMAIL: ${{ secrets.MESA_DEMO_EMAIL }}
+          TEST_RUNNER_MESA_DEMO_PASSWORD: ${{ secrets.MESA_DEMO_PASSWORD }}
+        run: |
+          mkdir -p /tmp/vid
+          for pair in "map:testPreviewMap" "findtable:testPreviewFindTable" "tonight:testPreviewTonight"; do
+            name=${pair%%:*}; test=${pair##*:}
+            xcrun simctl io "$UDID" recordVideo --codec h264 --force "/tmp/vid/$name.mov" &
+            REC=$!
+            python3 -c "import time;print('%.3f' % time.time())" > "/tmp/vid/$name.rec_start.txt"
+            sleep 2
+            xcodebuild test-without-building -project loc.xcodeproj -scheme loc -destination "id=$UDID" \
+              -derivedDataPath /tmp/dd -only-testing:locUITests/PreviewTests/$test \
+              -parallel-testing-enabled NO \
+              -resultBundlePath "/tmp/vid/$name.xcresult" 2>&1 | tee "/tmp/vid/$name.log" | tail -n 5 || true
+            kill -INT $REC || true
+            wait $REC || true
+            { echo "record_start $(cat /tmp/vid/$name.rec_start.txt)"; grep -h "PREVIEW_MARK" "/tmp/vid/$name.log" | sed 's/^.*PREVIEW_MARK/PREVIEW_MARK/' | sort -u; } > "/tmp/vid/$name.marks.txt"
+            cat "/tmp/vid/$name.marks.txt"
+            rm -rf "/tmp/vid/$name.xcresult" "/tmp/vid/$name.rec_start.txt"
+            xcrun simctl terminate "$UDID" "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' /tmp/dd/Build/Products/Debug-iphonesimulator/loc.app/Info.plist)" || true
+          done
+          ls -la /tmp/vid
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: previews-raw
+          path: |
+            /tmp/vid/*.mov
+            /tmp/vid/*.marks.txt
+            /tmp/vid/*.log

@@ -2,6 +2,30 @@
 
 Newest entries first. Skimmable on purpose: decisions, how to use, open items.
 
+## 2026-11-27 - App Store preview videos (feature/appstore-shots)
+
+`.github/workflows/previews.yml` (iPhone 17 Pro Max only) records `locUITests/PreviewTests` (`testPreviewMap`, `testPreviewFindTable`,
+`testPreviewTonight`) with `simctl io recordVideo`. Trigger: push to `feature/appstore-shots` whose head commit message contains the tag
+"previews" in square brackets (screenshots.yml skips those pushes), or workflow_dispatch. Same secrets as screenshots (`MESA_DEMO_EMAIL`,
+`MESA_DEMO_PASSWORD`, `GMS_API_KEY`). Artifact `previews-raw`: `<name>.mov`, `<name>.marks.txt` (`record_start` epoch plus
+`PREVIEW_MARK start|end|...` epochs; trim window = mark minus record_start, accurate to about 1-2 s), xcodebuild logs. Each recording
+also holds the app launch/sign-in dead time, so always trim. Find-a-table results stream in for ~18 s (marks `search` and `results`
+bracket it); speed that stretch up in post. Privacy: place "saved by" avatars are now greyed in screenshot mode
+(`PlaceDetailTabsView.SavedByIndicator`). Added `tonight.pick` accessibility id on `TonightPickCard`.
+
+## 2026-11-27 - App Store screenshot pipeline (feature/appstore-shots)
+
+`.github/workflows/screenshots.yml` builds Debug for two simulators (iPhone 17 Pro Max "6.9", iPhone 11 Pro Max "6.5"; the 11 Pro Max
+renders 1242x2688, `ci/screenshots/frame.py` resizes to ASC sizes), runs `locUITests/ScreenshotTests`, and uploads artifacts
+`screenshots-<size>` (PNG + `diag_*.txt`) and `shots-xcresult-<size>`. Triggers: push to `feature/appstore-shots` or manual dispatch.
+Secrets: `MESA_DEMO_EMAIL`, `MESA_DEMO_PASSWORD` (forwarded as `TEST_RUNNER_MESA_DEMO_*`), `GMS_API_KEY`. Read-only: it signs in and views.
+App side is `#if DEBUG` + launch arg `-MesaScreenshotMode`: `loc/Services/Debug/ScreenshotMode.swift` (read-only sign-in, scene opener via
+AppTabRouter/PresentationService/deep link, profile-photo load with retries), `ScreenshotPrivacy` (neutral names, no other people's faces),
+`ScreenshotReadiness` + `ScreenshotReadinessProbe` (hidden `screenshot.ready` element: shimmer count, pfp loaded). It does NOT use the
+UITEST_* login hook because that path (handleUserMigration) can write the users row. Download: `gh run download <id> -n screenshots-6.9`.
+Known gaps: some Explore city covers have no photos (gradient fallback; `PlacePhotoCollage` shimmers forever when no candidate loads -
+product bug, only masked in screenshot mode); Tonight (07) shows placeholder thumbnails for places without photos.
+
 ## 2026-11-27 - TestFlight release gate
 
 `.github/workflows/testflight.yml` now has a `checks` job (`uses: ./.github/workflows/checks.yml`, `secrets: inherit`,

@@ -80,7 +80,7 @@ struct TripDetailHeaderView: View {
     /// Single collaborator avatar circle.
     private func collaboratorAvatar(_ collaborator: LightweightCollaborator) -> some View {
         Group {
-            if let urlString = collaborator.profilePhotoUrl,
+            if let urlString = ScreenshotPrivacy.photoURL(collaborator.profilePhotoUrl, userId: collaborator.userId),
                let url = URL(string: urlString) {
                 AsyncImage(url: url) { image in
                     image.resizable().scaledToFill()

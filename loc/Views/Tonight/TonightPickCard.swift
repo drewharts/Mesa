@@ -51,5 +51,6 @@ struct TonightPickCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("tonight.pick")
     }
 }
