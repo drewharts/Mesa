@@ -2,6 +2,18 @@
 
 Newest entries first. Skimmable on purpose: decisions, how to use, open items.
 
+## 2026-11-27 - Screenshots/previews: every image must be loaded (`images=1`)
+
+`ScreenshotReadiness` (DEBUG) now counts pending images and "empty" tiles. `screenshot.ready` reads `...;shimmer=0;images=1;pending=N;empty=N;failed=N;jobs=N;pfp=1`.
+`images=1` only when no shimmer, no pending image (`CachedAsyncImage`, `PlacePhotoCollage`, "Loading Place Details"), no tile showing a placeholder
+(`PlacePhotoCollage` unresolvable/empty, `ListPlaceThumbnail` without photo, Tonight thumbnail, failed place photo) and no prep job running
+(`.screenshotImagePending` / `.screenshotTileEmpty` modifiers; no-ops outside screenshot mode). ScreenshotTests/PreviewTests wait on `images=1`.
+Screenshot mode only: `ImageLoadingUtility.rankedPhotoURLs` drops stale `maps.googleapis.com/maps/api/place/photo` URLs (data issue, no DB write);
+`ExploreTabViewModel` verifies popular/city covers through `ScreenshotCoverVerifier` (loads them, drops lists/cities with no loadable photo; city tiles
+use verified URLs), hides lists named like a friend ("Finn") and ranks extra to backfill; Tonight drops picks whose thumbnail does not load.
+Previews: `cut-begin`/`cut-end` marks (several pairs allowed) bracket loading stretches; trim with CFR first (`fps=30`) or holds are lost, and calibrate
+the per-clip offset between marks and video visually (it varied from 0 to -24 s). Secrets used: `MESA_DEMO_EMAIL`, `MESA_DEMO_PASSWORD`, `GMS_API_KEY`.
+
 ## 2026-11-27 - App Store preview videos (feature/appstore-shots)
 
 `.github/workflows/previews.yml` (iPhone 17 Pro Max only) records `locUITests/PreviewTests` (`testPreviewMap`, `testPreviewFindTable`,
