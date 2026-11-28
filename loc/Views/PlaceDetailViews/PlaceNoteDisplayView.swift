@@ -64,7 +64,7 @@ struct PlaceNoteDisplayView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(Color.blue.opacity(0.2), lineWidth: 1)
             )
-            .padding(.bottom, 16)
+            .padding(.top, 12)
         }
     }
 }

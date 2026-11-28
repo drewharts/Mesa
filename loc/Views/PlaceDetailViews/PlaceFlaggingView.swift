@@ -25,10 +25,10 @@ struct PlaceFlaggingView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.yellow)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
 
                 Text("Help Improve Detection")
-                    .font(.subheadline)
+                    .font(.footnote)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
 
@@ -39,6 +39,8 @@ struct PlaceFlaggingView: View {
                     .foregroundColor(.secondary)
             }
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("place.detail.helpImproveDetection")
         .sheet(isPresented: $showingPlaceCorrectionSheet) {
             PlaceCorrectionSheet(
                 mode: .correctionWithVideos(videos: videos, currentPlaceName: place.name),

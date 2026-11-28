@@ -2,6 +2,15 @@
 
 Newest entries first. Skimmable on purpose: decisions, how to use, open items.
 
+## 2026-11-27 - Place detail compact redesign (tabs removed)
+
+Drew: "better use of space, do we need tabs, photos farther up, less white space." Changes (branch `feature/place-detail-compact`, CI-verified only, not seen on a device):
+- **No ABOUT / FEED tabs.** `PlaceDetailTabsView` (name kept) is one scroll: title (28pt) + bookmark/share, meta row with the open/closed pill inline (wraps via `ViewThatFits`), **media strip**, rating/summary/action row, insights, note, would-return, Reviews (old Feed posts, collapsed when none), Help Improve Detection. `PlaceDetailTabsViewModel.selectedTab` is now unused (left in place).
+- **Media strip** (`PlaceMediaStripView`, 132pt tiles, 8pt spacing, `place.detail.mediaStrip`) merges videos then photos; logic is pure in `PlaceMediaStripContent.make` (tests: `PlaceMediaStripContentTests`). Tiles with no/blank URL or that fail to load are hidden, never grey boxes; the strip collapses when empty. External videos reuse `ExternalVideoView` in a compact mode (play badge, thumbnail refresh once, then hidden). `PlacePhotosView`/`ModernPhotoGallery` (big staggered grid) were deleted; the fullscreen gallery is unchanged.
+- **Action row** is one horizontal scroll of `PlaceActionPillLabel` pills: Reserve, Menu, Website, Call, Review (`place.detail.writeReview`), Note (`place.detail.note`, moved from the tab bar; opens the note sheet). The full-width "Write a Review" field and the "Share something..." composer in the Feed were removed (one Review entry point).
+- Empty sections collapse (no "No description available", no empty posts state, no gray Videos container).
+- Open: a video whose thumbnail is expired and cannot be refreshed is hidden from the strip (previously it showed a grey card that still played). If that matters, add a text-only fallback tile.
+
 ## 2026-11-27 - TestFlight release gate
 
 `.github/workflows/testflight.yml` now has a `checks` job (`uses: ./.github/workflows/checks.yml`, `secrets: inherit`,

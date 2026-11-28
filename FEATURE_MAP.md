@@ -301,7 +301,7 @@ Worked example: *"the map didn't reset after leaving a trip"* -> Trips list / Tr
 - **How to reach it:** Tab bar -> Map -> long-press on the map; or Search -> pick a coordinate result.
 - **Main views/files:** loc/Views/GoogleMapView.swift (didLongPressAt), loc/Views/MapView.swift, loc/Views/CreatePlacePopupView.swift, loc/Views/PlaceDetailViews/CustomPlaceCreatorView.swift
 - **ViewModels/services:** loc/ViewModels/SelectedPlace/PlaceCreationViewModel.swift, loc/ViewModels/CreatePlaceSheetViewModel.swift, loc/ViewModels/CustomPlaceCreatorViewModel.swift
-- **Accessibility identifiers:** `place.detail.save` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:188); `place.detail.createPlace` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:180); `place.detail.share` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:233); `place.detail.note` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:341); `place.detail.writeReview` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:106); `place.detail.reserve` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:123); `place.detail.call` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:168) (place.detail.createPlace on the dropped-pin detail)
+- **Accessibility identifiers:** `place.detail.save` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:186); `place.detail.createPlace` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:178); `place.detail.share` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:275); `place.detail.note` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:190); `place.detail.writeReview` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:179); `place.detail.reserve` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:123); `place.detail.call` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:168) (place.detail.createPlace on the dropped-pin detail)
 - **Backend / Supabase:** Supabase places / my_places inserts via SupabasePlaceService; RPC get_custom_place_creator
 - **Known caveats:** Gesture-based; not UI-test friendly.
 
@@ -333,26 +333,26 @@ Worked example: *"the map didn't reset after leaving a trip"* -> Trips list / Tr
 - **Known caveats:** Presented via AppCoordinator.hasPendingKeywordPopup after search sheet dismisses.
 
 ### Place detail
-- **Purpose:** Place sheet: name, save (bookmark), share, rating/open status, description, Write a Review, action row (Reserve, Menu, Website, Call), About and Feed tabs, private note, hours, savers, category correction, travel time, photos/videos, damnlines wait-time row (DamnlinesWaitRow.swift; `place.detail.damnlinesWait`; 5 mapped NYC venues).
+- **Purpose:** Place sheet: name, save (bookmark), share, rating/open status (inline with the meta row), a horizontal photo+video media strip right under the title, description, action row (Reserve, Menu, Website, Call, Review, Note), private note, reviews/posts section, hours, savers, category correction, travel time, Help Improve Detection row, one scrolling sheet (no About/Feed tabs), damnlines wait-time row (DamnlinesWaitRow.swift; `place.detail.damnlinesWait`; 5 mapped NYC venues).
 - **How to reach it:** Tab bar -> Map -> tap a pin; or Search -> pick a place; or list/explore/tonight "open place".
-- **Main views/files:** loc/Views/PlaceDetailViews/PlaceDetailView.swift, PlaceDetailTabsView.swift, PlaceInfoSection.swift, AboutTabContent.swift, NotesTabContent.swift, PlaceHoursSheetView.swift, OpenStatusBadgeView.swift, PlaceSaversSheetView.swift, CategoryCorrectionSheet.swift, PlaceFlaggingView.swift, ReserveActionLabel.swift, TravelTimeSelector.swift, PlacePhotosView.swift, ModernPhotoGallery.swift, FullscreenMediaGalleryView.swift, ExternalVideosSection.swift
-- **ViewModels/services:** loc/ViewModels/PlaceDetailViewModel.swift, DetailPlaceViewModel.swift, SelectedPlaceViewModel.swift (+ ViewModels/SelectedPlace/*), PlaceDetailTabsViewModel.swift, AboutTabViewModel.swift, NotesTabViewModel.swift, PlaceSaversViewModel.swift, PlaceInsightsViewModel.swift, ReservationViewModel.swift, DamnlinesWaitViewModel.swift; services DamnlinesWaitService, PlaceRepository, PlaceInsightsService, PlaceListService, PlaceShareService
-- **Accessibility identifiers:** `place.detail.save` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:188); `place.detail.createPlace` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:180); `place.detail.share` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:233); `place.detail.note` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:341); `place.detail.writeReview` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:106); `place.detail.reserve` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:123); `place.detail.call` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:168)
+- **Main views/files:** loc/Views/PlaceDetailViews/PlaceDetailView.swift, PlaceDetailTabsView.swift, PlaceInfoSection.swift, AboutTabContent.swift, NotesTabContent.swift, PlaceHoursSheetView.swift, OpenStatusBadgeView.swift, PlaceSaversSheetView.swift, CategoryCorrectionSheet.swift, PlaceFlaggingView.swift, ReserveActionLabel.swift, PlaceActionPillLabel.swift, TravelTimeSelector.swift, PlaceMediaStripView.swift, PlaceMediaStripPhotoTile.swift, PlacePostsView.swift, FullscreenMediaGalleryView.swift, ExternalVideosSection.swift
+- **ViewModels/services:** loc/ViewModels/PlaceDetailViewModel.swift, DetailPlaceViewModel.swift, SelectedPlaceViewModel.swift (+ ViewModels/SelectedPlace/*), PlaceDetailTabsViewModel.swift, AboutTabViewModel.swift, NotesTabViewModel.swift, PlaceSaversViewModel.swift, PlaceMediaStripViewModel.swift (+ Models/PlaceMediaStripContent.swift, PlaceMediaStripItem.swift), PlaceInsightsViewModel.swift, ReservationViewModel.swift, DamnlinesWaitViewModel.swift; services DamnlinesWaitService, PlaceRepository, PlaceInsightsService, PlaceListService, PlaceShareService
+- **Accessibility identifiers:** `place.detail.save` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:186); `place.detail.createPlace` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:178); `place.detail.share` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:275); `place.detail.note` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:190); `place.detail.writeReview` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:179); `place.detail.reserve` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:123); `place.detail.call` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:168)
 - **Backend / Supabase:** `GET /search/place-details`; `GET /places/<place_id>/reservation` (routes/reservations.py); `GET /places/<place_id>/insights` (routes/place_insights.py); `POST /search/refresh-review-images`; RPCs get_place_savers, get_place_total_save_count, get_place_friend_activity, is_place_in_user_lists, get_place_reviews_with_tiktoks, get_place_tiktoks; tables place_notes, favorites, place_list_items, my_places, places.
-- **Known caveats:** The bookmark does a one-tap save into the place's city list (CitySaveBannerViewModel) and shows a "Saved to <City>" banner; if already saved (or a dropped pin) it opens the list picker (PlaceListSelectionViewModel) instead. Dropped pins show "Create Place" instead of bookmark/share. Reserve/Menu/Website/Call appear only when data exists. Share is a Menu (Share Link / Create Story Card) for custom places, so place.detail.share only exists for non-custom places. Hours open via the open-status badge. Sheet resizes between min height and 800 pt.
+- **Known caveats:** The bookmark does a one-tap save into the place's city list (CitySaveBannerViewModel) and shows a "Saved to <City>" banner; if already saved (or a dropped pin) it opens the list picker (PlaceListSelectionViewModel) instead. Dropped pins show "Create Place" instead of bookmark/share. Reserve/Menu/Website/Call appear only when data exists. Share is a Menu (Share Link / Create Story Card) for custom places, so place.detail.share only exists for non-custom places. Hours open via the open-status badge. Sheet resizes between min height and 800 pt. The About/Feed tab bar was removed: everything is one scroll (header, media strip, rating/summary/actions, insights, note, would-return, reviews, Help Improve Detection). The strip hides tiles that fail to load or have no URL and collapses when empty; reviews and other empty sections collapse with no gap. The note icon moved from the tab bar to a Note pill in the action row (`place.detail.note`).
 
 ### Save to list (from place detail)
 - **Purpose:** Choose which list(s) a place belongs to.
 - **How to reach it:** Place detail -> bookmark when already saved, or "change list" on the saved banner.
 - **Main views/files:** sheet `showListSelection` in PlaceDetailView.swift (list selection view in ListViews)
 - **ViewModels/services:** loc/ViewModels/PlaceListSelectionViewModel.swift, PlaceListService
-- **Accessibility identifiers:** `place.detail.save` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:188); `place.detail.createPlace` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:180); `place.detail.share` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:233); `place.detail.note` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:341); `place.detail.writeReview` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:106); `place.detail.reserve` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:123); `place.detail.call` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:168) (place.detail.save)
+- **Accessibility identifiers:** `place.detail.save` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:186); `place.detail.createPlace` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:178); `place.detail.share` (loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:275); `place.detail.note` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:190); `place.detail.writeReview` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:179); `place.detail.reserve` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:123); `place.detail.call` (loc/Views/PlaceDetailViews/PlaceInfoSection.swift:168) (place.detail.save)
 - **Backend / Supabase:** RPC is_place_in_user_lists; tables place_lists, place_list_items
 - **Known caveats:** First tap on an unsaved place saves immediately (no picker).
 
 ### Create post / review
 - **Purpose:** Write a review/post for a place with text, media, ratings, sentiment (Would return?) and optional voice dictation.
-- **How to reach it:** Place detail -> "Write a Review" (or Feed tab add post).
+- **How to reach it:** Place detail -> "Review" pill in the action row.
 - **Main views/files:** loc/Views/PlaceReviews/CreatePostView.swift, VoiceReviewButton.swift, RatingSlidersView.swift, SelectedImagesView.swift, UploadPhotosButtonView.swift, UpvoteFavDishesView.swift, ReviewTextView.swift; post display in Views/PlaceDetailViews/PlacePostsView.swift, PlacePostView.swift, PostActionBar.swift, PostCommentsSheet.swift
 - **ViewModels/services:** loc/ViewModels/PlacePostViewModel.swift, VoiceReviewViewModel.swift, PlacePostsViewModel.swift; loc/Services/SpeechTranscriber.swift, PostService
 - **Accessibility identifiers:** `post.create.cancel` (loc/Views/PlaceReviews/CreatePostView.swift:74); `post.create.share` (loc/Views/PlaceReviews/CreatePostView.swift:85); `post.create.text` (loc/Views/PlaceReviews/CreatePostView.swift:355) (existing foodSlider/serviceSlider/ambienceSlider in RatingSlidersView.swift)
@@ -518,7 +518,7 @@ Worked example: *"the map didn't reset after leaving a trip"* -> Trips list / Tr
 
 ### Place reservation link
 - **Purpose:** Show a Resy/OpenTable/Tock/SevenRooms link on a place page.
-- **How to reach it:** Place detail -> About tab
+- **How to reach it:** Place detail -> action row / summary (no tabs)
 - **Main views/files:** loc/Views/PlaceDetailViews/AboutTabContent.swift; loc/Models/ReservationLink.swift
 - **ViewModels/services:** loc/ViewModels/ReservationViewModel.swift; MesaBackendService.fetchReservation
 - **Accessibility identifiers:** none (outside assigned files)
@@ -749,10 +749,10 @@ Worked example: *"the map didn't reset after leaving a trip"* -> Trips list / Tr
 
 ### External videos on place detail
 - **Purpose:** Show TikTok/Instagram videos linked to a place, play/open them, delete from place.
-- **How to reach it:** Place detail -> videos section (ExternalVideosSection).
+- **How to reach it:** Place detail -> media strip (videos carry a play badge; tap plays, long-press deletes own videos); ExternalVideosSection is now only the compact Help Improve Detection row.
 - **Main views/files:** loc/Views/PlaceDetailViews/ExternalVideosSection.swift, ExternalVideoView.swift, ExternalWebView.swift, ExternalReviewPhotoGallery.swift; loc/Views/Map/CityTikTokTile.swift.
 - **ViewModels/services:** loc/ViewModels/ExternalVideosViewModel.swift, ExternalVideoViewModel.swift, ExternalMetadataCache; loc/Services/TikTokPlaceService.swift, ExternalContentService.swift; loc/Models/ExternalVideo.swift, ExternalPlace.swift.
-- **Accessibility identifiers:** none added
+- **Accessibility identifiers:** `place.detail.mediaStrip`, `place.detail.mediaStrip.video`, `place.detail.helpImproveDetection`
 - **Backend / Supabase:** RPC get_places_for_tiktok_video; table external_places (select/delete); `POST /refresh-thumbnail`; `GET /tiktok/oembed`; `POST /search/refresh-review-images` (ExternalReviewPhotosViewModel).
 - **Known caveats:** Loads WebView embeds from tiktok.com/instagram.com (baseURL in ExternalWebView); needs network and seeded external data.
 
@@ -870,12 +870,17 @@ Every identifier added in the accessibility pass (ID -> file:line -> element). L
 | `onboarding.photo.choose` | `loc/Views/Onboarding/ProfilePhotoOnboardingView.swift:183` | Choose/Change Photo button | onboarding-photo |
 | `onboarding.suggested.done` | `loc/Views/Onboarding/SuggestedProfilesPopupView.swift:37` | Done button | onboarding-suggested |
 | `place.detail.call` | `loc/Views/PlaceDetailViews/PlaceInfoSection.swift:168` | Call button | place-detail |
-| `place.detail.createPlace` | `loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:180` | Create Place button (dropped pin) | place-detail |
-| `place.detail.note` | `loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:341` | Private note button | place-detail |
+| `place.detail.createPlace` | `loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:178` | Create Place button (dropped pin) | place-detail |
+| `place.detail.note` | `loc/Views/PlaceDetailViews/PlaceInfoSection.swift:190` | Private note button | place-detail |
 | `place.detail.reserve` | `loc/Views/PlaceDetailViews/PlaceInfoSection.swift:123` | Reserve button | place-detail |
-| `place.detail.save` | `loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:188` | Bookmark/save button | place-detail |
-| `place.detail.share` | `loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:233` | Share button (non-custom places) | place-detail |
-| `place.detail.writeReview` | `loc/Views/PlaceDetailViews/PlaceInfoSection.swift:106` | Write a Review button | place-detail |
+| `place.detail.save` | `loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:186` | Bookmark/save button | place-detail |
+| `place.detail.share` | `loc/Views/PlaceDetailViews/PlaceDetailTabsView.swift:275` | Share button (non-custom places) | place-detail |
+| `place.detail.writeReview` | `loc/Views/PlaceDetailViews/PlaceInfoSection.swift:179` | Write a Review button | place-detail |
+| `place.detail.mediaStrip` | `loc/Views/PlaceDetailViews/PlaceMediaStripView.swift:63` | Horizontal photo + video strip | place-detail |
+| `place.detail.mediaStrip.photo` | `loc/Views/PlaceDetailViews/PlaceMediaStripView.swift:97` | Photo / gallery-video tile in the strip | place-detail |
+| `place.detail.mediaStrip.video` | `loc/Views/PlaceDetailViews/PlaceMediaStripView.swift:111` | External video tile (play badge) in the strip | place-detail |
+| `place.detail.helpImproveDetection` | `loc/Views/PlaceDetailViews/PlaceFlaggingView.swift:43` | Help Improve Detection row | place-detail |
+| `place.detail.posts` | `loc/Views/PlaceDetailViews/PlacePostsView.swift:30` | Reviews/posts section (only when posts exist) | place-detail |
 | `post.create.cancel` | `loc/Views/PlaceReviews/CreatePostView.swift:74` | Create post Cancel | create-post |
 | `post.create.share` | `loc/Views/PlaceReviews/CreatePostView.swift:85` | Create post Share | create-post |
 | `post.create.text` | `loc/Views/PlaceReviews/CreatePostView.swift:355` | Post text editor | create-post |

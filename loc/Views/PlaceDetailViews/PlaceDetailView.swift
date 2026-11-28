@@ -109,76 +109,47 @@ struct PlaceDetailView: View {
     /// Loading view that shows place name while full details are loading.
     private func placeLoadingView(place: DetailPlace) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 12) {
                 // Header row with place name (matches PlaceDetailTabsView style)
                 HStack(alignment: .center) {
                     Text(place.displayName)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.black)
+                        .lineLimit(2)
 
                     Spacer()
 
-                    // Placeholder bookmark icon (disabled)
+                    // Placeholder bookmark and share icons (disabled)
                     Image(systemName: "bookmark")
                         .font(.title3)
                         .foregroundColor(.gray.opacity(0.4))
                         .frame(width: 32, height: 32)
 
-                    // Placeholder share icon (disabled)
                     Image(systemName: "square.and.arrow.up")
                         .font(.title3)
                         .foregroundColor(.gray.opacity(0.4))
                         .frame(width: 32, height: 32)
                 }
-                .padding(.bottom, 3)
+                .padding(.horizontal, 16)
 
-                // Info row placeholder with shimmer effect
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 80, height: 16)
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 60, height: 16)
+                // Skeleton sized like the loaded sheet (meta row, photo strip, summary, actions)
+                // so the sheet doesn't jump when real content replaces it.
+                SkeletonBlock(width: 180, height: 16, cornerRadius: 4)
+                    .padding(.horizontal, 16)
+                HStack(spacing: 8) {
+                    SkeletonBlock(width: 132, height: 132, cornerRadius: 8)
+                    SkeletonBlock(width: 132, height: 132, cornerRadius: 8)
+                    SkeletonBlock(height: 132, cornerRadius: 8)
                 }
-                .padding(.bottom, 10)
-
-                // Tab bar placeholder
-                HStack(spacing: 12) {
-                    Text("ABOUT")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.gray.opacity(0.5))
-
-                    Text("FEED")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.gray.opacity(0.5))
-
-                    Spacer()
+                .padding(.leading, 16)
+                VStack(alignment: .leading, spacing: 8) {
+                    SkeletonBlock(height: 14, cornerRadius: 4)
+                    SkeletonBlock(width: 220, height: 14, cornerRadius: 4)
+                    SkeletonBlock(height: 34, cornerRadius: 10)
                 }
-                .padding(.bottom, 10)
-
-                // Skeleton sized like the About tab (photo strip, info rows) so the sheet
-                // doesn't jump when real content replaces it.
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        SkeletonBlock(width: 140, height: 180, cornerRadius: 12)
-                        SkeletonBlock(width: 140, height: 180, cornerRadius: 12)
-                        SkeletonBlock(height: 180, cornerRadius: 12)
-                    }
-                    SkeletonBlock(height: 18, cornerRadius: 4)
-                    SkeletonBlock(width: 220, height: 18, cornerRadius: 4)
-                    SkeletonBlock(height: 56, cornerRadius: 12)
-                    SkeletonBlock(height: 56, cornerRadius: 12)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 360, alignment: .top)
+                .padding(.horizontal, 16)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
+            .padding(.top, 12)
         }
         .navigationBarTitleDisplayMode(.inline)
     }

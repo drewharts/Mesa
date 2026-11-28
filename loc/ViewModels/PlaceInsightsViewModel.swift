@@ -17,6 +17,8 @@ final class PlaceInsightsViewModel: ObservableObject {
 
     private var loadedPlaceId: String?
 
+    /// Whether the insights section has anything to show (friends, video summary or top dishes).
+    var hasContent: Bool { !friends.isEmpty || !videoSummary.isEmpty || !topDishes.isEmpty }
     var hasPeopleOrder: Bool { !topDishes.isEmpty || mentions.contains { ($0.tip ?? "").isEmpty == false || ($0.vibe ?? "").isEmpty == false } }
 
     func load(placeId: String) async {

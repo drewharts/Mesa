@@ -19,20 +19,28 @@ struct ExternalVideoView: View {
     let onNavigateToPlace: ((DetailPlace) -> Void)?
     let onDelete: (() -> Void)?
     let showDeleteOption: Bool
+    /// When set, renders a bare strip tile of this size (play badge, no author line, no gray backing).
+    let compactSize: CGSize?
+    /// Called in compact mode once the thumbnail cannot be loaded even after a refresh, so the tile can be hidden.
+    let onThumbnailUnavailable: (() -> Void)?
 
     /// Initializes the external video view with video data and optional navigation callbacks.
-    init(externalVideo: ExternalVideo, externalPlaceId: String? = nil, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil, onDelete: (() -> Void)? = nil, showDeleteOption: Bool = false) {
+    init(externalVideo: ExternalVideo, externalPlaceId: String? = nil, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil, onDelete: (() -> Void)? = nil, showDeleteOption: Bool = false, compactSize: CGSize? = nil, onThumbnailUnavailable: (() -> Void)? = nil) {
         _viewModel = StateObject(wrappedValue: ExternalVideoViewModel(externalVideo: externalVideo, externalPlaceId: externalPlaceId))
         self.associatedPlace = associatedPlace
         self.onNavigateToPlace = onNavigateToPlace
         self.onDelete = onDelete
         self.showDeleteOption = showDeleteOption
+        self.compactSize = compactSize
+        self.onThumbnailUnavailable = onThumbnailUnavailable
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             videoThumbnailButton
-            authorInfoSection
+            if compactSize == nil {
+                authorInfoSection
+            }
         }
         .fullScreenCover(isPresented: $viewModel.showingFullVideo) {
             NavigationView {
@@ -57,31 +65,59 @@ struct ExternalVideoView: View {
         }
     }
 
+    /// Edge sizes for the thumbnail image, its backing frame and corner radius.
+    private var tileMetrics: (image: CGSize, frame: CGSize, radius: CGFloat) {
+        if let compactSize { return (compactSize, compactSize, 8) }
+        return (CGSize(width: 160, height: 160), CGSize(width: 192, height: 192), 8)
+    }
+
+    /// Play badge shown over compact strip tiles.
+    @ViewBuilder
+    private var playBadge: some View {
+        if compactSize != nil {
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 30))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.35), radius: 3)
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// Refreshes an expired thumbnail once, then reports it unavailable if it still cannot load.
+    private func handleThumbnailFailure() {
+        guard !refreshAttempted else {
+            onThumbnailUnavailable?()
+            return
+        }
+        refreshAttempted = true
+        isRefreshingThumbnail = true
+        let previousURL = viewModel.externalVideo.thumbnailURL
+        Task {
+            await viewModel.refreshThumbnail()
+            await MainActor.run {
+                isRefreshingThumbnail = false
+                if viewModel.externalVideo.thumbnailURL == previousURL {
+                    onThumbnailUnavailable?()
+                }
+            }
+        }
+    }
+
     private var videoThumbnailButton: some View {
         ZStack {
-            // Background that matches the tap area
-            Color(.systemGray6)
-                .cornerRadius(12)
+            // Background that matches the tap area (strip tiles have none)
+            if compactSize == nil {
+                Color(.systemGray6)
+                    .cornerRadius(12)
+            }
 
             // Image content
             CustomImageLoader(
                 urlString: viewModel.externalVideo.thumbnailURL,
                 contentMode: .fill,
-                frameSize: CGSize(width: 160, height: 160),
-                cornerRadius: 8,
-                onFailure: {
-                    if !refreshAttempted {
-                        refreshAttempted = true
-                        isRefreshingThumbnail = true
-                        Task {
-                            await viewModel.refreshThumbnail()
-                            // If URL didn't change, refresh failed - stop showing loading
-                            await MainActor.run {
-                                isRefreshingThumbnail = false
-                            }
-                        }
-                    }
-                }
+                frameSize: tileMetrics.image,
+                cornerRadius: tileMetrics.radius,
+                onFailure: handleThumbnailFailure
             )
             .id("\(viewModel.externalVideo.thumbnailURL)_\(viewModel.externalVideo.id)")
 
@@ -89,15 +125,17 @@ struct ExternalVideoView: View {
             if isRefreshingThumbnail {
                 Rectangle()
                     .fill(Color(.systemGray6))
-                    .frame(width: 160, height: 160)
-                    .cornerRadius(8)
+                    .frame(width: tileMetrics.image.width, height: tileMetrics.image.height)
+                    .cornerRadius(tileMetrics.radius)
                     .overlay(
                         ProgressView()
                             .scaleEffect(0.8)
                     )
             }
+
+            playBadge
         }
-        .frame(width: 192, height: 192) // Match the visual size
+        .frame(width: tileMetrics.frame.width, height: tileMetrics.frame.height) // Match the visual size
         .contentShape(Rectangle()) // Make the entire frame tappable
         .onTapGesture {
             // Regular tap - open video or navigate

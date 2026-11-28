@@ -3,7 +3,7 @@
 //  loc
 //
 //  Created by Cursor on 1/22/25.
-//  Smart component with its own ViewModel for external video display
+//  Compact "Help Improve Detection" row shown when a place has external videos (videos live in the media strip)
 //
 
 import SwiftUI
@@ -11,79 +11,23 @@ import SwiftUI
 struct ExternalVideosSection: View {
     @ObservedObject var viewModel: ExternalVideosViewModel
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var userSession: UserSession
 
-    let placeId: String
     let selectedPlace: DetailPlace?
 
     /// Callback when user changes the place association - parent should navigate to new place
     var onPlaceChanged: ((DetailPlace) -> Void)?
 
+    /// Videos themselves live in the media strip; this only keeps the compact "Help Improve Detection" row,
+    /// shown when external videos exist for the place.
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if viewModel.isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding()
-            } else if viewModel.hasVideos {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Videos")
-                            .font(.headline)
-                            .fontWeight(.bold)
-
-                        Spacer()
-
-                        Text("\(viewModel.videoCount)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(12)
-                    }
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(viewModel.videos, id: \.videoID) { video in
-                                // Only show delete option if current user saved this video
-                                let canDelete = video.savedByUserId == userSession.currentUserId
-                                ExternalVideoView(
-                                    externalVideo: video,
-                                    externalPlaceId: video.externalPlaceId,
-                                    onDelete: {
-                                        Task {
-                                            await deleteVideo(video)
-                                        }
-                                    },
-                                    showDeleteOption: canDelete
-                                )
-                                .id("video_\(video.videoID)")
-                            }
-                        }
-                        .padding(.horizontal, 1)
-                    }
-                }
-                .padding(.top, 15)
-
-                // Place Flagging - shown when external videos are visible
-                if let place = selectedPlace {
-                    PlaceFlaggingView(
-                        place: place,
-                        videos: viewModel.videos,
-                        onPlaceChanged: onPlaceChanged
-                    )
-                    .environmentObject(profile)
-                    .padding(.top, 15)
-                }
-            }
+        if viewModel.hasVideos, let place = selectedPlace {
+            PlaceFlaggingView(
+                place: place,
+                videos: viewModel.videos,
+                onPlaceChanged: onPlaceChanged
+            )
+            .environmentObject(profile)
         }
-    }
-
-    // MARK: - Private Actions
-    private func deleteVideo(_ video: ExternalVideo) async {
-        guard let userId = userSession.currentUserId else { return }
-        await viewModel.deleteVideo(video, placeId: placeId, userId: userId)
     }
 }
 
@@ -135,7 +79,6 @@ struct ExternalVideosSection: View {
 
     return ExternalVideosSection(
         viewModel: externalVideosVM,
-        placeId: "test-place-123",
         selectedPlace: mockPlace
     )
     .environmentObject(profileVM)

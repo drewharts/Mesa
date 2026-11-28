@@ -22,6 +22,8 @@ class AboutTabViewModel: ObservableObject {
     let placePhotosViewModel: PlacePhotosViewModel
     let customPlaceCreatorViewModel: CustomPlaceCreatorViewModel
     let notesViewModel: NotesTabViewModel
+    /// Photo + video strip merged from the photo and video child ViewModels.
+    let mediaStripViewModel: PlaceMediaStripViewModel
 
     // MARK: - Dependencies (Services only)
     private let placeService: PlaceService
@@ -36,6 +38,10 @@ class AboutTabViewModel: ObservableObject {
         self.placePhotosViewModel = placePhotosViewModel
         self.customPlaceCreatorViewModel = customPlaceCreatorViewModel
         self.notesViewModel = notesViewModel
+        self.mediaStripViewModel = PlaceMediaStripViewModel(
+            photosViewModel: placePhotosViewModel,
+            videosViewModel: externalVideosViewModel
+        )
         self.placeService = ServiceContainer.shared.placeService
     }
 
@@ -43,9 +49,11 @@ class AboutTabViewModel: ObservableObject {
 
     /// Sets the current place and updates child ViewModels.
     func setPlace(_ place: DetailPlace?) {
+        let oldPlaceId = self.place?.id.uuidString
         self.place = place
         self.placeId = place?.id.uuidString ?? ""
         externalVideosViewModel.setPlaceId(place?.id.uuidString)
+        if place?.id.uuidString != oldPlaceId { mediaStripViewModel.reset() }
         customPlaceCreatorViewModel.setPlace(place)
     }
 

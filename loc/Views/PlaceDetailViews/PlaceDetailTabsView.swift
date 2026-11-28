@@ -3,7 +3,8 @@
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/9/25.
-//  Renamed from MinPlaceDetailView to better describe tabbed content view.
+//  Renamed from MinPlaceDetailView. Despite the name there are no tabs anymore: it is one scrolling sheet
+//  (header, media strip, about content, reviews, help-improve row).
 //
 
 import SwiftUI
@@ -48,19 +49,15 @@ struct PlaceDetailTabsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 5) {
-                headerRow
-                if let message = saveBanner.message {
-                    quickSaveBannerView(message)
-                }
-                infoRow
-                
-                tabBar
-                tabContent
+            VStack(alignment: .leading, spacing: 12) {
+                topBlock
+                mediaStrip
+                mainContent
+                    .padding(.horizontal, 16)
                     .transaction { $0.animation = nil }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -158,9 +155,10 @@ struct PlaceDetailTabsView: View {
                 viewModel.openGoogleMaps()
             }) {
                 Text(viewModel.placeName)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.black)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
             }
             .buttonStyle(.plain)
 
@@ -190,9 +188,54 @@ struct PlaceDetailTabsView: View {
                 shareButton
             }
         }
-        .padding(.bottom, 3)
     }
-    
+
+    // MARK: - Sections
+
+    /// Title row, save banner and meta/status block.
+    private var topBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            headerRow
+            if let message = saveBanner.message {
+                quickSaveBannerView(message)
+            }
+            infoRow
+        }
+        .padding(.horizontal, 16)
+    }
+
+    /// Edge-to-edge photo + video strip right under the title block.
+    private var mediaStrip: some View {
+        PlaceMediaStripView(
+            viewModel: viewModel.aboutTabViewModel.mediaStripViewModel,
+            placeId: viewModel.currentPlace?.id.uuidString ?? "",
+            onPhotoTapped: onPhotoTapped
+        )
+        .environmentObject(userSession)
+    }
+
+    /// About content, reviews and the compact help-improve row, with no empty gaps between them.
+    private var mainContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            AboutTabContent(
+                viewModel: viewModel.aboutTabViewModel,
+                onAddPost: onAddReview,
+                onEditNote: { showingNoteSheet = true },
+                isRefreshing: viewModel.isRefreshing,
+                onRefresh: viewModel.manualRefresh
+            )
+            PlacePostsView(viewModel: viewModel.postsViewModel)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(userProfileNavigationVM)
+            ExternalVideosSection(
+                viewModel: viewModel.aboutTabViewModel.externalVideosViewModel,
+                selectedPlace: viewModel.currentPlace,
+                onPlaceChanged: onPlaceChanged
+            )
+            .environmentObject(profile)
+        }
+    }
+
     // MARK: - One-tap save (city list)
 
     /// The bookmark saves an unsaved place into its city list in one tap; a saved place (or a dropped
@@ -215,7 +258,6 @@ struct PlaceDetailTabsView: View {
             saveBanner.dismiss()
             onAddToList()
         }
-        .padding(.bottom, 6)
         .transition(.opacity.combined(with: .move(edge: .top)))
         .onChange(of: viewModel.currentPlace?.id) { _, _ in saveBanner.dismiss() }
     }
@@ -268,130 +310,69 @@ struct PlaceDetailTabsView: View {
 
     // MARK: - Info Row (Extracted for compiler performance)
     
-    @ViewBuilder
+    /// Meta (category, travel time, savers) with the open/closed pill inline when it fits, wrapped below otherwise.
     private var infoRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        ViewThatFits(in: .horizontal) {
             HStack(spacing: 10) {
-                if viewModel.isCustomPlace {
-                    CustomPlaceCreatorView(
-                        viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
-                        onCreatorTapped: { userId in
-                            guard let currentUserId = userSession.currentUserId else { return }
-                            userProfileNavigationVM.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
-                        }
-                    )
-                    .layoutPriority(-1)
-                } else if let restaurantType = viewModel.restaurantType {
-                    Button {
-                        showingCategoryCorrectionSheet = true
-                    } label: {
-                        Text(restaurantType)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                    .layoutPriority(-1)
-                }
-
-                TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
-                    .fixedSize()
-
-                if viewModel.showSaversIndicator {
-                    SavedByIndicator(
-                        savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
-                        additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
-                        onTap: { showingSaversSheet = true }
-                    )
-                    .fixedSize()
-                }
+                metaItems
+                openStatusBadge
             }
-
-            if viewModel.openStatus.shouldDisplay {
-                OpenStatusBadgeView(
-                    status: viewModel.openStatus,
-                    onTap: { showingHoursSheet = true },
-                    detailText: viewModel.openStatusChangeText
-                )
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) { metaItems }
+                openStatusBadge
             }
         }
-        .padding(.bottom, 10)
     }
-    
-    // MARK: - Tab Bar (Extracted for compiler performance)
-    
-    private var tabBar: some View {
-        HStack(spacing: 12) {
-            tabButton(title: "ABOUT", tab: DetailTab.about)
-            tabButton(title: "FEED", tab: DetailTab.reviews)
-            
-            Spacer()
-            
-            // Private Note Button
-            Button(action: {
-                showingNoteSheet = true
-            }) {
-                Image(systemName: "note.text")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                    .frame(width: 32, height: 32)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(16)
-            }
-            .accessibilityIdentifier("place.detail.note")
-        }
-        .padding(.bottom, 10)
-    }
-    
-    private func tabButton(title: String, tab: DetailTab) -> some View {
-        Button(action: {
-            viewModel.selectTab(tab)
-        }) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.black)
-                .padding(.bottom, 5)
-                .overlay(
-                    Group {
-                        if viewModel.selectedTab == tab {
-                            Rectangle()
-                                .fill(Color.blue)
-                                .frame(height: 3)
-                                .offset(y: 6)
-                        }
-                    },
-                    alignment: .bottom
-                )
-        }
-    }
-    
-    // MARK: - Tab Content (Extracted for compiler performance)
-    
+
     @ViewBuilder
-    private var tabContent: some View {
-        switch viewModel.selectedTab {
-        case .about:
-            AboutTabContent(
-                viewModel: viewModel.aboutTabViewModel,
-                onPhotoTapped: onPhotoTapped,
-                onAddPost: onAddReview,
-                onPlaceChanged: onPlaceChanged,
-                isRefreshing: viewModel.isRefreshing,
-                onRefresh: viewModel.manualRefresh
+    private var openStatusBadge: some View {
+        if viewModel.openStatus.shouldDisplay {
+            OpenStatusBadgeView(
+                status: viewModel.openStatus,
+                onTap: { showingHoursSheet = true },
+                detailText: viewModel.openStatusChangeText
             )
-            .environmentObject(profile)
-            .environmentObject(userSession)
-        case .reviews:
-            PlacePostsView(
-                viewModel: viewModel.postsViewModel,
-                onAddPost: onAddReview
-            )
-            .environmentObject(selectedPlaceVM)
-            .environmentObject(userProfileNavigationVM)
         }
     }
-    
+
+    /// Category (or custom place creator), travel-time selector and savers indicator.
+    @ViewBuilder
+    private var metaItems: some View {
+        if viewModel.isCustomPlace {
+            CustomPlaceCreatorView(
+                viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
+                onCreatorTapped: { userId in
+                    guard let currentUserId = userSession.currentUserId else { return }
+                    userProfileNavigationVM.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+                }
+            )
+            .layoutPriority(-1)
+        } else if let restaurantType = viewModel.restaurantType {
+            Button {
+                showingCategoryCorrectionSheet = true
+            } label: {
+                Text(restaurantType)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .layoutPriority(-1)
+        }
+
+        TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
+            .fixedSize()
+
+        if viewModel.showSaversIndicator {
+            SavedByIndicator(
+                savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
+                additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
+                onTap: { showingSaversSheet = true }
+            )
+            .fixedSize()
+        }
+    }
+
     // MARK: - Dynamic Sheet Height
     
     /// Calculates appropriate sheet detents based on number of savers
