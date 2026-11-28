@@ -186,6 +186,7 @@ struct TonightSheet: View {
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.systemGray5)))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("tonight.planLater")
     }
 
     private var groupButton: some View {
@@ -208,5 +209,6 @@ struct TonightSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(viewModel.isSharing)
+        .accessibilityIdentifier("tonight.askGroup")
     }
 }

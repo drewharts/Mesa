@@ -193,7 +193,7 @@ final class ExploreTabViewModel: ObservableObject {
 
     /// Fetches covers for the lists, publishes them, and warms their images at the size the cards will draw.
     private func loadCovers(for ids: [String], frame: CGSize) async {
-        let fetched = await service.fetchCoverPhotos(listIds: ids)
+        let fetched = await service.fetchCoverPhotos(listIds: ids).filter { !$0.value.isEmpty }
         coverPhotos.merge(fetched) { _, new in new }
         prefetchImages(for: ids, frame: frame, allowsGrid: frame != ExploreCoverMetrics.city)
     }

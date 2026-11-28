@@ -85,6 +85,23 @@ class TripsListViewModel: ObservableObject {
             print("[TripsListVM] Failed to delete trip: \(error)")
         }
     }
+
+    // MARK: - Map Trip Exit
+
+    /// Clears from the map every trip that was popped off the navigation stack.
+    func clearTripsRemoved(from old: [String], to new: [String], on coordinator: MapDisplayCoordinatorViewModel) {
+        clearTrips(old.filter { !new.contains($0) }, on: coordinator)
+    }
+
+    /// Allows the given trip (if any) to show on the map again after its tab returns.
+    func beginTripSession(_ tripId: String?, on coordinator: MapDisplayCoordinatorViewModel) {
+        tripId.map { coordinator.beginTripSession(tripId: $0) }
+    }
+
+    /// Clears the given trips' pins and routes from the map.
+    func clearTrips(_ tripIds: [String], on coordinator: MapDisplayCoordinatorViewModel) {
+        tripIds.forEach { coordinator.clearTripFromMap(tripId: $0) }
+    }
 }
 
 /// Classifies trips as ongoing / upcoming / past against the user's local "today".

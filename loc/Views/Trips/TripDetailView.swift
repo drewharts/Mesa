@@ -14,7 +14,10 @@ struct TripDetailView: View {
     @StateObject private var viewModel: TripDetailViewModel
     @Environment(\.dismiss) private var dismiss
 
-    init(tripId: String) {
+    private let isTabActive: Bool
+
+    init(tripId: String, isTabActive: Bool = true) {
+        self.isTabActive = isTabActive
         _viewModel = StateObject(wrappedValue: TripDetailViewModel(tripId: tripId))
     }
 
@@ -75,6 +78,9 @@ struct TripDetailView: View {
             Analytics.track(.tripOpened, ["trip_id": viewModel.tripId])
             Analytics.screen("Trip Detail")
         }
+        .modifier(TripTabActivationModifier(isActive: isTabActive) {
+            viewModel.restoreMapAnnotations()
+        })
         .onDisappear {
             guard viewModel.selectedDayForDetail == nil
                   && viewModel.selectedPlaceIdForDetail == nil else { return }
@@ -104,6 +110,7 @@ struct TripDetailView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
+        .accessibilityIdentifier("trip.menu")
     }
 
     // MARK: - Error Content

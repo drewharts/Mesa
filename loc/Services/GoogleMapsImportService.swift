@@ -8,7 +8,7 @@
 
 import Foundation
 
-class GoogleMapsImportService {
+final class GoogleMapsImportService: Sendable {
     private let session: URLSession
 
     init(session: URLSession = .shared) {

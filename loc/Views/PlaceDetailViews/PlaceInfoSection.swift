@@ -18,6 +18,8 @@ struct PlaceInfoSection: View {
     /// Reservation link (Resy/OpenTable/...) when available; the button is hidden otherwise.
     var reservation: ReservationLink? = nil
     var onReserveTapped: (() -> Void)? = nil
+    /// damnlines.com wait-time data for tracked NYC venues; the row is hidden when nil.
+    var waitInfo: DamnlinesWaitInfo? = nil
 
     @Environment(\.openURL) private var openURL
 
@@ -103,6 +105,7 @@ struct PlaceInfoSection: View {
             // Prominent, always-visible review CTA (not buried in the scrollable row below)
             if let onAddPost {
                 GlassComposerButton(icon: "square.and.pencil", text: "Write a Review", action: onAddPost)
+                    .accessibilityIdentifier("place.detail.writeReview")
                     .padding(.bottom, hasActionButtons ? 10 : 12)
             }
 
@@ -119,6 +122,7 @@ struct PlaceInfoSection: View {
                                 ReserveActionLabel(link: reservation)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("place.detail.reserve")
                         }
 
                         // Menu button
@@ -163,10 +167,15 @@ struct PlaceInfoSection: View {
                                 actionButtonLabel(icon: "phone.fill", text: "Call")
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("place.detail.call")
                         }
                     }
                 }
                 .padding(.bottom, 12)
+            }
+
+            if let waitInfo {
+                DamnlinesWaitRow(info: waitInfo)
             }
         }
     }

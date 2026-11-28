@@ -61,6 +61,17 @@ class GoogleMapsImportViewModel: ObservableObject {
     private let placeService = SupabasePlaceService.shared
     private let userService = SupabaseUserService.shared
 
+    // MARK: - Concurrency
+
+    private static let maxConcurrentRequests = 6
+    private var importTask: Task<Void, Never>?
+
+    /// Result of resolving one extracted place.
+    private enum ResolveOutcome: Sendable {
+        case resolved(ImportedPlace)
+        case failed(String)
+    }
+
     // MARK: - List Pagination
 
     private var listsCurrentPage: Int = 0
@@ -105,6 +116,7 @@ class GoogleMapsImportViewModel: ObservableObject {
         // Phase 1: Extract place names and coordinates
         do {
             let result = try await importService.extractList(url: cleanURL)
+            guard !Task.isCancelled else { return }
             extractResult = result
             listName = result.listName
 
@@ -113,6 +125,7 @@ class GoogleMapsImportViewModel: ObservableObject {
                 return
             }
         } catch {
+            guard !Task.isCancelled else { return }
             extractResult = nil
             importState = .failed(message: error.localizedDescription)
             return
@@ -122,32 +135,22 @@ class GoogleMapsImportViewModel: ObservableObject {
         await resolvePlaces()
     }
 
-    /// Resolves each extracted place via the backend, updating progress per-place.
+    /// Resolves extracted places with bounded concurrency, keeping input order and reporting "n of total" progress.
     private func resolvePlaces() async {
         guard let places = extractResult?.places, !places.isEmpty else { return }
 
         resolvedPlaces = []
         resolveErrors = []
+        importState = .resolvingPlaces(current: 0, total: places.count)
 
-        for (index, place) in places.enumerated() {
-            importState = .resolvingPlaces(current: index + 1, total: places.count)
+        let outcomes = await resolveConcurrently(places)
+        guard !Task.isCancelled else { return }
 
-            do {
-                let result = try await importService.resolvePlace(
-                    name: place.name,
-                    latitude: place.latitude,
-                    longitude: place.longitude
-                )
-
-                if result.resolved, let resolved = result.place {
-                    resolvedPlaces.append(resolved)
-                } else {
-                    let errorMsg = result.error ?? "Could not resolve: \(place.name ?? "unknown")"
-                    resolveErrors.append(errorMsg)
-                }
-            } catch {
-                let label = place.name ?? "(\(place.latitude), \(place.longitude))"
-                resolveErrors.append("Could not resolve: \(label)")
+        for outcome in outcomes {
+            switch outcome {
+            case .resolved(let place): resolvedPlaces.append(place)
+            case .failed(let message): resolveErrors.append(message)
+            case .none: break
             }
         }
 
@@ -155,6 +158,81 @@ class GoogleMapsImportViewModel: ObservableObject {
             importState = .failed(message: "No places could be resolved from this list.")
         } else {
             importState = .idle
+        }
+    }
+
+    /// Runs resolve requests through a sliding window of `maxConcurrentRequests`, returning outcomes in input order.
+    private func resolveConcurrently(_ places: [ExtractedPlace]) async -> [ResolveOutcome?] {
+        var outcomes = [ResolveOutcome?](repeating: nil, count: places.count)
+        let service = importService
+        var nextIndex = 0
+        var completed = 0
+
+        await withTaskGroup(of: (Int, ResolveOutcome).self) { group in
+            while nextIndex < min(Self.maxConcurrentRequests, places.count) {
+                let index = nextIndex
+                let place = places[index]
+                group.addTask { (index, await Self.resolveOne(place, using: service)) }
+                nextIndex += 1
+            }
+
+            for await (index, outcome) in group {
+                outcomes[index] = outcome
+                completed += 1
+                importState = .resolvingPlaces(current: completed, total: places.count)
+
+                if Task.isCancelled {
+                    group.cancelAll()
+                } else if nextIndex < places.count {
+                    let next = nextIndex
+                    let place = places[next]
+                    group.addTask { (next, await Self.resolveOne(place, using: service)) }
+                    nextIndex += 1
+                }
+            }
+        }
+        return outcomes
+    }
+
+    /// Resolves a single place, mapping any failure into a displayable message.
+    private nonisolated static func resolveOne(_ place: ExtractedPlace, using service: GoogleMapsImportService) async -> ResolveOutcome {
+        do {
+            let result = try await service.resolvePlace(
+                name: place.name, latitude: place.latitude, longitude: place.longitude
+            )
+            if result.resolved, let resolved = result.place {
+                return .resolved(resolved)
+            }
+            return .failed(result.error ?? "Could not resolve: \(place.name ?? "unknown")")
+        } catch {
+            let label = place.name ?? "(\(place.latitude), \(place.longitude))"
+            return .failed("Could not resolve: \(label)")
+        }
+    }
+
+    // MARK: - Task Ownership & Cancellation
+
+    /// Starts the extract-and-resolve flow in a task owned by this view model so it can be cancelled.
+    func startExtraction() {
+        importTask?.cancel()
+        importTask = Task { [weak self] in
+            await self?.extractPlaces()
+        }
+    }
+
+    /// Cancels any in-flight extract/resolve task and returns to a clean idle state if it was mid-flight.
+    func cancelImport() {
+        importTask?.cancel()
+        importTask = nil
+
+        switch importState {
+        case .extracting, .resolvingPlaces:
+            importState = .idle
+            extractResult = nil
+            resolvedPlaces = []
+            resolveErrors = []
+        default:
+            break
         }
     }
 
@@ -200,20 +278,38 @@ class GoogleMapsImportViewModel: ObservableObject {
 
     // MARK: - Shared Add-Places Loop
 
-    /// Adds an array of places to a list one at a time with progress updates.
+    /// Adds places to a list with bounded concurrency (no batch endpoint exists), reporting "n of total" progress.
     private func addPlacesLoop(places: [ImportedPlace], listId: String, userId: String) async {
-        for (index, place) in places.enumerated() {
-            importState = .addingPlaces(current: index + 1, total: places.count)
+        let service = userService
+        var nextIndex = 0
+        var completed = 0
+        importState = .addingPlaces(current: 0, total: places.count)
 
-            do {
-                try await userService.addPlaceToList(
-                    listId: listId,
-                    placeId: place.id,
-                    addedBy: userId
-                )
-            } catch {
-                print("Failed to add place \(place.name) to list: \(error.localizedDescription)")
+        await withTaskGroup(of: Void.self) { group in
+            while nextIndex < min(Self.maxConcurrentRequests, places.count) {
+                let place = places[nextIndex]
+                group.addTask { await Self.addOne(place, listId: listId, userId: userId, using: service) }
+                nextIndex += 1
             }
+
+            for await _ in group {
+                completed += 1
+                importState = .addingPlaces(current: completed, total: places.count)
+                if nextIndex < places.count {
+                    let place = places[nextIndex]
+                    group.addTask { await Self.addOne(place, listId: listId, userId: userId, using: service) }
+                    nextIndex += 1
+                }
+            }
+        }
+    }
+
+    /// Adds one place to a list, logging (not throwing) on failure.
+    private nonisolated static func addOne(_ place: ImportedPlace, listId: String, userId: String, using service: SupabaseUserService) async {
+        do {
+            try await service.addPlaceToList(listId: listId, placeId: place.id, addedBy: userId)
+        } catch {
+            print("Failed to add place \(place.name) to list: \(error.localizedDescription)")
         }
     }
 
@@ -266,6 +362,8 @@ class GoogleMapsImportViewModel: ObservableObject {
 
     /// Resets the import flow back to the initial state.
     func reset() {
+        importTask?.cancel()
+        importTask = nil
         url = ""
         listName = ""
         importState = .idle

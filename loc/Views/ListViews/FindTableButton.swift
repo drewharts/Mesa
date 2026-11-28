@@ -27,5 +27,6 @@ struct FindTableButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Search this list for open tables")
+        .accessibilityIdentifier("list.findTable")
     }
 }

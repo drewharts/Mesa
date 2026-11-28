@@ -45,6 +45,7 @@ struct CreateTripView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     if viewModel.currentStep == .name {
                         Button("Cancel") { dismiss() }
+                            .accessibilityIdentifier("trip.create.cancel")
                     } else if canGoBack {
                         Button("Back") { viewModel.previousStep() }
                     }

@@ -46,6 +46,7 @@ struct PhotoImportTooltip: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("import.photos.tooltip.dismiss")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

@@ -65,6 +65,7 @@ struct SearchHeaderView: View {
                 .font(.body)
                 .foregroundColor(.primary)
                 .focused($isFocused)
+                .accessibilityIdentifier("search.field")
 
             if !searchText.isEmpty {
                 Button {
@@ -89,5 +90,6 @@ struct SearchHeaderView: View {
                 .font(.body)
                 .foregroundColor(.primary)
         }
+        .accessibilityIdentifier("search.cancel")
     }
 }

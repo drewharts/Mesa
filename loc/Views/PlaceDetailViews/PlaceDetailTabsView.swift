@@ -177,6 +177,7 @@ struct PlaceDetailTabsView: View {
                         .background(Color.blue)
                         .cornerRadius(20)
                 }
+                .accessibilityIdentifier("place.detail.createPlace")
             } else {
                 Button(action: handleBookmarkTap) {
                     Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
@@ -184,6 +185,7 @@ struct PlaceDetailTabsView: View {
                         .foregroundColor(.gray)
                         .frame(width: 32, height: 32)
                 }
+                .accessibilityIdentifier("place.detail.save")
 
                 shareButton
             }
@@ -228,6 +230,7 @@ struct PlaceDetailTabsView: View {
             Button(action: viewModel.sharePlace) {
                 shareIcon
             }
+            .accessibilityIdentifier("place.detail.share")
         }
     }
 
@@ -335,6 +338,7 @@ struct PlaceDetailTabsView: View {
                     .background(Color.gray.opacity(0.1))
                     .cornerRadius(16)
             }
+            .accessibilityIdentifier("place.detail.note")
         }
         .padding(.bottom, 10)
     }

@@ -132,6 +132,33 @@ class LoginViewModel: ObservableObject {
         }
     }
 
+    #if DEBUG
+    /// Signs in with email/password for UI tests, then runs the same migration/session path as Google sign-in (compiled out of Release).
+    func signInWithEmailForUITests(email: String, password: String, userSession: UserSession) {
+        Task { @MainActor in
+            do {
+                let session = try await authService.signIn(email: email, password: password)
+                await handleUserMigration(
+                    email: session.user.email ?? email,
+                    supabaseUserId: session.user.id.uuidString,
+                    userSession: userSession
+                )
+            } catch {
+                errorMessage = "Email sign-in failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Disables animations and signs in at launch from UITEST_EMAIL / UITEST_PASSWORD launch environment values, if both are set (compiled out of Release).
+    func signInFromLaunchEnvironmentForUITests(userSession: UserSession) {
+        let env = ProcessInfo.processInfo.environment
+        guard let email = env["UITEST_EMAIL"], !email.isEmpty,
+              let password = env["UITEST_PASSWORD"], !password.isEmpty else { return }
+        UIView.setAnimationsEnabled(false) // keeps XCUITest idle detection from timing out on busy CI simulators
+        signInWithEmailForUITests(email: email, password: password, userSession: userSession)
+    }
+    #endif
+
     private func handleUserMigration(
         email: String?,
         supabaseUserId: String,

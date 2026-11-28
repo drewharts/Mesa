@@ -41,6 +41,7 @@ struct ProfileQuickActionsRow: View {
             .cornerRadius(12)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("import.photos")
         .padding(.horizontal, 20)
     }
 }

@@ -24,7 +24,8 @@ class PhotoImportViewModel: ObservableObject {
     @Published var noLocationDataError: Bool = false
     @Published var shouldNavigateToPlaceDetail: Bool = false
     @Published var createdPlaceForDetail: DetailPlace?
-    @Published var searchRadiusUsed: Int = 50
+    @Published var searchRadiusUsed: Int = 60
+    @Published var hasConfidentPick: Bool = false
     @Published var isSavingPlace: Bool = false
     @Published var isUserCreatedPlace: Bool = false
     @Published var isInPhotoImportFlow: Bool = false
@@ -80,7 +81,7 @@ class PhotoImportViewModel: ObservableObject {
         }
     }
     
-    /// Processes selected photos: loads images, clusters by GPS, and routes to the appropriate flow.
+    /// Processes selected photos: loads images, clusters by GPS and capture time, and routes to the appropriate flow.
     func processSelectedPhotos() async {
         guard !selectedItems.isEmpty else { return }
         isInPhotoImportFlow = true
@@ -115,7 +116,7 @@ class PhotoImportViewModel: ObservableObject {
                 let cluster = clusteringVM.clusters[0]
                 detectedCoordinates = (latitude: cluster.latitude, longitude: cluster.longitude)
                 showPlaceSelection = true
-                await fetchNearbyPlaces(latitude: cluster.latitude, longitude: cluster.longitude)
+                await loadPlacesForSingleCluster(cluster.id)
             } else {
                 // Multiple clusters — show overview
                 showClusterOverview = true
@@ -130,7 +131,7 @@ class PhotoImportViewModel: ObservableObject {
     }
     
     /// Extracts GPS coordinates from EXIF data in a photo. Returns nil if no GPS data found.
-    static func extractGPSCoordinates(from data: Data) -> (latitude: Double, longitude: Double)? {
+    nonisolated static func extractGPSCoordinates(from data: Data) -> (latitude: Double, longitude: Double)? {
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
               let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any],
               let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
@@ -146,64 +147,18 @@ class PhotoImportViewModel: ObservableObject {
         return (latitude: finalLatitude, longitude: finalLongitude)
     }
 
-    private func extractCoordinatesFromPhoto(data: Data, photoIndex: Int) async -> Bool {
-        guard let coords = Self.extractGPSCoordinates(from: data) else {
-            return false
-        }
-
-        detectedCoordinates = coords
-        await fetchNearbyPlaces(latitude: coords.latitude, longitude: coords.longitude)
-        return true
-    }
-    
-    func fetchNearbyPlaces(latitude: Double, longitude: Double) async {
+    /// Fetches and ranks nearby places for the only cluster and publishes them for the selection sheet.
+    private func loadPlacesForSingleCluster(_ clusterId: UUID) async {
         isLoadingNearbyPlaces = true
-        
-        do {
-            // First try with default radius (50m)
-            var response = try await nearbyPlacesService.fetchNearbyPlaces(
-                latitude: latitude,
-                longitude: longitude,
-                radiusMeters: 50
-            )
-            
-            nearbyPlaces = response.features
-
-            // If no places found, try with larger radius (250m)
-            if nearbyPlaces.isEmpty {
-                response = try await nearbyPlacesService.fetchNearbyPlaces(
-                    latitude: latitude,
-                    longitude: longitude,
-                    radiusMeters: 250
-                )
-                
-                nearbyPlaces = response.features
-
-                // If still no places found, try with even larger radius (1000m)
-                if nearbyPlaces.isEmpty {
-                    response = try await nearbyPlacesService.fetchNearbyPlaces(
-                        latitude: latitude,
-                        longitude: longitude,
-                        radiusMeters: 1000
-                    )
-                    
-                    nearbyPlaces = response.features
-
-                    searchRadiusUsed = 1000
-                } else {
-                    searchRadiusUsed = 250
-                }
-            } else {
-                searchRadiusUsed = 50
-            }
-            
-        } catch {
-            print("❌ Failed to fetch nearby places: \(error)")
+        await clusteringVM.fetchNearbyPlacesForCluster(clusterId)
+        if let cluster = clusteringVM.clusters.first(where: { $0.id == clusterId }) {
+            nearbyPlaces = cluster.nearbyPlaces
+            searchRadiusUsed = cluster.searchRadiusUsed
+            hasConfidentPick = cluster.hasConfidentPick
         }
-        
         isLoadingNearbyPlaces = false
     }
-    
+
     func selectPlace(_ place: NearbyPlaceFeature) async {
         selectedPlace = place
         isUserCreatedPlace = false  // Always Google Place in photo import flow
@@ -436,7 +391,8 @@ class PhotoImportViewModel: ObservableObject {
         selectedPlace = nil
         showPlaceSelection = false
         showPostCreation = false
-        searchRadiusUsed = 50
+        searchRadiusUsed = 60
+        hasConfidentPick = false
         resolvedPlace = nil
         isResolvingPlace = false
         photoThumbnail = nil
@@ -457,7 +413,8 @@ class PhotoImportViewModel: ObservableObject {
         noLocationDataError = false
         shouldNavigateToPlaceDetail = false
         createdPlaceForDetail = nil
-        searchRadiusUsed = 50
+        searchRadiusUsed = 60
+        hasConfidentPick = false
         isUserCreatedPlace = false
         isInPhotoImportFlow = false
         resolvedPlace = nil

@@ -68,6 +68,7 @@ struct FeedbackSheet: View {
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(Color(.systemGray4), lineWidth: 1)
                 )
+                .accessibilityIdentifier("feedback.text")
             if feedbackText.isEmpty {
                 Text("What's on your mind?")
                     .foregroundColor(.secondary)
@@ -91,6 +92,7 @@ struct FeedbackSheet: View {
             }
         }
         .disabled(feedbackText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
+        .accessibilityIdentifier("feedback.send")
     }
 
     /// Submits the feedback to the user_feedback table.

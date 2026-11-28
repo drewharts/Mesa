@@ -62,6 +62,7 @@ struct AccountMenuView: View {
         } label: {
             Label("Edit Profile", systemImage: "pencil")
         }
+        .accessibilityIdentifier("settings.editProfile")
     }
 
     /// Opens the feedback submission sheet.
@@ -71,6 +72,7 @@ struct AccountMenuView: View {
         } label: {
             Label("Send Feedback", systemImage: "envelope")
         }
+        .accessibilityIdentifier("settings.feedback")
     }
 
     /// Logs the user out.
@@ -80,6 +82,7 @@ struct AccountMenuView: View {
         } label: {
             Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
         }
+        .accessibilityIdentifier("settings.signOut")
     }
 
     /// Shows the delete account confirmation.
@@ -89,6 +92,7 @@ struct AccountMenuView: View {
         } label: {
             Label("Delete Account", systemImage: "trash")
         }
+        .accessibilityIdentifier("settings.deleteAccount")
     }
 
     /// Gear icon for the menu trigger.
@@ -96,5 +100,6 @@ struct AccountMenuView: View {
         Image(systemName: "gearshape")
             .foregroundColor(.black)
             .font(.body)
+            .accessibilityIdentifier("settings.menu")
     }
 }

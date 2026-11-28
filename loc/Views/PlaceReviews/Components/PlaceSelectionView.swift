@@ -85,6 +85,13 @@ struct PlaceSelectionView: View {
     private var placesList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                if let prompt = viewModel.ambiguityPrompt {
+                    Text(prompt)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 ForEach(viewModel.filteredPlaces) { place in
                     PlaceSelectionRowView(
                         place: place,
@@ -93,7 +100,8 @@ struct PlaceSelectionView: View {
                         ),
                         typeEmoji: viewModel.placeTypeEmoji(for: place),
                         onSelect: { viewModel.selectPlace(place) },
-                        isLoading: viewModel.isPlaceBusy
+                        isLoading: viewModel.isPlaceBusy,
+                        isTopPick: viewModel.isTopPick(place)
                     )
                 }
             }

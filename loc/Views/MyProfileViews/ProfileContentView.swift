@@ -39,6 +39,7 @@ struct ProfileContentView: View {
                                     .font(.title3)
                                     .fontWeight(.bold)
                                     .foregroundColor(.black)
+                                    .accessibilityIdentifier("profile.name")
 
                                 ProfileSocialLinksRow(
                                     instagramUsername: profile.user?.instagramUsername,

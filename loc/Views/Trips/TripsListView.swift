@@ -17,7 +17,7 @@ struct TripsListView: View {
 
     private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
 
-    @State private var navigationPath = NavigationPath()
+    @State private var navigationPath: [String] = []
 
     /// False when the list is the root of the Trips tab (there is nothing to close).
     private let showsCloseButton: Bool
@@ -36,6 +36,15 @@ struct TripsListView: View {
     var body: some View { analyticsBody.analyticsScreen("Trips") }
 
     @ViewBuilder private var analyticsBody: some View {
+        stack.modifier(TripMapExitModifier(
+            path: navigationPath,
+            isActive: isActive,
+            coordinator: mapDisplayCoordinatorVM,
+            viewModel: viewModel
+        ))
+    }
+
+    private var stack: some View {
         NavigationStack(path: $navigationPath) {
             Group {
                 if viewModel.isLoading && viewModel.trips.isEmpty {
@@ -52,11 +61,12 @@ struct TripsListView: View {
                 if showsCloseButton {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Close") { dismiss() }
+                            .accessibilityIdentifier("trip.close")
                     }
                 }
             }
             .navigationDestination(for: String.self) { tripId in
-                TripDetailView(tripId: tripId)
+                TripDetailView(tripId: tripId, isTabActive: isActive)
                     .environmentObject(userSession)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(mapDisplayCoordinatorVM)
@@ -133,6 +143,7 @@ struct TripsListView: View {
                     .foregroundStyle(.white)
                     .clipShape(Capsule())
             }
+            .accessibilityIdentifier("trips.create")
             .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -166,6 +177,7 @@ struct TripsListView: View {
             TripCardView(trip: trip)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("trips.row")
     }
 
     private var pastTripsHeader: some View {

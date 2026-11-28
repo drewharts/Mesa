@@ -1,0 +1,86 @@
+# SwiftLint config for the "hard CI checks" (.github/workflows/checks.yml, job `lint`).
+# Philosophy: opt-in correctness rules only (no style rules), plus custom regex rules for
+# patterns coding agents keep getting wrong. Existing violations are grandfathered in
+# ci/swiftlint-baseline.json, so only NEW violations fail CI.
+# Regenerate the baseline (only when intentionally accepting debt):
+#   swiftlint lint --write-baseline ci/swiftlint-baseline.json
+# SwiftLint version is pinned in checks.yml (baseline hashes are version-sensitive).
+
+included:
+  - loc
+  - MesaShare
+  - ShareExtension
+  - locTests
+  - locUITests
+
+excluded:
+  - "**/build"
+  - "**/.build"
+  - "**/DerivedData"
+  - "**/Preview Content"
+  - "**/SourcePackages"
+
+only_rules:
+  # --- built-in correctness rules (cheap, low false-positive) ---
+  - duplicate_conditions        # same condition in if/else-if chains or switch-like repeats
+  - duplicate_enum_cases        # two cases with the same name in one enum
+  - force_try                   # `try!` crashes at runtime
+  - force_cast                  # `as!` crashes at runtime
+  - invalid_swiftlint_command   # typos in // swiftlint:disable comments
+  - unowned_variable_capture    # [unowned x] in closures -> use weak
+  - class_delegate_protocol     # delegate protocols must be class-bound
+  - legacy_hashing              # hashValue instead of hash(into:)
+  - empty_xctest_method         # XCTest methods with no body = test that never tests anything
+  - private_unit_test           # private test methods are silently never run by XCTest
+  - unused_capture_list         # captured but unused -> usually a copy/paste error
+  - return_value_from_void_function
+  - no_fallthrough_only
+  - override_in_extension
+  - custom_rules                # enables the custom_rules section below
+
+force_try: error
+force_cast: error
+
+custom_rules:
+  # Failure class 2 (concurrency): opts out of the compiler's data-race checking.
+  no_nonisolated_unsafe:
+    name: "nonisolated(unsafe)"
+    regex: 'nonisolated\(unsafe\)'
+    message: "nonisolated(unsafe) silences actor-isolation checking. Isolate the state (@MainActor / actor) instead."
+    severity: error
+
+  # Failure class 2: hides isolation errors from imported modules.
+  no_preconcurrency_import:
+    name: "@preconcurrency import"
+    regex: '@preconcurrency\s+import'
+    message: "@preconcurrency import hides concurrency diagnostics. Fix the isolation instead."
+    severity: error
+
+  # Failure class 2: runtime-asserted isolation instead of compile-time isolation.
+  no_assume_isolated:
+    name: "MainActor.assumeIsolated"
+    regex: 'MainActor\.assumeIsolated'
+    message: "assumeIsolated traps at runtime if wrong. Mark the caller @MainActor or hop with `await MainActor.run`."
+    severity: error
+
+  # Failure class 2: Task.detached drops actor isolation and task-locals. A trailing
+  # `// detached: <reason>` comment on the same line documents why it is needed.
+  task_detached_needs_justification:
+    name: "Task.detached without justification"
+    regex: 'Task\.detached(?![^\n]*//\s*detached:)'
+    message: "Task.detached drops actor isolation. Use Task { } or add a same-line `// detached: <reason>` comment."
+    severity: error
+
+  # Placeholders agents leave behind that compile but crash/ship broken.
+  no_todo_implement_stub:
+    name: "TODO implement stub"
+    regex: 'fatalError\(\s*"TODO|TODO:\s*implement'
+    message: "Unimplemented stub left in code. Implement it or remove it."
+    severity: error
+
+  # Failure class 2: `@unchecked Sendable` bypasses Sendable checking.
+  no_unchecked_sendable:
+    name: "@unchecked Sendable"
+    regex: '@unchecked\s+Sendable'
+    message: "@unchecked Sendable bypasses data-race checking. Prefer a real Sendable conformance or an actor."
+    severity: error

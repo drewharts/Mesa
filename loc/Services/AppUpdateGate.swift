@@ -89,6 +89,7 @@ struct UpdateRequiredView: View {
                 .buttonStyle(.borderedProminent)
                 .padding(.horizontal, 32)
                 .padding(.top, 8)
+                .accessibilityIdentifier("update.open")
             }
         }
     }

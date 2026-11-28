@@ -19,12 +19,15 @@ struct ListActionsMenu: View {
             Button { onAddList() } label: {
                 Label("New List", systemImage: "plus")
             }
+            .accessibilityIdentifier("lists.menu.newList")
             Button { onCreateTrip() } label: {
                 Label("New Trip", systemImage: "airplane")
             }
+            .accessibilityIdentifier("lists.menu.newTrip")
             Button { onImportGoogleMaps() } label: {
                 Label("Import from Google Maps", systemImage: "map")
             }
+            .accessibilityIdentifier("import.googleMaps")
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 14, weight: .semibold))
@@ -37,5 +40,6 @@ struct ListActionsMenu: View {
         }
         .frame(minWidth: 44, minHeight: 44)
         .contentShape(Circle())
+        .accessibilityIdentifier("profile.lists.add")
     }
 }

@@ -25,6 +25,7 @@ struct MapBottomControls: View {
                 accessibilityLabel: "Show my location",
                 action: onRecenterTap
             )
+            .accessibilityIdentifier("map.recenter")
         }
         .padding(.trailing, 16)
         .padding(.bottom, bottomClearance)
@@ -46,5 +47,6 @@ struct MapBottomControls: View {
             MapCircleButtonLabel(systemName: "square.3.layers.3d")
         }
         .accessibilityLabel("Map layers")
+        .accessibilityIdentifier("map.layers")
     }
 }

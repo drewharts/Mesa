@@ -28,6 +28,7 @@ struct EditListSheet: View {
                 Section("Name") {
                     TextField("List name", text: $viewModel.name)
                         .disabled(viewModel.isSaving)
+                        .accessibilityIdentifier("list.edit.name")
                 }
 
                 Section("Description") {
@@ -55,6 +56,7 @@ struct EditListSheet: View {
                         }
                     }
                     .disabled(!viewModel.hasChanges || !viewModel.isNameValid || viewModel.isSaving)
+                    .accessibilityIdentifier("list.edit.save")
                 }
             }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {

@@ -30,6 +30,7 @@ struct ImportHelpView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .accessibilityIdentifier("import.help.done")
                 }
             }
         }

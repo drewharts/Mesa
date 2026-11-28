@@ -1,0 +1,4 @@
+# Tests skipped in CI (passed to xcodebuild as -skip-testing:<identifier>).
+# One identifier per line: locTests/<Class>[/<method>]. Everything after '#' is a comment.
+# EVERY entry needs a reason comment and an owner/plan; quarantine is for tests that fail for
+# reasons unrelated to the change under review. Do not delete the tests themselves.

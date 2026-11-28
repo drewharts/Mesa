@@ -402,6 +402,7 @@ struct MapView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("Places here")
                     }
+                    .accessibilityIdentifier("map.placesHere")
                     .padding(.leading, 20)
                     .padding(.top, 70) // Position below top safe area
                     Spacer()
