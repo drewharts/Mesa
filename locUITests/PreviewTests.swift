@@ -31,6 +31,7 @@ final class PreviewTests: XCTestCase {
     func testPreviewMap() throws {
         let app = launch(scene: "listpeek:\(listId)")
         _ = waitUntilReady(app, scene: "listpeek", markers: ["list.findTable"])
+        retryFailedLoad(in: app, until: "list.findTable")
         sleep(12) // pins load after the list's places
         let recenter = app.buttons["map.recenter"]
         if recenter.exists && recenter.isHittable { recenter.tap(); sleep(2) }
@@ -54,12 +55,14 @@ final class PreviewTests: XCTestCase {
     func testPreviewFindTable() throws {
         let app = launch(scene: "explore")
         _ = waitUntilReady(app, scene: "explore", markers: ["explore.featured"])
+        warmUpTableSearch(in: app)
         let button = app.descendants(matching: .any).matching(identifier: "explore.featured.findTable").firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 30))
-        sleep(4)
+        let listButton = app.buttons["list.findTable"]
+        XCTAssertTrue(button.waitForExistence(timeout: 20) || listButton.exists)
+        sleep(3)
         mark("start", "findtable")
         pause(2.5)
-        button.tap()
+        if button.exists { button.tap() } else { listButton.tap() }
         let search = app.buttons["list.findTable.search"]
         XCTAssertTrue(search.waitForExistence(timeout: 40))
         pause(2.5)
@@ -83,12 +86,8 @@ final class PreviewTests: XCTestCase {
         XCTAssertTrue(pick.waitForExistence(timeout: 60))
         sleep(6) // thumbnails settle
         mark("start", "tonight")
-        pause(3)
-        drag(app, from: (0.5, 0.80), to: (0.5, 0.60))
-        pause(2.5)
-        drag(app, from: (0.5, 0.60), to: (0.5, 0.80))
-        pause(2)
-        if pick.isHittable { pick.tap() }
+        pause(3.5)
+        openPick(in: app)
         pause(4)
         drag(app, from: (0.5, 0.715), to: (0.5, 0.35))
         pause(4)
@@ -184,17 +183,59 @@ final class PreviewTests: XCTestCase {
         sleep(8)
     }
 
-    /// Waits for the search to finish: the status text stops reading as loading and time pills render.
-    private func waitForResults(_ app: XCUIApplication) {
-        sleep(3)
-        let deadline = Date().addingTimeInterval(90)
-        var calm = 0
+    /// Waits for the search to finish: the status line reads "Checked N places ..." (no "of") and nothing says Loading.
+    private func waitForResults(_ app: XCUIApplication, timeout: TimeInterval = 150) {
+        sleep(2)
+        let done = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Checked' AND NOT label CONTAINS ' of '"))
+        let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            calm = isLoading(app) ? 0 : calm + 1
-            if calm >= 3 { break }
+            if done.count > 0 && !isLoading(app) { break }
             sleep(2)
         }
+        sleep(3)
+    }
+
+    /// Runs the table search once before recording so the app's availability cache makes the recorded search instant, then returns to Explore.
+    private func warmUpTableSearch(in app: XCUIApplication) {
+        let button = app.descendants(matching: .any).matching(identifier: "explore.featured.findTable").firstMatch
+        guard button.waitForExistence(timeout: 30) else { return }
+        button.tap()
+        let search = app.buttons["list.findTable.search"]
+        guard search.waitForExistence(timeout: 40) else { return }
         sleep(2)
+        search.tap()
+        waitForResults(app)
+        let showAll = app.buttons["Show all"]
+        if showAll.exists { showAll.tap(); sleep(2) }
+        let back = app.navigationBars.buttons.firstMatch
+        if back.exists && back.isHittable { back.tap() }
+        sleep(4)
+    }
+
+    /// Taps "Try again" until `identifier` appears (or ~60 s pass) when a list or place failed to load.
+    private func retryFailedLoad(in app: XCUIApplication, until identifier: String) {
+        for _ in 0..<12 {
+            if app.descendants(matching: .any).matching(identifier: identifier).firstMatch.exists { return }
+            let retry = app.buttons["Try again"]
+            if retry.exists && retry.isHittable { retry.tap() }
+            sleep(5)
+        }
+    }
+
+    /// Taps the first Tonight pick whose place details load; backs out and tries the next pick if they stay on "Loading".
+    private func openPick(in app: XCUIApplication) {
+        let picks = app.buttons.matching(identifier: "tonight.pick")
+        for index in 0..<min(picks.count, 3) {
+            let pick = picks.element(boundBy: index)
+            guard pick.exists && pick.isHittable else { continue }
+            pick.tap()
+            let loading = app.staticTexts["Loading Place Details..."]
+            let deadline = Date().addingTimeInterval(12)
+            while loading.exists && Date() < deadline { sleep(1) }
+            if !loading.exists { return }
+            let back = app.navigationBars.buttons.firstMatch
+            if back.exists { back.tap(); sleep(2) }
+        }
     }
 
     /// Taps the first list tile whose label matches one of `preferred`; falls back to a tile in the sheet.
