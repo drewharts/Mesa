@@ -42,8 +42,10 @@ final class PreviewTests: XCTestCase {
         pause(1.5)
         drag(app, from: (0.5, 0.75), to: (0.5, 0.55))
         pause(1.5)
+        drag(app, from: (0.5, 0.55), to: (0.5, 0.75)) // back to the top so the preferred tile is on screen
+        pause(1.5)
         mark("cut-begin", "map") // place details load after the tap; that stretch is cut in post
-        openPlace(in: app, preferred: ["Minetta Tavern", "Genki Omakase"])
+        openPlace(in: app, preferred: ["Minetta Tavern", "COTE Flatiron", "Genki Omakase"])
         waitForImages(app)
         drag(app, from: (0.5, 0.715), to: (0.5, 0.25)) // show the place photos
         waitForImages(app)
@@ -62,9 +64,12 @@ final class PreviewTests: XCTestCase {
         sleep(3)
         mark("start", "findtable")
         pause(2.5)
+        mark("cut-begin", "findtable") // the list opens with skeleton tiles; cut until its photos are in
         if button.exists { button.tap() } else { listButton.tap() }
         let search = app.buttons["list.findTable.search"]
         XCTAssertTrue(search.waitForExistence(timeout: 40))
+        waitForImages(app)
+        mark("cut-end", "findtable")
         pause(2.5)
         mark("search", "findtable")
         mark("cut-begin", "findtable") // results stream in with partial tiles; cut until every tile has its photo
@@ -253,13 +258,14 @@ final class PreviewTests: XCTestCase {
         }
     }
 
-    /// Taps the first list tile whose label matches one of `preferred`; falls back to a tile in the sheet.
+    /// Taps the first visible tile whose title starts with one of `preferred` (in order); does nothing when none is on screen.
     private func openPlace(in app: XCUIApplication, preferred: [String]) {
         for name in preferred {
-            let match = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "label CONTAINS %@", name)).element(boundBy: 0)
-            if match.exists && match.isHittable { match.tap(); return }
+            let titles = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", name))
+            for index in 0..<titles.count {
+                let title = titles.element(boundBy: index)
+                if title.isHittable { title.tap(); return }
+            }
         }
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.65)).tap()
     }
 }
