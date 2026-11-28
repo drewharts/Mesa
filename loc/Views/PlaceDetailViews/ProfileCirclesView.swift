@@ -59,9 +59,15 @@ struct ProfileCirclesView: View {
     
     // Helper view for profile image circle
     private func profileCircleImage(image: UIImage) -> some View {
-        Image(uiImage: image)
-            .resizable()
-            .scaledToFill()
+        Group {
+            if ScreenshotPrivacy.isActive {
+                Circle().fill(Color(.systemGray4))
+            } else {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
             .frame(width: 30, height: 30)
             .clipShape(Circle())
             .overlay(

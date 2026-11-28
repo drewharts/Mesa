@@ -42,8 +42,6 @@ final class PreviewTests: XCTestCase {
         pause(2)
         drag(app, from: (0.5, 0.75), to: (0.5, 0.55))
         pause(2)
-        drag(app, from: (0.5, 0.60), to: (0.5, 0.75))
-        pause(2)
         openPlace(in: app, preferred: ["Minetta Tavern", "Genki Omakase"])
         pause(3)
         drag(app, from: (0.5, 0.715), to: (0.5, 0.25)) // show the place photos
@@ -55,7 +53,6 @@ final class PreviewTests: XCTestCase {
     func testPreviewFindTable() throws {
         let app = launch(scene: "explore")
         _ = waitUntilReady(app, scene: "explore", markers: ["explore.featured"])
-        warmUpTableSearch(in: app)
         let button = app.descendants(matching: .any).matching(identifier: "explore.featured.findTable").firstMatch
         let listButton = app.buttons["list.findTable"]
         XCTAssertTrue(button.waitForExistence(timeout: 20) || listButton.exists)
@@ -66,6 +63,7 @@ final class PreviewTests: XCTestCase {
         let search = app.buttons["list.findTable.search"]
         XCTAssertTrue(search.waitForExistence(timeout: 40))
         pause(2.5)
+        mark("search", "findtable") // results stream in for ~25 s after this; the loading stretch can be sped up in post
         search.tap()
         waitForResults(app)
         mark("results", "findtable")
@@ -193,23 +191,6 @@ final class PreviewTests: XCTestCase {
             sleep(2)
         }
         sleep(3)
-    }
-
-    /// Runs the table search once before recording so the app's availability cache makes the recorded search instant, then returns to Explore.
-    private func warmUpTableSearch(in app: XCUIApplication) {
-        let button = app.descendants(matching: .any).matching(identifier: "explore.featured.findTable").firstMatch
-        guard button.waitForExistence(timeout: 30) else { return }
-        button.tap()
-        let search = app.buttons["list.findTable.search"]
-        guard search.waitForExistence(timeout: 40) else { return }
-        sleep(2)
-        search.tap()
-        waitForResults(app)
-        let showAll = app.buttons["Show all"]
-        if showAll.exists { showAll.tap(); sleep(2) }
-        let back = app.navigationBars.buttons.firstMatch
-        if back.exists && back.isHittable { back.tap() }
-        sleep(4)
     }
 
     /// Taps "Try again" until `identifier` appears (or ~60 s pass) when a list or place failed to load.
