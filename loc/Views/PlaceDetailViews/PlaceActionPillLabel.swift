@@ -11,17 +11,21 @@ struct PlaceActionPillLabel: View {
     let icon: String
     let text: String
     var isProminent: Bool = false
+    /// Hides the text (keeping it for accessibility) so the pill is a compact icon button.
+    var iconOnly: Bool = false
 
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
-            Text(text)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .medium))
+            if !iconOnly {
+                Text(text)
+                    .font(.system(size: 12, weight: .semibold))
+            }
         }
         .foregroundColor(isProminent ? .white : .primary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .frame(height: 30)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(isProminent ? Color.blue : Color(.systemGray6))
@@ -30,5 +34,7 @@ struct PlaceActionPillLabel: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color(.systemGray4), lineWidth: isProminent ? 0 : 0.5)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }

@@ -21,7 +21,8 @@ class SearchCoordinatorViewModel {
     private weak var userSession: UserSession?
 
     // MARK: - Constants (Computed, not stored)
-    var minSheetHeight: CGFloat { 250 }
+    /// Peek detent for place detail: grabber + title + meta line + the full 112pt photo strip + safe area.
+    var minSheetHeight: CGFloat { 240 }
     var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.85 }
 
     // MARK: - Initialization

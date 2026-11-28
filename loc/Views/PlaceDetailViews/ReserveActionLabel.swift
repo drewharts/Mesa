@@ -10,17 +10,17 @@ import SwiftUI
 struct ReserveActionLabel: View {
     let link: ReservationLink
 
-    private let logoHeight: CGFloat = 18
+    private let logoHeight: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 6) {
             icon
             Text(link.buttonLabelText)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
         }
         .foregroundColor(.primary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .frame(height: 30)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(.systemGray6))

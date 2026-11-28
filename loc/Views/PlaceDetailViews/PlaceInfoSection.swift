@@ -35,14 +35,14 @@ struct PlaceInfoSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             ratingRow
             if let summaryText {
                 Text(summaryText)
                     .font(.footnote)
                     .foregroundColor(.black)
-                    .lineLimit(3)
-                    .lineSpacing(1)
+                    .lineLimit(2)
+                    .lineSpacing(0)
                     .fixedSize(horizontal: false, vertical: true)
             }
             actionRow
@@ -62,14 +62,14 @@ struct PlaceInfoSection: View {
                 Image("GoogleLogo")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 14)
+                    .frame(height: 12)
                 Text(String(format: "%.1f", rating))
-                    .font(.subheadline)
+                    .font(.footnote)
                     .fontWeight(.semibold)
                     .foregroundColor(.black)
                 if let count = place.userRatingsTotal, count > 0 {
-                    Text("(\(count.formatted()) reviews)")
-                        .font(.subheadline)
+                    Text("(\(count.formatted()))")
+                        .font(.footnote)
                         .foregroundColor(.gray)
                 }
                 refreshButton
@@ -99,7 +99,7 @@ struct PlaceInfoSection: View {
     /// Horizontally scrolling row: Reserve, Menu, Website, Call, Review, Note.
     private var actionRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 reserveButton
                 menuButton
                 websiteButton
@@ -184,7 +184,7 @@ struct PlaceInfoSection: View {
     private var noteButton: some View {
         if let onNoteTapped {
             Button(action: onNoteTapped) {
-                PlaceActionPillLabel(icon: "note.text", text: "Note")
+                PlaceActionPillLabel(icon: "note.text", text: "Note", iconOnly: true)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("place.detail.note")
