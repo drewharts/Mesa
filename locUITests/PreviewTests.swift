@@ -42,9 +42,12 @@ final class PreviewTests: XCTestCase {
         pause(1.5)
         drag(app, from: (0.5, 0.75), to: (0.5, 0.55))
         pause(1.5)
+        mark("cut-begin", "map") // place details load after the tap; that stretch is cut in post
         openPlace(in: app, preferred: ["Minetta Tavern", "Genki Omakase"])
-        pause(3)
+        waitForImages(app)
         drag(app, from: (0.5, 0.715), to: (0.5, 0.25)) // show the place photos
+        waitForImages(app)
+        mark("cut-end", "map")
         pause(3.5)
         finish("map")
     }
@@ -63,9 +66,12 @@ final class PreviewTests: XCTestCase {
         let search = app.buttons["list.findTable.search"]
         XCTAssertTrue(search.waitForExistence(timeout: 40))
         pause(2.5)
-        mark("search", "findtable") // results stream in for ~25 s after this; the loading stretch can be sped up in post
+        mark("search", "findtable")
+        mark("cut-begin", "findtable") // results stream in with partial tiles; cut until every tile has its photo
         search.tap()
         waitForResults(app)
+        warmResults(app)
+        mark("cut-end", "findtable")
         mark("results", "findtable")
         pause(2.5)
         for _ in 0..<3 {
@@ -82,12 +88,16 @@ final class PreviewTests: XCTestCase {
         _ = waitUntilReady(app, scene: "tonight", markers: [])
         let pick = app.buttons.matching(identifier: "tonight.pick").firstMatch
         XCTAssertTrue(pick.waitForExistence(timeout: 60))
-        sleep(6) // thumbnails settle
+        waitForImages(app)
         mark("start", "tonight")
         pause(3.5)
+        mark("cut-begin", "tonight") // place details load after the tap; that stretch is cut in post
         openPick(in: app)
+        waitForImages(app)
+        mark("cut-end", "tonight")
         pause(4)
         drag(app, from: (0.5, 0.715), to: (0.5, 0.35))
+        waitForImages(app)
         pause(4)
         finish("tonight")
     }
@@ -145,7 +155,7 @@ final class PreviewTests: XCTestCase {
         while Date() < deadline {
             if let value = readiness(in: app) {
                 last = value
-                let ready = value.contains("scene=\(scene)") && value.contains("shimmer=0") && value.contains("pfp=1")
+                let ready = value.contains("scene=\(scene)") && value.contains("shimmer=0") && value.contains("images=1") && value.contains("pfp=1")
                     && hasContent(markers, in: app) && !isLoading(app)
                 idlePolls = ready ? idlePolls + 1 : 0
                 if idlePolls >= 3 { break }
@@ -154,6 +164,30 @@ final class PreviewTests: XCTestCase {
         }
         sleep(4)
         return last
+    }
+
+    /// Waits until the app reports every visible image loaded (images=1) and no loading text shows, for three polls in a row.
+    private func waitForImages(_ app: XCUIApplication, timeout: TimeInterval = 90) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var stable = 0
+        while Date() < deadline {
+            let ok = (readiness(in: app) ?? "").contains("images=1") && !isLoading(app)
+            stable = ok ? stable + 1 : 0
+            if stable >= 3 { return }
+            sleep(1)
+        }
+    }
+
+    /// Scrolls the results down and back up so every row's photo is in the image cache, then waits for images.
+    private func warmResults(_ app: XCUIApplication) {
+        for _ in 0..<4 {
+            drag(app, from: (0.5, 0.78), to: (0.5, 0.40))
+            waitForImages(app, timeout: 30)
+        }
+        for _ in 0..<4 {
+            drag(app, from: (0.5, 0.40), to: (0.5, 0.78))
+        }
+        waitForImages(app, timeout: 30)
     }
 
     /// True when one of the marker identifiers or labels exists (always true when there are none).

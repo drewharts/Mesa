@@ -97,6 +97,7 @@ final class ScreenshotTests: XCTestCase {
             sleep(UInt32(env["SCREENSHOT_SETTLE_SECONDS"] ?? "5") ?? 5)
             if scene.name == "01_map" || scene.name == "03_list" { sleep(12) } // pins load after the list's places
             if scene.name == "01_map" { zoomMap(in: app) }
+            waitForImages(in: app)
             if scene.name == "02_explore" { captureExploreCities(in: app, summary: summary) }
             if scene.name == "04_place" { dragSheetUp(in: app) }
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -116,10 +117,8 @@ final class ScreenshotTests: XCTestCase {
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.80))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
         start.press(forDuration: 0.1, thenDragTo: end)
-        // Slide the city row so the first card (the slowest cover to resolve) is out of frame.
-        let rowStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.83))
-        rowStart.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.83)))
-        sleep(12)
+        sleep(4)
+        waitForImages(in: app)
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "02b_explore_cities"
         shot.lifetime = .keepAlways
@@ -142,7 +141,20 @@ final class ScreenshotTests: XCTestCase {
     private func dragSheetUp(in app: XCUIApplication) {
         let handle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.715))
         handle.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
-        sleep(8)
+        sleep(3)
+        waitForImages(in: app)
+    }
+
+    /// Waits until the app reports every visible image loaded (images=1), for three polls in a row.
+    private func waitForImages(in app: XCUIApplication, timeout: TimeInterval = 90) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var stable = 0
+        while Date() < deadline {
+            let ok = (readiness(in: app) ?? "").contains("images=1") && !isLoading(app)
+            stable = ok ? stable + 1 : 0
+            if stable >= 3 { return }
+            sleep(1)
+        }
     }
 
     /// Reads the app's hidden readiness value ("scene=..;shimmer=..;pfp=..;note=..").
@@ -165,7 +177,7 @@ final class ScreenshotTests: XCTestCase {
             if let value = readiness(in: app) {
                 last = value
                 let opened = value.contains("scene=\(scene.launch.split(separator: ":").first ?? "")")
-                let ready = opened && value.contains("shimmer=0") && value.contains("pfp=1") && hasContent(scene, in: app) && !isLoading(app)
+                let ready = opened && value.contains("shimmer=0") && value.contains("images=1") && value.contains("pfp=1") && hasContent(scene, in: app) && !isLoading(app)
                 idlePolls = ready ? idlePolls + 1 : 0
                 if idlePolls >= 3 { return last }
             }

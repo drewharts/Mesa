@@ -12,8 +12,17 @@ enum ImageLoadingUtility {
     /// Stored / permanent URLs first; Google CDN and Places photo links last since they often expire.
     static func rankedPhotoURLs(_ urls: [String]) -> [String] {
         var seen = Set<String>()
-        let clean = urls.filter { !$0.isEmpty && !$0.contains("firebasestorage.googleapis.com") && seen.insert($0).inserted }
+        let clean = urls.filter { !$0.isEmpty && !isKnownDeadInScreenshots($0) && !$0.contains("firebasestorage.googleapis.com") && seen.insert($0).inserted }
         return clean.filter { !isTransientGoogleURL($0) } + clean.filter { isTransientGoogleURL($0) }
+    }
+
+    /// Screenshot mode skips Google Places photo-API thumbnails (stale photo_reference links that never load).
+    private static func isKnownDeadInScreenshots(_ url: String) -> Bool {
+        #if DEBUG
+        return ScreenshotPrivacy.isActive && url.contains("maps.googleapis.com/maps/api/place/photo")
+        #else
+        return false
+        #endif
     }
 
     /// Returns true for Google photo links that commonly expire or require a live API key.

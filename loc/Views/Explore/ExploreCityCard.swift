@@ -26,6 +26,7 @@ struct ExploreCityCard: View {
                 label
             }
             .frame(width: 150, height: 96)
+            .screenshotTileEmpty(photoURLs.isEmpty)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
         }

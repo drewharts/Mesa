@@ -35,6 +35,8 @@ struct PlacePhotoCollage: View {
                 ShimmerView().transition(.opacity)
             }
         }
+        .screenshotImagePending(viewModel.resolved == nil && !photoURLs.isEmpty && !viewModel.unresolvable)
+        .screenshotTileEmpty(viewModel.resolved == nil && (photoURLs.isEmpty || viewModel.unresolvable))
         .task(id: photoURLs) { await viewModel.update(candidates: photoURLs) }
     }
 

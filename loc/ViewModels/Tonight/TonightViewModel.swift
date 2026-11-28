@@ -44,6 +44,10 @@ final class TonightViewModel: ObservableObject {
     /// Page 0 is the default top 3; later pages are the next best candidates, 3 at a time.
     private var pages: [[TonightPick]] = []
     private var pageIndex = 0
+    #if DEBUG
+    /// Screenshot mode: place ids (details keys) whose thumbnail could not be loaded; they are never ranked.
+    var screenshotRejectedPlaceIds: Set<String> = []
+    #endif
 
     init(
         userSession: UserSession,
@@ -168,6 +172,9 @@ final class TonightViewModel: ObservableObject {
         }
         details = first.merging(await restLoad) { a, _ in a }
         rerank(reportAnalytics: true)
+        #if DEBUG
+        await verifyScreenshotThumbnails()
+        #endif
         Self.cache = (userId, candidates, details, friendNames, origin, Date())
         Analytics.track(.tonightLoaded, [
             "ms": Int(Date().timeIntervalSince(started) * 1000),
@@ -175,6 +182,14 @@ final class TonightViewModel: ObservableObject {
             "details": details.count,
             "from_cache": cached != nil
         ])
+    }
+
+    /// Details the ranker may use (screenshot mode drops places whose thumbnail failed to load).
+    private var rankableDetails: [String: DetailPlace] {
+        #if DEBUG
+        if ScreenshotPrivacy.isActive { return details.filter { !screenshotRejectedPlaceIds.contains($0.key) } }
+        #endif
+        return details
     }
 
     /// Last Tonight load, so reopening the sheet is instant.
@@ -193,6 +208,7 @@ final class TonightViewModel: ObservableObject {
     private func rerank(reportAnalytics: Bool) {
         guard let userId = userSession.currentUserId else { return }
         let ranker = TonightRanker(vibe: vibe, origin: origin, currentUserId: userId, friendNames: friendNames)
+        let details = rankableDetails
         let picks = ranker.rank(candidates: candidates, places: details)
         // Default stays the top 3; extra pages come from a wider ranking, minus what's already shown.
         let shown = Set(picks.map(\.placeId))
@@ -344,3 +360,35 @@ extension TonightViewModel {
         }
     }
 }
+
+#if DEBUG
+extension TonightViewModel {
+    /// Screenshot mode: loads the top picks' thumbnails up front, drops places whose photo is missing or dead, and re-ranks.
+    fileprivate func verifyScreenshotThumbnails() async {
+        guard ScreenshotPrivacy.isActive, let userId = userSession.currentUserId else { return }
+        ScreenshotReadiness.shared.beginJob()
+        defer { ScreenshotReadiness.shared.endJob() }
+        let ranker = TonightRanker(vibe: vibe, origin: origin, currentUserId: userId, friendNames: friendNames)
+        let wide = ranker.rank(candidates: candidates, places: details, limit: 40)
+        let rejected = await withTaskGroup(of: String?.self, returning: Set<String>.self) { group in
+            for pick in wide {
+                let id = pick.placeId.lowercased()
+                let url = TonightPlaceThumbnail.storedPhotoURL(for: pick.place)
+                group.addTask { await Self.thumbnailLoads(url) ? nil : id }
+            }
+            var out = Set<String>()
+            for await id in group { if let id { out.insert(id) } }
+            return out
+        }
+        screenshotRejectedPlaceIds.formUnion(rejected)
+        rerank(reportAnalytics: false)
+    }
+
+    /// True when the place has a stored photo that loads at the thumbnail size (leaving it in the image cache).
+    nonisolated private static func thumbnailLoads(_ url: URL?) async -> Bool {
+        guard let url else { return false }
+        let size = await TonightPlaceThumbnail.requestSize(72)
+        return await ImageCacheService.shared.fetchImage(for: url, targetSize: size) != nil
+    }
+}
+#endif

@@ -10,6 +10,7 @@ struct CachedAsyncImage<Placeholder: View>: View {
     let fadeInDuration: Double
 
     @State private var loadedImage: UIImage?
+    @State private var didFail = false
 
     /// Creates the image view; `onFailure` (last, so trailing-closure placeholders keep working) fires when the URL can't be loaded.
     init(
@@ -39,6 +40,7 @@ struct CachedAsyncImage<Placeholder: View>: View {
                     .transition(.opacity)
             }
         }
+        .screenshotImagePending(url != nil && loadedImage == nil && !didFail)
         .task(id: url) {
             await loadImage()
         }
@@ -46,6 +48,7 @@ struct CachedAsyncImage<Placeholder: View>: View {
 
     /// Loads image via ImageCacheService (cache -> deduplicated fetch -> downsample -> cache), reporting non-cancelled failures.
     private func loadImage() async {
+        didFail = false
         guard let imageURL = url else { loadedImage = nil; return }
         if let cached = ImageCacheService.shared.memoryImage(for: imageURL, targetSize: targetSize) {
             loadedImage = cached
@@ -59,6 +62,10 @@ struct CachedAsyncImage<Placeholder: View>: View {
             loadedImage = fetched
         }
         if loadedImage == nil && !Task.isCancelled {
+            didFail = true
+            #if DEBUG
+            ScreenshotReadiness.shared.imageFailed()
+            #endif
             onFailure?()
         }
     }

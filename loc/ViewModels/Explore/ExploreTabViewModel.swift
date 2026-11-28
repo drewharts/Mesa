@@ -50,6 +50,10 @@ final class ExploreTabViewModel: ObservableObject {
     private var ownerCache: [String: ExploreListOwner] = [:]
     private var rankedLocation: CLLocation?
     private var cityCoverListIds: [String: [String]] = [:]
+    #if DEBUG
+    /// Screenshot mode: verified, loadable city cover photos (replace the raw candidates, which may be dead links).
+    private var screenshotCityPhotos: [String: [String]] = [:]
+    #endif
     private let listsCache = ExploreDiskCache<ExploreListsSnapshot>(fileName: "ExploreLists.json")
 
     /// True once lists finished loading and nothing public was found.
@@ -59,6 +63,12 @@ final class ExploreTabViewModel: ObservableObject {
 
     /// Loads lists, cities, and people suggestions; each section publishes as soon as it is ready.
     func load(userId: String, location: CLLocation?) async {
+        #if DEBUG
+        if ScreenshotPrivacy.isActive {
+            ScreenshotReadiness.shared.beginJob()
+        }
+        defer { if ScreenshotPrivacy.isActive { ScreenshotReadiness.shared.endJob() } }
+        #endif
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.primeFromDisk() }
             group.addTask { await self.loadFeatured() }
@@ -117,6 +127,9 @@ final class ExploreTabViewModel: ObservableObject {
             group.addTask { await self.attachOwners() }
             group.addTask { await self.loadCoverPhotos() }
         }
+        #if DEBUG
+        await verifyScreenshotCovers()
+        #endif
         persistCovers()
     }
 
@@ -137,8 +150,25 @@ final class ExploreTabViewModel: ObservableObject {
         popularTitle = nearby.isEmpty ? "Popular on Mesa" : "Popular near you"
         let candidates = nearby.isEmpty ? pool : nearby
         popularLists = Array(
-            ExploreListRanker.sorted(candidates, by: .popular, followedOwnerIds: followedIds).prefix(popularCount)
+            ExploreListRanker.sorted(candidates, by: .popular, followedOwnerIds: followedIds)
+                .filter(isPopularCandidate).prefix(popularLimit)
         )
+    }
+
+    /// Screenshot mode hides lists named after other people (e.g. a friend's nickname); always true otherwise.
+    private func isPopularCandidate(_ list: ExploreList) -> Bool {
+        #if DEBUG
+        if ScreenshotPrivacy.isActive { return !list.name.localizedCaseInsensitiveContains("finn") }
+        #endif
+        return true
+    }
+
+    /// How many popular lists to rank; screenshot mode ranks extra so lists without loadable photos can be dropped.
+    private var popularLimit: Int {
+        #if DEBUG
+        if ScreenshotPrivacy.isActive { return popularCount * 2 }
+        #endif
+        return popularCount
     }
 
     /// Fills in owner names and photos for the popular lists with one batched lookup.
@@ -171,6 +201,9 @@ final class ExploreTabViewModel: ObservableObject {
     /// Returns background photo candidates for a city: its top-ranked lists' place photos in order, so the
     /// card can fall through dead or expired links to the next photo.
     func photoURLs(for city: ExploreCity) -> [String] {
+        #if DEBUG
+        if ScreenshotPrivacy.isActive { return screenshotCityPhotos[city.key] ?? [] }
+        #endif
         let urls = (cityCoverListIds[city.key] ?? []).flatMap { coverPhotos[$0] ?? [] }
         var seen = Set<String>()
         return urls.filter { seen.insert($0).inserted }
@@ -307,3 +340,56 @@ final class ExploreTabViewModel: ObservableObject {
         return result
     }
 }
+
+#if DEBUG
+extension ExploreTabViewModel {
+    /// Screenshot mode: loads every cover the page will draw, keeps only loadable photos, and drops lists and cities with none.
+    fileprivate func verifyScreenshotCovers() async {
+        guard ScreenshotPrivacy.isActive else { return }
+        ScreenshotReadiness.shared.beginJob()
+        defer { ScreenshotReadiness.shared.endJob() }
+        async let popular = verifiedCovers(for: popularLists.map(\.id), frame: ExploreCoverMetrics.card)
+        async let cityPhotos = verifiedCityPhotos()
+        let (pop, city) = await (popular, cityPhotos)
+        coverPhotos.merge(pop.filter { !$0.value.isEmpty }) { _, new in new }
+        popularLists = Array(popularLists.filter { !(pop[$0.id] ?? []).isEmpty }.prefix(popularCount))
+        screenshotCityPhotos = city
+        cities = cities.filter { !(city[$0.key] ?? []).isEmpty }
+    }
+
+    /// Returns each list's loadable cover photos, verified at the size a grid collage draws them.
+    private func verifiedCovers(for ids: [String], frame: CGSize) async -> [String: [String]] {
+        let covers = coverPhotos
+        return await withTaskGroup(of: (String, [String]).self, returning: [String: [String]].self) { group in
+            for id in ids {
+                let urls = covers[id] ?? []
+                group.addTask { (id, await ScreenshotCoverVerifier.verifiedCover(urls, frame: frame, allowsGrid: true)) }
+            }
+            var out: [String: [String]] = [:]
+            for await (id, urls) in group { out[id] = urls }
+            return out
+        }
+    }
+
+    /// Returns up to two loadable photos per city (walking its lists in rank order), verified at the city tile size.
+    private func verifiedCityPhotos() async -> [String: [String]] {
+        let covers = coverPhotos
+        let listIds = cityCoverListIds
+        let frame = ExploreCoverMetrics.city
+        return await withTaskGroup(of: (String, [String]).self, returning: [String: [String]].self) { group in
+            for (key, ids) in listIds {
+                group.addTask {
+                    var found: [String] = []
+                    for id in ids where found.count < 2 {
+                        found += await ScreenshotCoverVerifier.firstLoadable(covers[id] ?? [], frame: frame, limit: 1)
+                    }
+                    return (key, found)
+                }
+            }
+            var out: [String: [String]] = [:]
+            for await (key, urls) in group { out[key] = urls }
+            return out
+        }
+    }
+}
+#endif
