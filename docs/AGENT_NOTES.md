@@ -2,6 +2,17 @@
 
 Newest entries first. Skimmable on purpose: decisions, how to use, open items.
 
+## 2026-11-27 - App Store preview videos (feature/appstore-shots)
+
+`.github/workflows/previews.yml` (iPhone 17 Pro Max only) records `locUITests/PreviewTests` (`testPreviewMap`, `testPreviewFindTable`,
+`testPreviewTonight`) with `simctl io recordVideo`. Trigger: push to `feature/appstore-shots` whose head commit message contains the tag
+"previews" in square brackets (screenshots.yml skips those pushes), or workflow_dispatch. Same secrets as screenshots (`MESA_DEMO_EMAIL`,
+`MESA_DEMO_PASSWORD`, `GMS_API_KEY`). Artifact `previews-raw`: `<name>.mov`, `<name>.marks.txt` (`record_start` epoch plus
+`PREVIEW_MARK start|end|...` epochs; trim window = mark minus record_start, accurate to about 1-2 s), xcodebuild logs. Each recording
+also holds the app launch/sign-in dead time, so always trim. Find-a-table results stream in for ~18 s (marks `search` and `results`
+bracket it); speed that stretch up in post. Privacy: place "saved by" avatars are now greyed in screenshot mode
+(`PlaceDetailTabsView.SavedByIndicator`). Added `tonight.pick` accessibility id on `TonightPickCard`.
+
 ## 2026-11-27 - App Store screenshot pipeline (feature/appstore-shots)
 
 `.github/workflows/screenshots.yml` builds Debug for two simulators (iPhone 17 Pro Max "6.9", iPhone 11 Pro Max "6.5"; the 11 Pro Max
